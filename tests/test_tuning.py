@@ -96,6 +96,7 @@ def hyperparams_for_tuning():
     return default_hyperparams, lightgbm_params
 
 
+@pytest.mark.arm64_incompatible
 @patch("multicalibration.tuning.normalized_entropy")
 def test_tune_mcboost_params_with_weights(
     mock_normalized_entropy,
@@ -133,6 +134,7 @@ def test_tune_mcboost_params_with_weights(
         assert call[1]["sample_weight"] is not None
 
 
+@pytest.mark.arm64_incompatible
 @patch("multicalibration.tuning.normalized_entropy")
 def test_tune_mcboost_params_without_weights(
     mock_normalized_entropy,
@@ -169,6 +171,7 @@ def test_tune_mcboost_params_without_weights(
         assert call[1]["sample_weight"] is None
 
 
+@pytest.mark.arm64_incompatible
 @patch("multicalibration.tuning.normalized_entropy")
 def test_tune_mcboost_params_default_parameters(
     mock_normalized_entropy,
@@ -198,6 +201,7 @@ def test_tune_mcboost_params_default_parameters(
         assert call[1]["numerical_feature_column_names"] is None
 
 
+@pytest.mark.arm64_incompatible
 @patch("multicalibration.tuning.normalized_entropy")
 def test_tune_mcboost_params_ax_client_setup(
     mock_normalized_entropy,
@@ -223,6 +227,7 @@ def test_tune_mcboost_params_ax_client_setup(
     assert mock_mcboost_model.fit.call_count >= 2
 
 
+@pytest.mark.arm64_incompatible
 @patch("multicalibration.tuning.normalized_entropy")
 @patch("multicalibration.tuning.train_test_split")
 def test_tune_mcboost_params_data_splitting(
@@ -257,6 +262,7 @@ def test_tune_mcboost_params_data_splitting(
     assert call_args[1]["random_state"] == 42
 
 
+@pytest.mark.arm64_incompatible
 @patch("multicalibration.tuning.normalized_entropy")
 def test_tune_mcboost_params_with_subset_of_parameters(
     mock_normalized_entropy,
@@ -326,6 +332,7 @@ def test_mcboost_and_lightgbm_default_hyperparams_are_within_bounds_for_tuning(
                 ), f"Default {param_name} ({default_value}) should be a float"
 
 
+@pytest.mark.arm64_incompatible
 def test_warm_starting_trials_produces_the_right_number_of_sobol_and_bayesian_trials(
     rng,
 ):
@@ -881,6 +888,7 @@ def test_aggregate_metrics_and_add_parameters_works_properly():
     assert "context" in result.columns
 
 
+@pytest.mark.arm64_incompatible
 def test_non_default_parameters_preserved_when_not_in_tuning_configurations(
     sample_data,
 ):
@@ -1043,6 +1051,7 @@ def test_set_up_cv_custom_parameter_space_doesnt_raise_errors():
         assert 1 <= params["param2"] < 10
 
 
+@pytest.mark.arm64_incompatible
 @patch("multicalibration.tuning.normalized_entropy")
 @patch("multicalibration.tuning.train_test_split")
 def test_tune_mcboost_params_with_explicit_validation_set(
@@ -1081,6 +1090,7 @@ def test_tune_mcboost_params_with_explicit_validation_set(
         assert call.kwargs["df"] is sample_val_data
 
 
+@pytest.mark.arm64_incompatible
 @patch("multicalibration.tuning.normalized_entropy")
 @patch("multicalibration.tuning.train_test_split")
 def test_tune_mcboost_params_fallback_to_train_test_split(
@@ -1165,6 +1175,7 @@ def test_parameter_raises_when_no_segment_columns_specified(rng):
         )
 
 
+@pytest.mark.arm64_incompatible
 def test_that_parameter_tuning_return_shape_correct(rng):
     n = 100
     predictions = rng.uniform(low=0.0, high=1.0, size=n)
@@ -1209,6 +1220,7 @@ def test_that_parameter_tuning_return_shape_correct(rng):
     assert len(cv_results) >= n_parameter_samples
 
 
+@pytest.mark.arm64_incompatible
 def test_that_parameter_tuning_can_continue_from_previous_run(tmp_path, rng):
     n = 100
     predictions = rng.uniform(low=0.0, high=1.0, size=n)
