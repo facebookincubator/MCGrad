@@ -19,7 +19,8 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from multicalibration import utils
-from multicalibration.mcnet import CoreMCNet
+
+# from multicalibration.mcnet import CoreMCNet  # mcnet.py not included in this release
 from multicalibration.metrics import ScoreFunctionInterface, wrap_sklearn_metric_func
 from numpy import typing as npt
 from sklearn import isotonic, metrics as skmetrics
