@@ -1,0 +1,2186 @@
+# (c) Meta Platforms, Inc. and affiliates. Confidential and proprietary.
+
+# pyre-unsafe
+
+
+from unittest.mock import Mock
+
+import numpy as np
+
+import pandas as pd
+import pytest
+import scipy
+import sklearn.metrics as skmetrics
+
+from multicalibration import methods
+from multicalibration.metrics import (
+    wrap_multicalibration_error_metric,
+    wrap_sklearn_metric_func,
+)
+from multicalibration.regression import methods as regression_methods
+
+
+@pytest.fixture
+def rng():
+    return np.random.RandomState(42)
+
+
+def generate_test_data(n):
+    return pd.DataFrame(
+        {
+            "City": np.array(["Paris", "Tokyo", "Amsterdam", "Paris", "Amsterdam"])[:n],
+            "Gender": np.array(["Male", "Female", "Male", "Female", "Male"])[:n],
+            "Prediction": np.array([0.1, 0.2, 0.3, 0.4, 0.5])[:n],
+            "Label": np.array([0, 1, 0, 1, 0])[:n],
+        }
+    )
+
+
+@pytest.mark.parametrize("num_rounds", [(1), (2), (6), (10), (16)])
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+@pytest.mark.parametrize(
+    "calibrator_kwargs",
+    [
+        {
+            "early_stopping": False,
+            "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+        },
+        {
+            "early_stopping": True,
+            "early_stopping_use_crossvalidation": True,
+            "n_folds": 2,
+            "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+        },
+    ],
+)
+def test_deserialized_mcboost_fits_correct_num_rounds_when_no_early_stopping(
+    num_rounds, calibrator_class, calibrator_kwargs
+):
+    df_train = generate_test_data(5)
+    model = calibrator_class(
+        num_rounds=num_rounds,
+        **calibrator_kwargs,
+    )
+    model.fit(
+        df_train=df_train,
+        prediction_column_name="Prediction",
+        label_column_name="Label",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+    if calibrator_kwargs["early_stopping"]:
+        assert len(model.mr) <= num_rounds
+    else:
+        assert len(model.mr) == num_rounds
+    serialized = model.serialize()
+    deserialized = calibrator_class.deserialize(serialized)
+    if calibrator_kwargs["early_stopping"]:
+        assert len(deserialized.mr) <= num_rounds
+    else:
+        assert len(deserialized.mr) == num_rounds
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+@pytest.mark.parametrize(
+    "calibrator_kwargs",
+    [
+        # Pass MCBoost params that minimize test runtime
+        {
+            "num_rounds": 2,
+            "early_stopping": False,
+            "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+        },
+        {
+            "num_rounds": 2,
+            "early_stopping": True,
+            "early_stopping_use_crossvalidation": True,
+            "n_folds": 2,  # More than 2 folds would require more input data
+            # Pass MCBoost params that minimize test runtime
+            "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+        },
+    ],
+)
+def test_mcboost_serialize_deserialize_encode_categorical(
+    calibrator_class, calibrator_kwargs
+):
+    df_train = generate_test_data(5)
+    model = calibrator_class(**calibrator_kwargs)
+    model.fit(
+        df_train=df_train,
+        prediction_column_name="Prediction",
+        label_column_name="Label",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+    serialized = model.serialize()
+
+    deserialized = calibrator_class.deserialize(serialized)
+
+    df_test = generate_test_data(3)
+    original_scores = model.predict(
+        df=df_test,
+        prediction_column_name="Prediction",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+    deserialized_scores = deserialized.predict(
+        df=df_test,
+        prediction_column_name="Prediction",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+
+    # Deserialized model should have an encoder and should be configured to use one
+    assert hasattr(deserialized, "enc")
+    assert deserialized.encode_categorical_variables
+    # Deserialized model and original model should give the same results
+    np.testing.assert_array_equal(deserialized_scores, original_scores)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+@pytest.mark.parametrize(
+    "calibrator_kwargs",
+    [
+        # Pass MCBoost params that minimize test runtime
+        {
+            "num_rounds": 2,
+            "early_stopping": False,
+            "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+        },
+        {
+            "num_rounds": 2,
+            "early_stopping": True,
+            "early_stopping_use_crossvalidation": True,
+            "n_folds": 2,  # More than 2 folds would require more input data
+            # Pass MCBoost params that minimize test runtime
+            "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+        },
+    ],
+)
+def test_mcboost_serialize_deserialize_no_encode_categorical(
+    calibrator_class, calibrator_kwargs
+):
+    df_train = generate_test_data(5)
+    city_codebook = {"Paris": 0, "Tokyo": 1, "Amsterdam": 2, "Copenhagen": 3}
+    gender_codebook = {
+        "Male": 0,
+        "Female": 1,
+    }
+    df_train["City"] = df_train["City"].apply(lambda x: city_codebook[x])
+    df_train["Gender"] = df_train["Gender"].apply(lambda x: gender_codebook[x])
+
+    calibrator_kwargs = calibrator_kwargs.copy()
+    calibrator_kwargs["encode_categorical_variables"] = False
+    model = calibrator_class(**calibrator_kwargs)
+    model.fit(
+        df_train=df_train,
+        prediction_column_name="Prediction",
+        label_column_name="Label",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+    serialized = model.serialize()
+
+    deserialized = calibrator_class.deserialize(serialized)
+
+    df_test = generate_test_data(3)
+    df_test["City"] = df_test["City"].apply(lambda x: city_codebook[x])
+    df_test["Gender"] = df_test["Gender"].apply(lambda x: gender_codebook[x])
+    original_scores = model.predict(
+        df=df_test,
+        prediction_column_name="Prediction",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+    deserialized_scores = deserialized.predict(
+        df=df_test,
+        prediction_column_name="Prediction",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+    # Deserialized model should not have an encoder
+    assert deserialized.enc is None
+    assert not deserialized.encode_categorical_variables
+    # Deserialized model and original model should give the same results
+    np.testing.assert_array_equal(deserialized_scores, original_scores)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+@pytest.mark.parametrize("max_num_rounds", [(1), (2), (6), (10), (16)])
+def test_deserialized_mcboost_has_at_most_max_num_rounds(
+    max_num_rounds, calibrator_class
+):
+    df_train = pd.DataFrame(
+        {
+            "City": ["Paris", "Tokyo", "Amsterdam", "Paris", "Amsterdam"],
+            "Gender": ["Male", "Female", "Male", "Female", "Male"],
+            "Prediction": [0.1, 0.2, 0.3, 0.4, 0.5],
+            "Label": [0, 1, 0, 1, 0],
+        }
+    )
+    model = calibrator_class(
+        early_stopping=True,
+        early_stopping_use_crossvalidation=True,
+        num_rounds=max_num_rounds,
+        lightgbm_params={"max_depth": 2, "n_estimators": 2},
+        n_folds=2,
+    )
+    model.fit(
+        df_train=df_train,
+        prediction_column_name="Prediction",
+        label_column_name="Label",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+    assert model.NUM_ROUNDS <= max_num_rounds
+    serialized = model.serialize()
+    deserialized = calibrator_class.deserialize(serialized)
+    assert len(deserialized.mr) == len(model.mr)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class, calibrator_kwargs",
+    [
+        (methods.PlattScaling, {}),
+        (methods.IsotonicRegression, {}),
+        # Pass MCBoost params that minimize test runtime
+        (
+            methods.MCBoost,
+            {"num_rounds": 2, "lightgbm_params": {"max_depth": 2, "n_estimators": 2}},
+        ),
+        (
+            methods.MCBoost,
+            {
+                "num_rounds": 2,
+                "early_stopping": True,
+                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+            },
+        ),
+        (
+            methods.MCBoost,
+            {
+                "num_rounds": 2,
+                "early_stopping": False,
+                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+            },
+        ),
+        (methods.IdentityCalibrator, {}),
+        (methods.MultiplicativeAdjustment, {}),
+        (methods.AdditiveAdjustment, {}),
+        (
+            methods.RegressionMCBoost,
+            {
+                "num_rounds": 2,
+                "early_stopping": True,
+                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+            },
+        ),
+        (
+            methods.RegressionMCBoost,
+            {
+                "num_rounds": 2,
+                "early_stopping": False,
+                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+            },
+        ),
+    ],
+)
+def test_fit_transform_with_train_col_identical_to_fit_then_predict(
+    calibrator_class, calibrator_kwargs, rng
+):
+    df = pd.DataFrame(
+        {
+            "prediction": np.linspace(0, 1, 100),
+            "label": rng.choice([0, 1], 100),
+            "is_train_set": np.concatenate([np.full(50, False), np.full(50, True)]),
+        }
+    )
+    result_fit_transform = calibrator_class(**calibrator_kwargs).fit_transform(
+        df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        is_train_set_col_name="is_train_set",
+    )
+
+    calibrator = calibrator_class(**calibrator_kwargs)
+    calibrator.fit(df[df.is_train_set], "prediction", "label")
+    result_fit_predict = calibrator.predict(df[~df.is_train_set], "prediction")
+
+    assert np.allclose(
+        result_fit_transform[~df.is_train_set], result_fit_predict
+    ), "fit_transform does not give the same result as fit followed by predict"
+
+
+@pytest.mark.parametrize(
+    "calibrator_class, calibrator_kwargs",
+    [
+        (methods.PlattScaling, {}),
+        (methods.IsotonicRegression, {}),
+        # Pass MCBoost params that minimize test runtime
+        (
+            methods.MCBoost,
+            {"num_rounds": 2, "lightgbm_params": {"max_depth": 2, "n_estimators": 2}},
+        ),
+        (
+            methods.MCBoost,
+            {
+                "num_rounds": 2,
+                "early_stopping": True,
+                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+            },
+        ),
+        (
+            methods.MCBoost,
+            {
+                "num_rounds": 2,
+                "early_stopping": False,
+                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+            },
+        ),
+        (methods.IdentityCalibrator, {}),
+        (methods.MultiplicativeAdjustment, {}),
+        (methods.AdditiveAdjustment, {}),
+        (
+            methods.RegressionMCBoost,
+            {
+                "num_rounds": 2,
+                "early_stopping": True,
+                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+            },
+        ),
+        (
+            methods.RegressionMCBoost,
+            {
+                "num_rounds": 2,
+                "early_stopping": False,
+                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+            },
+        ),
+    ],
+)
+def test_fit_transform_no_train_col_identical_to_fit_then_predict(
+    calibrator_class, calibrator_kwargs, rng
+):
+    df = pd.DataFrame(
+        {
+            "prediction": np.linspace(0, 1, 100),
+            "label": rng.choice([0, 1], 100),
+        }
+    )
+    result_fit_transform = calibrator_class(**calibrator_kwargs).fit_transform(
+        df, prediction_column_name="prediction", label_column_name="label"
+    )
+
+    calibrator = calibrator_class(**calibrator_kwargs)
+    calibrator.fit(df, "prediction", "label")
+    result_fit_predict = calibrator.predict(df, "prediction")
+
+    assert np.allclose(
+        result_fit_transform, result_fit_predict
+    ), "fit_transform does not give the same result as fit followed by predict"
+
+
+def test_segmentwise_calibrator_raises_when_incompatible_calibrator_kwargs_are_passed():
+    with pytest.raises(ValueError):
+        methods.SegmentwiseCalibrator(methods.PlattScaling, {"non_existent_arg": 42})
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.PlattScaling,
+        methods.IsotonicRegression,
+        methods.IdentityCalibrator,
+        methods.MultiplicativeAdjustment,
+        methods.AdditiveAdjustment,
+    ],
+)
+def test_segmentwise_calibrator_equivalent_to_calibrator_per_segment(
+    calibrator_class, rng
+):
+    df = pd.DataFrame(index=range(100))
+    df["label"] = rng.choice([0, 1], size=len(df))
+    # Create an 'uncalibrated_score' column that is correlated with 'label'
+    # We thereofre add some random noise to the 'label' values to create the 'uncalibrated_score' values
+    # We use the logistic function to map the scores to the (0, 1) interval
+    noise = rng.normal(0, 0.1, size=len(df))
+    df["uncalibrated_score"] = 1 / (1 + np.exp(-(df["label"] + noise)))
+
+    df["is_train"] = rng.choice([0, 1], size=len(df)).astype(bool)
+    df["segment"] = rng.choice(["A", "B"], size=len(df))
+
+    segmentwise_calibrator = methods.SegmentwiseCalibrator(calibrator_class)
+    df["segmentwise_results"] = segmentwise_calibrator.fit_transform(
+        df,
+        prediction_column_name="uncalibrated_score",
+        label_column_name="label",
+        is_train_set_col_name="is_train",
+        categorical_feature_column_names=["segment"],
+    )
+
+    # Compare to the results per segment individually
+    for segment in ["A", "B"]:
+        segment_df = df[df["segment"] == segment]
+        segment_results = calibrator_class().fit_transform(
+            segment_df,
+            prediction_column_name="uncalibrated_score",
+            label_column_name="label",
+            is_train_set_col_name="is_train",
+        )
+        assert np.allclose(
+            df[df["segment"] == segment]["segmentwise_results"].values, segment_results
+        )
+        assert np.array_equal(
+            df[df["segment"] == segment]["segmentwise_results"].index, segment_df.index
+        )
+
+
+def test_segmentwise_calibrator_with_additive_adjustment_gives_expected_results(rng):
+    df = pd.DataFrame(index=range(1000))
+    df["label"] = rng.choice(range(1000), size=len(df))
+    df["uncalibrated_score"] = rng.choice(range(1000), size=len(df))
+    df["segment_1"] = rng.choice(["A", "B"], size=len(df))
+    df["segment_2"] = rng.choice(["C", "D"], size=len(df))
+
+    segmentwise_calibrator = methods.SegmentwiseCalibrator(
+        methods.AdditiveAdjustment, calibrator_kwargs={"clip_to_zero_one": False}
+    )
+    df["segmentwise_results"] = segmentwise_calibrator.fit_transform(
+        df,
+        prediction_column_name="uncalibrated_score",
+        label_column_name="label",
+        categorical_feature_column_names=["segment_1", "segment_2"],
+    )
+    prediction_means = df.groupby(by=["segment_1", "segment_2"])["uncalibrated_score"]
+    label_means = df.groupby(by=["segment_1", "segment_2"])["label"]
+    df["mean_adjusted"] = df["uncalibrated_score"]
+    for segment_1 in ["A", "B"]:
+        for segment_2 in ["C", "D"]:
+            df.loc[
+                (df.segment_1 == segment_1) & (df.segment_2 == segment_2),
+                "mean_adjusted",
+            ] += (
+                label_means.get_group((segment_1, segment_2)).mean()
+                - prediction_means.get_group((segment_1, segment_2)).mean()
+            )
+
+    assert np.allclose(df["segmentwise_results"].values, df["mean_adjusted"].values)
+
+
+@pytest.mark.parametrize(
+    "scores, labels, expected_multiplier",
+    [
+        ([0.2, 0.4, 0.6, 0.8], [0, 1, 0, 1], 1),
+        ([0.2, 0.4, 0.6, 0.8], [1, 1, 1, 1], 2),
+        ([0.2, 0.4, 0.6, 0.8], [0, 0, 0, 1], 0.5),
+    ],
+)
+def test_multiplicative_adjustment_gives_expected_result(
+    scores, labels, expected_multiplier
+):
+    df = pd.DataFrame({"prediction": scores, "label": labels})
+    calibrator = methods.MultiplicativeAdjustment(clip_to_zero_one=False)
+    calibrator.fit(df, "prediction", "label")
+
+    # Check that the multiplier is correctly calculated
+    assert calibrator.multiplier == expected_multiplier
+    np.testing.assert_array_equal(
+        calibrator.predict(df, "prediction"),
+        df["prediction"] * expected_multiplier,
+    )
+
+
+@pytest.mark.parametrize(
+    "scores, labels, expected_multiplier, expected_predictions",
+    [
+        ([0.2, 0.4, 0.6, 0.8], [0, 1, 0, 1], 1, [0.2, 0.4, 0.6, 0.8]),
+        ([0.2, 0.4, 0.6, 0.8], [1, 1, 1, 1], 2, [0.4, 0.8, 1.0, 1.0]),
+        ([0.2, 0.4, 0.6, 0.8], [0, 0, 0, 1], 0.5, [0.1, 0.2, 0.3, 0.4]),
+    ],
+)
+def test_multiplicative_adjustment_with_clip_gives_expected_result(
+    scores, labels, expected_multiplier, expected_predictions
+):
+    df = pd.DataFrame({"prediction": scores, "label": labels})
+    calibrator = methods.MultiplicativeAdjustment(clip_to_zero_one=True)
+    calibrator.fit(df, "prediction", "label")
+
+    # Check that the multiplier is correctly calculated
+    assert calibrator.multiplier == expected_multiplier
+    np.testing.assert_allclose(
+        calibrator.predict(df, "prediction"),
+        expected_predictions,
+    )
+
+
+@pytest.mark.parametrize(
+    "scores, labels, expected_offset",
+    [
+        ([0.2, 0.4, 0.6, 0.8], [0, 1, 0, 1], 0),
+        ([0.2, 0.4, 0.6, 0.8], [1, 1, 1, 1], 0.5),
+        ([0.2, 0.4, 0.6, 0.8], [0, 0, 0, 1], -0.25),
+    ],
+)
+def test_additive_adjustment_calibrator_gives_expected_result(
+    scores, labels, expected_offset
+):
+    # Create a simple DataFrame for testing
+    df = pd.DataFrame({"prediction": scores, "label": labels})
+    calibrator = methods.AdditiveAdjustment(clip_to_zero_one=False)
+    calibrator.fit(df, "prediction", "label")
+
+    # Check that the offset is correctly calculated
+    assert calibrator.offset == expected_offset
+    np.testing.assert_array_equal(
+        calibrator.predict(df, "prediction"),
+        df["prediction"] + expected_offset,
+    )
+
+
+@pytest.mark.parametrize(
+    "scores, labels, expected_offset, expected_predictions",
+    [
+        ([0.2, 0.4, 0.6, 0.8], [0, 1, 0, 1], 0, [0.2, 0.4, 0.6, 0.8]),
+        ([0.2, 0.4, 0.6, 0.8], [1, 1, 1, 1], 0.5, [0.7, 0.9, 1.0, 1.0]),
+        ([0.2, 0.4, 0.6, 0.8], [0, 0, 0, 1], -0.25, [0, 0.15, 0.35, 0.55]),
+    ],
+)
+def test_additive_adjustment_calibrator_with_clip_gives_expected_result(
+    scores, labels, expected_offset, expected_predictions
+):
+    # Create a simple DataFrame for testing
+    df = pd.DataFrame({"prediction": scores, "label": labels})
+    calibrator = methods.AdditiveAdjustment(clip_to_zero_one=True)
+    calibrator.fit(df, "prediction", "label")
+
+    # Check that the offset is correctly calculated
+    assert calibrator.offset == expected_offset
+    np.testing.assert_allclose(
+        calibrator.predict(df, "prediction"),
+        expected_predictions,
+    )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class, calibrator_kwargs",
+    [
+        (
+            methods.MCBoost,
+            {
+                "num_rounds": 2,
+                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+                "early_stopping": False,
+            },
+        ),
+        (
+            methods.RegressionMCBoost,
+            {
+                "num_rounds": 2,
+                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+                "early_stopping": False,
+            },
+        ),
+        (methods.PlattScaling, {}),
+        (methods.IsotonicRegression, {}),
+        (methods.MultiplicativeAdjustment, {}),
+        (methods.AdditiveAdjustment, {}),
+        (methods.IdentityCalibrator, {}),
+        (methods.SwissCheesePlattScaling, {}),
+    ],
+)
+def test_calibration_methods_use_weight_column_correctly(
+    calibrator_class, calibrator_kwargs
+):
+    # Create an unweighted dataset with duplicates: positive 0.2 occurs 3x and negative 0.6 occurs 2x
+    df_train_unweighted = pd.DataFrame(
+        {
+            "prediction": [0.1, 0.2, 0.2, 0.2, 0.3, 0.4, 0.5, 0.6, 0.6, 0.8],
+            "label": [0, 1, 1, 1, 0, 0, 0, 0, 0, 1],
+        }
+    )
+    # Create a weighted dataset -> duplicates turn into weights
+    df_train_weighted = pd.DataFrame(
+        {
+            "prediction": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8],
+            "label": [0, 1, 0, 0, 0, 0, 1],
+            "weight": [1, 3, 1, 1, 1, 2, 1],
+        }
+    )
+    model_unweighted = calibrator_class(**calibrator_kwargs)
+    model_unweighted.fit(df_train_unweighted, "prediction", "label")
+
+    model_weighted = calibrator_class(**calibrator_kwargs)
+    model_weighted.fit(df_train_weighted, "prediction", "label", "weight")
+    # Adding this assertion because there were test cases earlier where a model passed
+    # just because in both cases it was fit with 0 rounds
+    # TODO: understand why early stopping is not equivalent with/without weights
+    if isinstance(model_unweighted, methods.BaseMCBoost):
+        assert len(model_weighted.mr) > 0
+        assert len(model_unweighted.mr) > 0
+
+    df_test = pd.DataFrame({"prediction": [0.15, 0.25, 0.35, 0.45, 0.55]})
+    predictions_unweighted = model_unweighted.predict(df_test, "prediction")
+    predictions_weighted = model_weighted.predict(df_test, "prediction")
+    assert np.allclose(predictions_unweighted, predictions_weighted)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class, predictions",
+    [
+        (methods.MCBoost, np.array([-0.001, 0.1])),
+        (methods.MCBoost, np.array([0.1, 1.0001])),
+        (methods.MCBoost, np.array([-0.001, 1.0001])),
+        (methods.RegressionMCBoost, np.array([-0.001, float("inf")])),
+        (methods.RegressionMCBoost, np.array([0.1, -1 * float("inf")])),
+        (methods.RegressionMCBoost, np.array([-0.001, None])),
+    ],
+)
+def test_mcboost_raises_when_predictions_invalid(calibrator_class, predictions):
+    df = pd.DataFrame({"prediction": predictions, "label": np.array([0, 1])})
+    mcboost = calibrator_class()
+    with pytest.raises(ValueError):
+        mcboost.fit(
+            df_train=df, prediction_column_name="prediction", label_column_name="label"
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class, calibrator_kwargs",
+    [
+        (
+            methods.MCBoost,
+            # Pass MCBoost params that minimize test runtime
+            {
+                "num_rounds": 2,
+                "early_stopping": False,
+                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+            },
+        ),
+        (
+            methods.MCBoost,
+            {
+                "num_rounds": 2,
+                "early_stopping": True,
+                "early_stopping_use_crossvalidation": True,
+                "n_folds": 2,  # More than 2 folds would require more input data
+                # Pass MCBoost params that minimize test runtime
+                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+            },
+        ),
+    ],
+)
+def test_mcboost_runs_without_errors_when_scores_in_zero_one(
+    calibrator_class, calibrator_kwargs
+):
+    df = pd.DataFrame(
+        {
+            "prediction": np.array([0.001, 0.999, 0.01, 0.99]),
+            "label": np.array([0, 1, 0, 1]),
+        }
+    )
+    mcboost = calibrator_class(**calibrator_kwargs)
+    mcboost.fit(
+        df_train=df, prediction_column_name="prediction", label_column_name="label"
+    )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class, calibrator_kwargs",
+    [
+        (
+            methods.MCBoost,
+            # Pass MCBoost params that minimize test runtime
+            {
+                "num_rounds": 2,
+                "early_stopping": False,
+                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+            },
+        ),
+        (
+            methods.MCBoost,
+            {
+                "num_rounds": 2,
+                "early_stopping": True,
+                "early_stopping_use_crossvalidation": True,
+                "n_folds": 2,  # More than 2 folds would require more input data
+                # Pass MCBoost params that minimize test runtime
+                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+            },
+        ),
+    ],
+)
+def test_mcboost_runs_without_errors_when_scores_are_exactly_zero_or_one(
+    calibrator_class, calibrator_kwargs
+):
+    df = pd.DataFrame(
+        {"prediction": np.array([0, 1, 0, 1]), "label": np.array([0, 1, 0, 1])}
+    )
+    mcboost = calibrator_class(**calibrator_kwargs)
+    mcboost.fit(
+        df_train=df, prediction_column_name="prediction", label_column_name="label"
+    )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class", [methods.MCBoost, methods.RegressionMCBoost]
+)
+@pytest.mark.parametrize("num_rounds", [(1), (2), (4)])
+def test_mcboost_predict_returns_correct_number_of_rounds_and_consistent_final_prediction_when_no_early_stopping(
+    num_rounds, calibrator_class, rng
+):
+    n = 10
+    predictions = rng.uniform(low=0.0, high=1.0, size=n)
+    labels = scipy.stats.binom.rvs(1, predictions, size=n, random_state=rng)
+
+    df = pd.DataFrame({"prediction": predictions, "label": labels})
+    calibrator = calibrator_class(
+        num_rounds=num_rounds,
+        early_stopping=False,
+        lightgbm_params={"max_depth": 2, "n_estimators": 2},
+    )
+    calibrator.fit(df, "prediction", "label")
+
+    # Check that the multiplier is correctly calculated
+    rounds_predictions = calibrator.predict(df, "prediction", return_all_rounds=True)
+    final_predictions = calibrator.predict(df, "prediction", return_all_rounds=False)
+    assert rounds_predictions.shape == (num_rounds, len(df))
+    assert final_predictions.shape == (len(df),)
+    assert np.array_equal(rounds_predictions[-1], final_predictions)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class", [methods.MCBoost, methods.RegressionMCBoost]
+)
+@pytest.mark.parametrize("num_rounds", [(1), (2), (4)])
+def test_mcboost_predict_returns_correct_number_of_rounds_and_consistent_final_prediction_when_early_stopping_is_used(
+    num_rounds, calibrator_class, rng
+):
+    n = 10
+    predictions = rng.uniform(low=0.0, high=1.0, size=n)
+    labels = scipy.stats.binom.rvs(1, predictions, size=n, random_state=rng)
+
+    df = pd.DataFrame({"prediction": predictions, "label": labels})
+    calibrator = calibrator_class(
+        num_rounds=num_rounds,
+        early_stopping=True,
+        early_stopping_use_crossvalidation=True,
+        n_folds=2,
+        lightgbm_params={"max_depth": 2, "n_estimators": 2},
+    )
+    calibrator.fit(df, "prediction", "label")
+
+    # Check that the multiplier is correctly calculated
+    rounds_predictions = calibrator.predict(df, "prediction", return_all_rounds=True)
+    final_predictions = calibrator.predict(df, "prediction", return_all_rounds=False)
+    assert rounds_predictions.shape == (max(1, len(calibrator.mr)), len(df))
+    assert final_predictions.shape == (len(df),)
+    assert np.array_equal(rounds_predictions[-1], final_predictions)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class", [methods.MCBoost, methods.RegressionMCBoost]
+)
+def test_mcboost_predict_returns_correct_number_of_rounds_and_consistent_final_prediction(
+    calibrator_class,
+    rng,
+):
+    n = 10
+    max_num_rounds = 2
+
+    predictions = rng.uniform(low=0.0, high=1.0, size=n)
+    labels = scipy.stats.binom.rvs(1, predictions, size=n, random_state=rng)
+
+    df = pd.DataFrame({"prediction": predictions, "label": labels})
+    calibrator = calibrator_class(
+        num_rounds=max_num_rounds,
+        early_stopping=True,
+        early_stopping_use_crossvalidation=True,
+        lightgbm_params={"max_depth": 2, "n_estimators": 2},
+        n_folds=2,
+    )
+    calibrator.fit(df, "prediction", "label")
+
+    # Check that the multiplier is correctly calculated
+    rounds_predictions = calibrator.predict(df, "prediction", return_all_rounds=True)
+    final_predictions = calibrator.predict(df, "prediction", return_all_rounds=False)
+    assert rounds_predictions.shape[0] <= max_num_rounds
+    assert rounds_predictions.shape[1] == len(df)
+    assert final_predictions.shape == (len(df),)
+    assert np.array_equal(rounds_predictions[-1], final_predictions)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class, input_params, expected_params, objective",
+    [
+        # if nothing is passed we take all defaults
+        (
+            methods.MCBoost,
+            None,
+            methods.MCBoost.DEFAULT_HYPERPARAMS["lightgbm_params"],
+            "binary",
+        ),
+        # if only one is passed we take the default for the others
+        (
+            methods.MCBoost,
+            {"max_depth": -1},
+            {
+                k: v if k != "max_depth" else -1
+                for k, v in methods.MCBoost.DEFAULT_HYPERPARAMS[
+                    "lightgbm_params"
+                ].items()
+            },
+            "binary",
+        ),
+        # if a parameter is passed that is not present in the default we take the default + the passed parameter
+        (
+            methods.MCBoost,
+            {"_OTHER": -1},
+            methods.MCBoost.DEFAULT_HYPERPARAMS["lightgbm_params"] | {"_OTHER": -1},
+            "binary",
+        ),
+        # if nothing is passed we take all defaults
+        (
+            methods.RegressionMCBoost,
+            None,
+            methods.RegressionMCBoost.DEFAULT_HYPERPARAMS["lightgbm_params"],
+            "regression",
+        ),
+        # if only one is passed we take the default for the others
+        (
+            methods.RegressionMCBoost,
+            {"max_depth": -1},
+            {
+                k: v if k != "max_depth" else -1
+                for k, v in methods.RegressionMCBoost.DEFAULT_HYPERPARAMS[
+                    "lightgbm_params"
+                ].items()
+            },
+            "regression",
+        ),
+        # if a parameter is passed that is not present in the default we take the default + the passed parameter
+        (
+            methods.RegressionMCBoost,
+            {"_OTHER": -1},
+            methods.RegressionMCBoost.DEFAULT_HYPERPARAMS["lightgbm_params"]
+            | {"_OTHER": -1},
+            "regression",
+        ),
+    ],
+)
+def test_that_default_lightgbm_params_are_applied_correctly_for_mcboost(
+    calibrator_class, input_params, expected_params, objective
+):
+    model = calibrator_class(lightgbm_params=input_params)
+
+    # These are always added in the MCBoost init
+    expected_params |= {
+        "objective": objective,
+        "seed": 42,
+        "deterministic": True,
+        "verbosity": -1,
+    }
+
+    assert model.lightgbm_params == expected_params
+
+
+@pytest.mark.parametrize(
+    "calibrator_class, input_params, expected_params, objective",
+    [
+        # if nothing is passed we take all defaults
+        (
+            methods.MCBoost,
+            None,
+            methods.MCBoost.DEFAULT_HYPERPARAMS["lightgbm_params"],
+            "binary",
+        ),
+        # if only one is passed we take the default for the others
+        (
+            methods.MCBoost,
+            {"max_depth": -1},
+            {
+                k: v if k != "max_depth" else -1
+                for k, v in methods.MCBoost.DEFAULT_HYPERPARAMS[
+                    "lightgbm_params"
+                ].items()
+            },
+            "binary",
+        ),
+        # if a parameter is passed that is not present in the default we take the default + the passed parameter
+        (
+            methods.MCBoost,
+            {"_OTHER": -1},
+            methods.MCBoost.DEFAULT_HYPERPARAMS["lightgbm_params"] | {"_OTHER": -1},
+            "binary",
+        ),
+        # if nothing is passed we take all defaults
+        (
+            methods.RegressionMCBoost,
+            None,
+            methods.RegressionMCBoost.DEFAULT_HYPERPARAMS["lightgbm_params"],
+            "regression",
+        ),
+        # if only one is passed we take the default for the others
+        (
+            methods.RegressionMCBoost,
+            {"max_depth": -1},
+            {
+                k: v if k != "max_depth" else -1
+                for k, v in methods.RegressionMCBoost.DEFAULT_HYPERPARAMS[
+                    "lightgbm_params"
+                ].items()
+            },
+            "regression",
+        ),
+        # if a parameter is passed that is not present in the default we take the default + the passed parameter
+        (
+            methods.RegressionMCBoost,
+            {"_OTHER": -1},
+            methods.RegressionMCBoost.DEFAULT_HYPERPARAMS["lightgbm_params"]
+            | {"_OTHER": -1},
+            "regression",
+        ),
+    ],
+)
+def test_that_lightgbm_params_are_applied_correctly_after_resetting_them(
+    calibrator_class, input_params, expected_params, objective
+):
+    model = calibrator_class()
+    model._set_lightgbm_params(lightgbm_params=input_params)
+
+    # These are always added in the MCBoost init
+    expected_params |= {
+        "objective": objective,
+        "seed": 42,
+        "deterministic": True,
+        "verbosity": -1,
+    }
+
+    assert model.lightgbm_params == expected_params
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+@pytest.mark.parametrize("num_rounds", [(2), (4), (6)])
+def test_early_stopping_stops_at_max_num_rounds(num_rounds: int, calibrator_class, rng):
+    df_train = pd.DataFrame(
+        {
+            "feature1": rng.rand(100),
+            "prediction": rng.rand(100),
+            "label": rng.randint(0, 2, 100),
+        }
+    )
+
+    # We create a dummy score function that always returns increasing values
+    score_increments = np.linspace(0, 0.01, 100)  # 100 steps of tiny increments
+    score_index = [0]  # Use a list to allow modification within the closure
+
+    def dummy_score_func(
+        y_true: np.ndarray, y_score: np.ndarray, sample_weight: np.ndarray | None = None
+    ) -> float:
+        score = score_increments[score_index[0]]
+        score_index[0] += 1
+        return score
+
+    # Early stopping should now not kick in, because the score is always increasing
+    # It should still stop at the maximum number of rounds, which is specified by num_rounds
+    mcboost = calibrator_class(
+        num_rounds=num_rounds,
+        early_stopping=True,
+        early_stopping_score_func=wrap_sklearn_metric_func(dummy_score_func),
+        early_stopping_minimize_score=False,
+        save_training_performance=True,
+        lightgbm_params={"num_iterations": 1},
+    )
+    mcboost.fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=[],
+        numerical_feature_column_names=["feature1"],
+    )
+    assert (
+        num_rounds
+        == len(mcboost.mr)
+        == len(mcboost._performance_metrics["avg_valid_performance_dummy_score_func"])
+        - 1
+        == len(mcboost._performance_metrics["avg_train_performance_dummy_score_func"])
+        - 1
+    ), "Early stopping exceeded the maximum number of rounds."
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_mce_correctly_setup_in_mcboost(calibrator_class, rng):
+    # Check if the MCE is the right metric by looking at the name of the score function
+
+    df_train = pd.DataFrame(
+        {
+            "feature1": rng.randint(0, 3, 100),
+            "feature2": rng.rand(100),
+            "prediction": rng.rand(100),
+            "label": rng.randint(0, 2, 100),
+        }
+    )
+
+    # Create an MCBoost object using MCE with the expected parameters and fit MCBoost
+    mcboost = calibrator_class(
+        early_stopping_score_func=wrap_multicalibration_error_metric(
+            categorical_segment_columns=["feature1"],
+            numerical_segment_columns=["feature2"],
+        ),
+        early_stopping_minimize_score=True,
+        num_rounds=1,
+    ).fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["feature1"],
+        numerical_feature_column_names=["feature2"],
+    )
+
+    assert (
+        "Multicalibration Error" in mcboost.early_stopping_score_func.name
+    ), "Name of the MCE metric does not contain Multicalibration Error or is not properly set up."
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_mce_parameters_correctly_setup_in_mcboost(calibrator_class, rng):
+    # Check if the MCE's parameters are correctly set in the MCBoost object
+
+    df_train = pd.DataFrame(
+        {
+            "feature1": rng.randint(0, 3, 100),
+            "feature2": rng.rand(100),
+            "prediction": rng.rand(100),
+            "label": rng.randint(0, 2, 100),
+        }
+    )
+
+    # Define the expected parameters
+    expected_params = {
+        "max_depth": 7,
+        "min_samples_per_segment": 8,
+        "max_values_per_segment_feature": 9,
+        "max_n_segments": 10,
+        "sigma_estimation_method": "kuiper_upper_bound_standard_deviation",
+    }
+
+    # Create an MCBoost object using MCE with the expected parameters and fit MCBoost
+    mcboost = calibrator_class(
+        early_stopping_score_func=wrap_multicalibration_error_metric(
+            categorical_segment_columns=["feature1"],
+            numerical_segment_columns=["feature2"],
+            **expected_params,
+        ),
+        early_stopping_minimize_score=True,
+        early_stopping=True,
+        num_rounds=1,
+    ).fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["feature1"],
+        numerical_feature_column_names=["feature2"],
+    )
+
+    # Check if the MCE's parameters are correctly set in the MCBoost object
+    for param, expected_value in expected_params.items():
+        assert (
+            getattr(mcboost.early_stopping_score_func, param) == expected_value
+        ), f"Parameter {param} not set correctly"
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_mcboost_calls_score_func_during_early_stopping(calibrator_class, rng):
+    # Check if the score function is called during early stopping
+
+    mock_roc_auc_score = Mock(spec="skmetrics.roc_auc_score")
+    mock_roc_auc_score.name = "roc_auc_score"
+    mock_roc_auc_score.return_value = 0.5
+    df_train = pd.DataFrame(
+        {
+            "feature1": rng.randint(0, 3, 100),
+            "feature2": rng.rand(100),
+            "prediction": rng.rand(100),
+            "label": rng.randint(0, 2, 100),
+        }
+    )
+    mcboost = calibrator_class(
+        early_stopping_score_func=mock_roc_auc_score,
+        early_stopping_minimize_score=False,
+        num_rounds=1,
+    )
+    mcboost.fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["feature1"],
+        numerical_feature_column_names=["feature2"],
+    )
+    mock_roc_auc_score.assert_called()
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_performance_metrics_dictionary_size_matches_number_of_rounds(
+    calibrator_class, rng
+):
+    # Check if the performance metrics dictionary has the correct number of elements
+
+    df_train = pd.DataFrame(
+        {
+            "feature1": rng.randint(0, 3, 100),
+            "feature2": rng.rand(100),
+            "prediction": rng.rand(100),
+            "label": rng.randint(0, 2, 100),
+        }
+    )
+
+    mcboost = calibrator_class(
+        early_stopping_score_func=wrap_sklearn_metric_func(
+            skmetrics.average_precision_score
+        ),
+        early_stopping_minimize_score=False,
+        num_rounds=10,
+        early_stopping=True,
+        save_training_performance=True,
+        patience=0,
+    ).fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["feature1"],
+        numerical_feature_column_names=["feature2"],
+    )
+    extra_evaluation_due_to_early_stopping = (
+        1 if len(mcboost.mr) < mcboost.NUM_ROUNDS else 0
+    )
+
+    # +1 because we also have the initial performance
+    # + extra_evaluation_due_to_early_stopping because we also have the performance after the last round
+    assert (
+        len(
+            mcboost._performance_metrics[
+                f"avg_valid_performance_{mcboost.early_stopping_score_func.name}"
+            ]
+        )
+        == 1 + len(mcboost.mr) + extra_evaluation_due_to_early_stopping
+    ), f"The (validation) performance metrics dictionary should have {1 + len(mcboost.mr)+extra_evaluation_due_to_early_stopping} elements"
+    assert (
+        len(
+            mcboost._performance_metrics[
+                f"avg_train_performance_{mcboost.early_stopping_score_func.name}"
+            ]
+        )
+        == 1 + len(mcboost.mr) + extra_evaluation_due_to_early_stopping
+    ), f"The (training) performance metrics dictionary should have {1 + len(mcboost.mr)+extra_evaluation_due_to_early_stopping} elements"
+
+
+def test_categorical_features_used_correctly_in_mcboost_regressor():
+    # Create a dataset that can be perfectly fit only when categorical features are used appropriately, rather than ordinally
+
+    uncalibrated_col = "uncalibrated"
+    categorical_segment_cols = ["X"]
+    numerical_segment_cols = []
+    truth_col = "y"
+
+    LEN = 100
+    categorical_col = np.array(
+        ([0] * (LEN // 4)) + ([2] * (LEN // 4)) + ([1] * (LEN // 2))
+    )
+    y = np.array(([1] * (LEN // 2)) + ([0] * (LEN // 2)))
+    uncalibrated = np.array([0] * LEN)
+
+    # Notice that to solve it perfectly (with a shallow tree), the model has to treat 0,2 differently from 1, in a single split
+
+    # Merge the columns into a dataframe
+    df_train = pd.DataFrame(
+        np.c_[categorical_col, y, uncalibrated],
+        columns=[categorical_segment_cols[0], truth_col, uncalibrated_col],
+    )
+
+    h = methods.RegressionMCBoost(
+        num_rounds=1,
+        lightgbm_params={
+            "min_child_samples": 1,
+            "num_leaves": 2,
+            "n_estimators": 1,
+            "max_depth": 2,
+        },
+    )
+
+    # Assert incorrect usage gives bad results
+    h.fit(
+        df_train,
+        uncalibrated_col,
+        truth_col,
+        categorical_feature_column_names=[],
+        numerical_feature_column_names=numerical_segment_cols
+        + categorical_segment_cols,
+    )
+
+    assert (
+        (
+            h.predict(
+                df_train,
+                uncalibrated_col,
+                [],
+                numerical_segment_cols + categorical_segment_cols,
+            )
+            - y
+        )
+        ** 2
+    ).mean() > 1e-2, "The model shouldn't have fit well"
+
+    # Assert proper usage gives good results
+    h.fit(
+        df_train,
+        uncalibrated_col,
+        truth_col,
+        categorical_feature_column_names=categorical_segment_cols,
+        numerical_feature_column_names=numerical_segment_cols,
+    )
+
+    assert (
+        (
+            h.predict(
+                df_train,
+                uncalibrated_col,
+                categorical_segment_cols,
+                numerical_segment_cols,
+            )
+            - y
+        )
+        ** 2
+    ).mean() < 1e-5, "The model did not fit perfectly"
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+@pytest.mark.parametrize("patience", [(4), (7), (9)])
+def test_patience_in_mcboost(patience: int, calibrator_class, rng):
+    # Check if the patience is correctly set in the MCBoost object: we use the dummy function that always increases the score
+    # and check if the early stopping with a given patience stops at the correct round.
+
+    num_rounds = 20  # This needs to be > than 1 + patience
+    df_train = pd.DataFrame(
+        {
+            "feature1": rng.rand(100),
+            "prediction": rng.rand(100),
+            "label": rng.randint(0, 2, 100),
+        }
+    )
+
+    score_increments = np.linspace(0, 0.01, 100)
+    score_index = [0]
+
+    def dummy_score_func(
+        y_true: np.ndarray, y_score: np.ndarray, sample_weight: np.ndarray | None = None
+    ) -> float:
+        score = score_increments[score_index[0]]
+        score_index[0] += 1
+        return score
+
+    mcboost = calibrator_class(
+        num_rounds=num_rounds,
+        early_stopping=True,
+        early_stopping_score_func=wrap_sklearn_metric_func(dummy_score_func),
+        early_stopping_minimize_score=True,
+        patience=patience,
+        lightgbm_params={"num_iterations": 1},
+    )
+    mcboost.fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=[],
+        numerical_feature_column_names=["feature1"],
+    )
+    effective_num_rounds = len(mcboost.mr)
+    extra_evaluation_due_to_early_stopping = (
+        1
+        if (mcboost.EARLY_STOPPING and effective_num_rounds < mcboost.NUM_ROUNDS)
+        else 0
+    )
+
+    assert (
+        len(
+            mcboost._performance_metrics[
+                f"avg_valid_performance_{mcboost.early_stopping_score_func.name}"
+            ]
+        )
+        == 1 + patience + len(mcboost.mr) + extra_evaluation_due_to_early_stopping
+    ), "Patience not used correctly."
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_mcboost_predict_with_num_rounds_0(calibrator_class, rng):
+    # Check if the predictions are the same as the original prediction column when num_rounds=0
+    df_train = pd.DataFrame(
+        {
+            "feature1": rng.randint(0, 3, 100),
+            "feature2": rng.rand(100),
+            "prediction": rng.rand(100),
+            "label": rng.randint(0, 2, 100),
+        }
+    )
+    mcboost = calibrator_class(
+        num_rounds=0,  # this has to be 0
+        early_stopping=True,
+        save_training_performance=True,
+    ).fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["feature1"],
+        numerical_feature_column_names=["feature2"],
+    )
+    predictions_all_rounds = mcboost.predict(
+        df_train, "prediction", return_all_rounds=True
+    )
+    predictions_final_round = mcboost.predict(
+        df_train, "prediction", return_all_rounds=False
+    )
+
+    # Check that the predictions are the same as the original prediction column in both cases
+    assert np.allclose(
+        predictions_all_rounds, df_train["prediction"]
+    ), "Predictions with 'return_all_rounds' = True do not match the original prediction column."
+    assert np.allclose(
+        predictions_final_round, df_train["prediction"]
+    ), "Predictions with 'return_all_rounds' = False do not match the original prediction column."
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_mcboost_number_rounds_after_fitting_with_0_rounds(calibrator_class, rng):
+    # Check if the number of rounds is 0 after fitting with 0 rounds by checking the length of the mr attribute
+    df_train = pd.DataFrame(
+        {
+            "feature1": rng.randint(0, 3, 100),
+            "feature2": rng.rand(100),
+            "prediction": rng.rand(100),
+            "label": rng.randint(0, 2, 100),
+        }
+    )
+
+    mcboost = calibrator_class(
+        num_rounds=0,
+        early_stopping=True,
+        save_training_performance=True,
+    ).fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["feature1"],
+        numerical_feature_column_names=["feature2"],
+    )
+
+    assert (
+        len(mcboost.mr) == 0
+    ), "MCBoost's number of rounds should be 0 after setting num_rounds to 0."
+
+
+@pytest.mark.parametrize(
+    "calibrator_class", [methods.MCBoost, methods.RegressionMCBoost]
+)
+def test_that_default_early_stopping_score_func_minimization_adheres_to_scikitlearn_convention(
+    calibrator_class,
+):
+    mcb = calibrator_class()
+    if mcb.early_stopping_score_func.name.endswith(
+        "_loss"
+    ) or mcb.early_stopping_score_func.name.endswith("_error"):
+        assert (
+            mcb.early_stopping_minimize_score
+        ), 'For loss functions that end with "_loss" or "_error" the minimization should be True. If you are sure this is correct, please change the test.'
+    elif mcb.early_stopping_score_func.name.endswith("_score"):
+        assert (
+            not mcb.early_stopping_minimize_score
+        ), 'For score functions that end with "_score" the minimization should be False. If you are sure this is correct, please change the test.'
+    else:
+        raise ValueError(
+            f"Default early stopping score function {mcb.early_stopping_score_func.name} does not adhere to scikit learn naming convention (suffix '_loss' -> lower is better, suffix '_score' -> higher is better). Make sure to set early_stopping_minimize_score correctly and adapt this test."
+        )
+
+
+def test_mce_below_initial_and_mce_below_strong_evidence_threshold_are_false_when_mce_is_greater_than_THR(
+    rng,
+):
+    df_train = pd.DataFrame(
+        {
+            "feature1": rng.randint(0, 3, 100),
+            "feature2": rng.rand(100),
+            "prediction": rng.rand(100),
+            "label": rng.randint(0, 2, 100),
+        }
+    )
+
+    def mce_sigma_scale_mock():
+        class WrappedFuncMockMCE:
+            name = "Multicalibration Error<br>(mce_sigma_scale)"
+
+            def __call__(
+                self,
+                df: pd.DataFrame,
+                label_column: str,
+                score_column: str,
+                weight_column: str | None,
+            ) -> float:
+                return methods.MCBoost().MCE_STRONG_EVIDENCE_THRESHOLD + 0.1
+
+        return WrappedFuncMockMCE()
+
+    mcboost = methods.MCBoost(
+        num_rounds=5,
+        early_stopping=True,
+        early_stopping_score_func=mce_sigma_scale_mock(),
+        early_stopping_minimize_score=True,
+        early_stopping_use_crossvalidation=False,
+    ).fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["feature1"],
+        numerical_feature_column_names=["feature2"],
+    )
+    assert (
+        not mcboost.mce_below_initial and mcboost.mce_below_initial is not None
+    ), "MCE is equal to the initial value. Thus, mce_below_initial must be False."
+    assert (
+        not mcboost.mce_below_strong_evidence_threshold
+        and mcboost.mce_below_strong_evidence_threshold is not None
+    ), f"MCE is greater than {mcboost.MCE_STRONG_EVIDENCE_THRESHOLD}. Thus, mce_below_strong_evidence_threshold must be False."
+    assert (
+        not mcboost.mce_is_satisfactory and mcboost.mce_is_satisfactory is not None
+    ), "MCE is neither below the initial value nor below strong evidence threshold. Thus, mce_is_satisfactory must be False."
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_extract_features_categorical_features_overflow(calibrator_class):
+    mcboost = calibrator_class(encode_categorical_variables=False)
+    x_cat = np.array([np.iinfo(np.int32).max + 1, np.nan, 0])
+    with pytest.raises(ValueError) as exc_info:
+        mcboost.extract_features(
+            df=pd.DataFrame({"cat_feature": x_cat}),
+            prediction_column_name="prediction",
+            categorical_feature_column_names=["cat_feature"],
+            numerical_feature_column_names=None,
+        )
+    assert "categorical feature values" in str(exc_info.value)
+    assert "integer overflow" in str(exc_info.value)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_extract_features_categorical_features_negative(calibrator_class):
+    mcboost = calibrator_class(encode_categorical_variables=False)
+    x_cat = np.array([-1, np.nan, 0])
+    with pytest.raises(ValueError) as exc_info:
+        mcboost.extract_features(
+            df=pd.DataFrame({"cat_feature": x_cat}),
+            prediction_column_name="prediction",
+            categorical_feature_column_names=["cat_feature"],
+            numerical_feature_column_names=None,
+        )
+    assert "categorical feature values" in str(exc_info.value)
+    assert "missing" in str(exc_info.value)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_extract_features_categorical_features_valid(calibrator_class):
+    mcboost = calibrator_class(encode_categorical_variables=False)
+    x_cat = np.array([1, np.nan, 0])
+    mcboost.extract_features(
+        df=pd.DataFrame({"cat_feature": x_cat}),
+        prediction_column_name="prediction",
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=None,
+    )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_extract_features_numerical_features_valid(calibrator_class):
+    mcboost = calibrator_class(encode_categorical_variables=False)
+    x_num = np.array([1.0, np.nan, 0])
+    mcboost.extract_features(
+        df=pd.DataFrame({"num_feature": x_num}),
+        prediction_column_name="prediction",
+        categorical_feature_column_names=None,
+        numerical_feature_column_names=["num_feature"],
+    )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+@pytest.mark.parametrize("best_num_rounds", [(0), (1), (2), (3)])
+def test_mcboost_early_stopping_returns_correct_number_of_rounds(
+    calibrator_class, best_num_rounds: int
+):
+    data_len = 10
+
+    x = np.arange(data_len)
+
+    # Arbitrary data
+    df_train = pd.DataFrame(
+        {
+            "feature1": x,
+            "prediction": np.linspace(0.1, 0.9, data_len),
+            "label": [0] * (data_len // 2) + [1] * (data_len - (data_len // 2)),
+        }
+    )
+
+    n_folds = 3
+    num_rounds = 3
+
+    # We create a dummy score function that increases for best_num_rounds rounds, then decreases to 0
+    score_increments = []
+
+    for i in range(best_num_rounds):
+        for _ in range(n_folds):
+            score_increments.append(i + 1)
+
+    # First n_folds are for estimating the performance before training
+    score_increments = (
+        ([0] * n_folds)
+        + score_increments
+        + ([-1] * (num_rounds - best_num_rounds) * n_folds)
+    )
+
+    score_index = [0]  # Use a list to allow modification within the closure
+
+    def dummy_score_func(
+        y_true: np.ndarray, y_score: np.ndarray, sample_weight: np.ndarray | None = None
+    ) -> float:
+        score = score_increments[score_index[0]]
+        score_index[0] += 1
+        return score
+
+    mcboost = calibrator_class(
+        num_rounds=num_rounds,
+        n_folds=n_folds,
+        early_stopping=True,
+        early_stopping_use_crossvalidation=True,
+        early_stopping_score_func=wrap_sklearn_metric_func(dummy_score_func),
+        early_stopping_minimize_score=False,
+    )
+    mcboost.fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=[],
+        numerical_feature_column_names=["feature1"],
+    )
+
+    assert len(mcboost.mr) == best_num_rounds
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_cross_val_timeout_in_mcboost(calibrator_class, rng):
+    # Check if the cross validation timeout is correctly set in the MCBoost object: we use the dummy function that always increases the score
+
+    data_len = 10
+
+    df_train = pd.DataFrame(
+        {
+            "feature1": np.arange(data_len),
+            "prediction": np.linspace(0.1, 0.9, data_len),
+            "label": rng.randint(0, 2, data_len),
+        }
+    )
+
+    # We create a dummy score function that always returns increasing values
+    score_increments = np.linspace(0, 0.01, 100)  # 100 steps of tiny increments
+    score_index = [0]  # Use a list to allow modification within the closure
+
+    # This keeps increasing the score until the timeout is reached
+    def dummy_score_func(
+        y_true: np.ndarray, y_score: np.ndarray, sample_weight: np.ndarray | None = None
+    ) -> float:
+        score = score_increments[score_index[0]]
+        score_index[0] += 1
+        return score
+
+    # Timeout after one round
+    num_rounds = 10
+    early_stopping_timeout = 20
+
+    mcboost = calibrator_class(
+        num_rounds=num_rounds,
+        early_stopping=True,
+        early_stopping_use_crossvalidation=True,
+        n_folds=3,
+        early_stopping_score_func=wrap_sklearn_metric_func(dummy_score_func),
+        early_stopping_minimize_score=False,
+        early_stopping_timeout=early_stopping_timeout,
+    )
+
+    returned_times = [
+        1,  # Round 0: metrics first evaluation
+        2,
+        early_stopping_timeout - 1,  # Round 2: last valid round
+        early_stopping_timeout + 1,
+        early_stopping_timeout + 2,
+    ]
+
+    # Mock the elapsed time check
+    mcboost._get_elapsed_time = Mock(side_effect=returned_times)
+
+    mcboost.fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=[],
+        numerical_feature_column_names=["feature1"],
+    )
+    assert len(mcboost.mr) == 2
+
+    del mcboost
+
+    # No timeout (timeout not reached or set to None)
+    num_rounds = 3
+    for early_stopping_timeout in [max(returned_times) + 1, None]:
+        mcboost = calibrator_class(
+            num_rounds=num_rounds,
+            early_stopping=True,
+            early_stopping_use_crossvalidation=True,
+            n_folds=3,  # Few folds to make sure the timeout is not reached
+            early_stopping_score_func=wrap_sklearn_metric_func(dummy_score_func),
+            early_stopping_minimize_score=False,
+            early_stopping_timeout=early_stopping_timeout,
+        )
+        mcboost._get_elapsed_time = Mock(side_effect=returned_times)
+        mcboost.fit(
+            df_train=df_train,
+            prediction_column_name="prediction",
+            label_column_name="label",
+            categorical_feature_column_names=[],
+            numerical_feature_column_names=["feature1"],
+        )
+        assert len(mcboost.mr) == num_rounds
+
+
+@pytest.mark.parametrize(
+    "calibrator_class, labels,is_valid",
+    [
+        # MCBoost
+        ## Valid cases
+        (methods.MCBoost, [0, 1], True),
+        (methods.MCBoost, [True, False], True),
+        ## Invalid cases
+        ### Only one unique label
+        (methods.MCBoost, [0, 0], False),
+        (methods.MCBoost, [1, 1], False),
+        (methods.MCBoost, [True, True], False),
+        (methods.MCBoost, [False, False], False),
+        ### Value > 1
+        (methods.MCBoost, [0, 1.1], False),
+        ### Invalid type
+        (methods.MCBoost, ["a", "b"], False),
+        ### Missing values in label
+        (methods.MCBoost, [0, None], False),
+        (methods.MCBoost, [0, np.nan], False),
+        (methods.MCBoost, [0, np.inf], False),
+        # RegressionMCBoost
+        ## Valid cases
+        (methods.RegressionMCBoost, [1.0, 101.0], True),
+        ## Invalid cases
+        ### Missing values
+        (methods.RegressionMCBoost, [np.nan, 101.0], False),
+        ### Infinite values
+        (methods.RegressionMCBoost, [float("inf"), 101.0], False),
+        ### String
+        (methods.RegressionMCBoost, ["a", "b"], False),
+        ### No variance
+        (methods.RegressionMCBoost, [1.0, 1.0], False),
+    ],
+)
+def test_mcboost__check_labels_fails_when_expected(calibrator_class, labels, is_valid):
+    df = pd.DataFrame({"label": labels})
+    if is_valid:
+        calibrator_class._check_labels(df, "label")
+    else:
+        with pytest.raises(ValueError):
+            calibrator_class._check_labels(df, "label")
+
+
+@pytest.mark.parametrize(
+    "calibrator_class,scores,is_valid",
+    [
+        # MCBoost
+        ## Valid cases
+        (methods.MCBoost, [0.1, 0.2], True),
+        ## Invalid cases
+        ### Missing values
+        (methods.MCBoost, [0.1, None], False),
+        (methods.MCBoost, [0.1, np.nan], False),
+        ### Out of bounds
+        (methods.MCBoost, [0.1, 1.1], False),
+        (methods.MCBoost, [0.1, -0.1], False),
+        (methods.MCBoost, [-0.1, 0.1], False),
+        ### Infinite values
+        (methods.MCBoost, [0.1, np.inf], False),
+        # RegressionMCBoost
+        ## Valid cases
+        (methods.RegressionMCBoost, [1.0, 101.0], True),
+        (methods.RegressionMCBoost, [-50.0, 50.0], True),
+        ## Invalid cases
+        ### Missing values
+        (methods.RegressionMCBoost, [1.0, None], False),
+        (methods.RegressionMCBoost, [1.0, np.nan], False),
+        ### Infinite values
+        (methods.RegressionMCBoost, [1.0, float("inf")], False),
+        (methods.RegressionMCBoost, [float("-inf"), 1.0], False),
+    ],
+)
+def test_mcboost__check_predictions_fails_when_expected(
+    calibrator_class, scores, is_valid
+):
+    df = pd.DataFrame({"score": scores})
+    if is_valid:
+        calibrator_class._check_predictions(df, "score")
+    else:
+        with pytest.raises(ValueError):
+            calibrator_class._check_predictions(df, "score")
+
+
+def test_basemcboost_implementations_transform_inverse_transform_invariance():
+    # Find all subclasses of BaseMCBoost. This only works for classes that are imported in this file
+    # so we're operating on the assumption that there's at least on other relevant test for any MCBoost implementation.
+    def get_all_subclasses(cls):
+        all_subclasses = []
+        for subclass in cls.__subclasses__():
+            all_subclasses.append(subclass)
+            all_subclasses.extend(get_all_subclasses(subclass))
+        return all_subclasses
+
+    subclasses = get_all_subclasses(methods.BaseMCBoost)
+    assert len(subclasses) > 0, "Expected at least one subclass of BaseMCBoost"
+
+    predictions = np.array([0.001, 0.1, 0.25, 0.5, 0.75, 0.9, 0.999])
+
+    for subclass in subclasses:
+        transformed = subclass._transform_predictions(predictions)
+        inverse_transformed = subclass._inverse_transform_predictions(transformed)
+        np.testing.assert_allclose(
+            inverse_transformed,
+            predictions,
+            rtol=1e-10,
+            err_msg=f"_inverse_transform_predictions(_transform_predictions(predictions)) != predictions for {subclass.__name__}",
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+@pytest.mark.parametrize(
+    "cat_data,num_data,allow_missing,should_raise",
+    [
+        ([[0, 1]], [[0.1, 0.2]], True, False),
+        ([[0, None]], [[0.1, 0.2]], True, False),
+        ([[0, 1]], [[0.1, None]], True, False),
+        ([[0, 1]], [[0.1, 0.2]], False, False),
+        ([[0, None]], [[0.1, 0.2]], False, True),
+        ([[0, 1]], [[0.1, None]], False, True),
+        ([[]], [[0.1, None]], False, True),
+    ],
+)
+def test_mcboost__check_segment_features_fails_when_expected(
+    calibrator_class, cat_data, num_data, allow_missing, should_raise
+):
+    df = pd.DataFrame(cat_data + num_data)
+    cat_colnames = [str(i) for i in range(len(cat_data))]
+    num_colnames = [str(i) for i in range(len(cat_data), len(cat_data) + len(num_data))]
+    df.columns = cat_colnames + num_colnames
+    mcb = calibrator_class(allow_missing_segment_feature_values=allow_missing)
+    if should_raise:
+        with pytest.raises(ValueError):
+            mcb._check_segment_features(df, cat_colnames, num_colnames)
+    else:
+        mcb._check_segment_features(df, cat_colnames, num_colnames)
+
+
+@pytest.mark.parametrize(
+    "early_stopping_use_crossvalidation,weights,scoring_function,expected_method",
+    [
+        (False, [1, 1, 1], None, methods.EstimationMethod.HOLDOUT),
+        (True, [1, 1, 1, 1, 1], None, methods.EstimationMethod.CROSS_VALIDATION),
+        (None, [1, 1, 1], None, methods.EstimationMethod.CROSS_VALIDATION),
+        (None, [1, 1, 1, 1, 1], None, methods.EstimationMethod.HOLDOUT),
+        (
+            None,
+            [100, 1, 1, 1, 1, 1],
+            None,
+            methods.EstimationMethod.CROSS_VALIDATION,
+        ),
+        (
+            None,
+            [100, 100, 100, 100, 1, 1],
+            None,
+            methods.EstimationMethod.HOLDOUT,
+        ),
+        (
+            None,
+            [1, 1, 1, 1, 1],
+            skmetrics.average_precision_score,
+            methods.EstimationMethod.CROSS_VALIDATION,
+        ),
+    ],
+)
+def test_mcboost__determine_estimation_method(
+    early_stopping_use_crossvalidation,
+    weights,
+    scoring_function,
+    expected_method,
+):
+    # For regression MCBoost we don't have a ESS threshold so we just run it for binary for now
+    mcb = methods.MCBoost(
+        early_stopping=True,
+        early_stopping_use_crossvalidation=early_stopping_use_crossvalidation,
+        early_stopping_score_func=(
+            wrap_sklearn_metric_func(scoring_function)
+            if scoring_function is not None
+            else None
+        ),
+        early_stopping_minimize_score=True if scoring_function is not None else None,
+    )
+
+    mcb.ESS_THRESHOLD_FOR_CROSS_VALIDATION = 4
+
+    assert expected_method == mcb._determine_estimation_method(np.array(weights))
+
+
+@pytest.mark.parametrize(
+    "calibrator_class,scores,segment,expected_mask,allow_missing_segment_features",
+    [
+        # MCBoost tests
+        (methods.MCBoost, [0.1, 0.2], [0, 1], [True, True], True),
+        (methods.MCBoost, [0.1, None], [0, 1], [True, False], True),
+        (methods.MCBoost, [0.1, 1.1], [0, 1], [True, False], True),
+        (methods.MCBoost, [0.1, -0.1], [0, 1], [True, False], True),
+        (methods.MCBoost, [0.1, np.nan], [0, 1], [True, False], True),
+        (methods.MCBoost, [0.1, np.inf], [0, 1], [True, False], True),
+        (methods.MCBoost, [-0.1, 0.1], [0, 1], [False, True], True),
+        (methods.MCBoost, [None, 0.1], [0, None], [False, True], True),
+        (methods.MCBoost, [None, 0.1], [0, None], [False, False], False),
+        # RegressionMCBoost tests - no out-of-bounds checking
+        (methods.RegressionMCBoost, [1.0, 101.0], [0, 1], [True, True], True),
+        (methods.RegressionMCBoost, [1.0, None], [0, 1], [True, False], True),
+        (methods.RegressionMCBoost, [-50.0, 50.0], [0, 1], [True, True], True),
+        (methods.RegressionMCBoost, [1.0, np.nan], [0, 1], [True, False], True),
+        (methods.RegressionMCBoost, [1.0, np.inf], [0, 1], [True, False], True),
+        (methods.RegressionMCBoost, [float("-inf"), 1.0], [0, 1], [False, True], True),
+        (methods.RegressionMCBoost, [None, 1.0], [0, None], [False, True], True),
+        (methods.RegressionMCBoost, [None, 1.0], [0, None], [False, False], False),
+    ],
+)
+def test_mcboost__get_output_presence_mask_works_correctly(
+    calibrator_class,
+    scores,
+    segment,
+    expected_mask,
+    allow_missing_segment_features,
+):
+    df = pd.DataFrame({"score": scores, "segment": segment})
+    mcb = calibrator_class(
+        allow_missing_segment_feature_values=allow_missing_segment_features
+    )
+    mask = mcb._get_output_presence_mask(
+        df,
+        prediction_column_name="score",
+        categorical_feature_column_names=["segment"],
+        numerical_feature_column_names=[],
+    )
+    assert np.array_equal(mask, expected_mask)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_mcboost_internal_state_reset_when_fitting_again(calibrator_class, rng):
+    df_train = pd.DataFrame(
+        {
+            "feature1": rng.rand(100),
+            "prediction": rng.rand(100),
+            "label": rng.randint(0, 2, 100),
+        }
+    )
+
+    score_increments = np.linspace(0, 0.01, 20)  # 100 steps of tiny increments
+    score_index = [0]  # Use a list to allow modification within the closure
+
+    def dummy_score_func(
+        y_true: np.ndarray, y_score: np.ndarray, sample_weight: np.ndarray | None = None
+    ) -> float:
+        score = score_increments[score_index[0]]
+        score_index[0] += 1
+        return score
+
+    mcboost = calibrator_class(
+        num_rounds=1,
+        early_stopping=True,
+        early_stopping_score_func=wrap_sklearn_metric_func(dummy_score_func),
+        early_stopping_minimize_score=False,
+        save_training_performance=True,
+        n_folds=2,
+    )
+    # Fitting MCBoost for the first time
+    mcboost.fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=[],
+        numerical_feature_column_names=["feature1"],
+    )
+    # Fitting MCBoost again should reset the training parameters
+    mcboost.fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=[],
+        numerical_feature_column_names=["feature1"],
+    )
+    # Number of rounds should be 1, not 2 as well as number of evaluations
+    assert (
+        1
+        == len(mcboost.mr)
+        == len(mcboost._performance_metrics["avg_valid_performance_dummy_score_func"])
+        - 1
+        == len(mcboost._performance_metrics["avg_train_performance_dummy_score_func"])
+        - 1
+    ), "The internal state - including number of Boosters & evaluations of MCBoost - should be reset when fitting MCBoost multiple times."
+
+
+# =============================================================================
+# DEPRECATED TESTS FOR reg_MCBoost
+# The following tests are for the deprecated reg_MCBoost function
+# (multicalibration.regression.methods.reg_MCBoost) which is maintained for
+# backward compatibility. These tests will be removed in the future when
+# reg_MCBoost is fully deprecated.
+# =============================================================================
+
+
+@pytest.mark.parametrize("num_rounds", [(1), (2), (6), (10), (16)])
+def test_deserialized_reg_mcboost_fits_correct_num_rounds(num_rounds):
+    df_train = generate_test_data(5)
+    model = regression_methods.reg_MCBoost(
+        num_rounds=num_rounds,
+        lightgbm_params={"max_depth": 2, "n_estimators": 2},
+    )
+    model.fit(
+        df_train=df_train,
+        prediction_column_name="Prediction",
+        label_column_name="Label",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+    assert len(model.mr) == num_rounds
+    serialized = model.serialize()
+    deserialized = regression_methods.reg_MCBoost.deserialize(serialized)
+    assert len(deserialized.mr) == num_rounds
+
+
+def test_reg_mcboost_that_default_lightgbm_params_are_applied_correctly():
+    model = regression_methods.reg_MCBoost(lightgbm_params=None)
+
+    expected_params = {
+        **regression_methods.reg_MCBoost.DEFAULT_HYPERPARAMS["lightgbm_params"],
+        "objective": "regression",
+        "seed": 42,
+        "deterministic": True,
+        "verbosity": -1,
+    }
+
+    assert model.lightgbm_params == expected_params
+
+
+def test_reg_mcboost_that_lightgbm_params_are_applied_correctly_after_resetting_them():
+    model = regression_methods.reg_MCBoost()
+    model._set_lightgbm_params(lightgbm_params={"max_depth": -1})
+
+    expected_params = {
+        k: v if k != "max_depth" else -1
+        for k, v in regression_methods.reg_MCBoost.DEFAULT_HYPERPARAMS[
+            "lightgbm_params"
+        ].items()
+    }
+    expected_params |= {
+        "objective": "regression",
+        "seed": 42,
+        "deterministic": True,
+        "verbosity": -1,
+    }
+
+    assert model.lightgbm_params == expected_params
+
+
+def test_categorical_features_used_correctly_in_reg_mcboost():
+    uncalibrated_col = "uncalibrated"
+    categorical_segment_cols = ["X"]
+    numerical_segment_cols = []
+    truth_col = "y"
+
+    LEN = 100
+    categorical_col = np.array(
+        ([0] * (LEN // 4)) + ([2] * (LEN // 4)) + ([1] * (LEN // 2))
+    )
+    y = np.array(([1] * (LEN // 2)) + ([0] * (LEN // 2)))
+    uncalibrated = np.array([0] * LEN)
+
+    df_train = pd.DataFrame(
+        np.c_[categorical_col, y, uncalibrated],
+        columns=[categorical_segment_cols[0], truth_col, uncalibrated_col],
+    )
+
+    h = regression_methods.reg_MCBoost(
+        num_rounds=1,
+        lightgbm_params={
+            "min_child_samples": 1,
+            "num_leaves": 2,
+            "n_estimators": 1,
+            "max_depth": 2,
+        },
+    )
+
+    h.fit(
+        df_train,
+        uncalibrated_col,
+        truth_col,
+        categorical_feature_column_names=[],
+        numerical_feature_column_names=numerical_segment_cols
+        + categorical_segment_cols,
+    )
+
+    assert (
+        (
+            h.predict(
+                df_train,
+                uncalibrated_col,
+                [],
+                numerical_segment_cols + categorical_segment_cols,
+            )
+            - y
+        )
+        ** 2
+    ).mean() > 1e-2, "The model shouldn't have fit well"
+
+    h.fit(
+        df_train,
+        uncalibrated_col,
+        truth_col,
+        categorical_feature_column_names=categorical_segment_cols,
+        numerical_feature_column_names=numerical_segment_cols,
+    )
+
+    assert (
+        (
+            h.predict(
+                df_train,
+                uncalibrated_col,
+                categorical_segment_cols,
+                numerical_segment_cols,
+            )
+            - y
+        )
+        ** 2
+    ).mean() < 1e-5, "The model did not fit perfectly"
