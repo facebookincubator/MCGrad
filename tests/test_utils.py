@@ -6,13 +6,12 @@
 import math
 
 import numpy as np
-
 import pandas as pd
 import pyarrow as pa
 import pytest
+from pandas.core.arrays import ArrowExtensionArray
 
 from multicalibration import utils
-from pandas.core.arrays import ArrowExtensionArray
 
 
 @pytest.fixture

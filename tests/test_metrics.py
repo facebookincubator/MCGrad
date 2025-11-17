@@ -7,7 +7,6 @@ from collections.abc import Callable
 from functools import partial
 
 import numpy as np
-
 import pandas as pd
 import pytest
 import scipy

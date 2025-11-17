@@ -16,24 +16,23 @@ from os import PathLike
 from typing import Any, Generator, List, Protocol
 
 import numpy as np
-
 import pandas as pd
-
 import scipy
 from ax.service.ax_client import AxClient, ObjectiveProperties
+from sklearn.metrics import average_precision_score
+from sklearn.model_selection import KFold, ParameterSampler, train_test_split
+
 from multicalibration import methods
 from multicalibration.metrics import (
+    MulticalibrationError,
     kuiper_calibration,
     kuiper_test,
     multi_segment_inverse_sqrt_normalized_statistic_max,
     multi_segment_kuiper_test,
     multi_segment_pvalue_geometric_mean,
     multicalibration_error,
-    MulticalibrationError,
     normalized_entropy,
 )
-from sklearn.metrics import average_precision_score
-from sklearn.model_selection import KFold, ParameterSampler, train_test_split
 
 if sys.version_info >= (3, 13):
     from warnings import deprecated
@@ -41,10 +40,6 @@ else:
     from typing_extensions import deprecated
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-
-from dataclasses import dataclass
-from typing import List
 
 
 @dataclass
@@ -1243,7 +1238,9 @@ def _confidence_interval(
         confidence_level, degrees_freedom, sample_mean, sample_standard_error
     )
 
-    return round(confidence_interval[0], 3), round(confidence_interval[1], 3)  # pyre-ignore
+    return round(confidence_interval[0], 3), round(
+        confidence_interval[1], 3
+    )  # pyre-ignore
 
 
 def _collect_to_list(series: pd.Series) -> list[Any]:
@@ -1276,7 +1273,9 @@ def _aggregate_metrics_and_add_parameters(
     param_df = pd.DataFrame(fold_params).drop_duplicates()
     # Store parameters as a dictionary as well to allow easy retrieval w/o specifying columns
     # setting the index to param_iteration as a quick way to remove it from the dicts
-    param_df["param_dict"] = param_df.set_index("param_iteration").to_dict(orient="records")  # pyre-ignore
+    param_df["param_dict"] = param_df.set_index("param_iteration").to_dict(
+        orient="records"
+    )  # pyre-ignore
     param_df["method"] = "MCBoost"
     param_df = param_df.set_index(["param_iteration", "num_rounds", "method"])
     return cv_results.join(param_df).join(context_df).reset_index()
