@@ -5,29 +5,29 @@ import json
 import logging
 import time
 import warnings
-
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from enum import Enum
 from functools import partial
-
-from typing import Any, cast, Dict, Generic, TypeVar
+from typing import Any, Dict, Generic, TypeVar, cast
 
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-from multicalibration import utils
-
-# from multicalibration.mcnet import CoreMCNet  # mcnet.py not included in this release
-from multicalibration.metrics import ScoreFunctionInterface, wrap_sklearn_metric_func
 from numpy import typing as npt
-from sklearn import isotonic, metrics as skmetrics
+from sklearn import isotonic
+from sklearn import metrics as skmetrics
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.model_selection import KFold, StratifiedKFold
 from sklearn.preprocessing import KBinsDiscretizer, OneHotEncoder
 from typing_extensions import Self
+
+from multicalibration import utils
+
+# from multicalibration.mcnet import CoreMCNet  # mcnet.py not included in this release
+from multicalibration.metrics import ScoreFunctionInterface, wrap_sklearn_metric_func
 
 logger: logging.Logger = logging.getLogger(__name__)
 

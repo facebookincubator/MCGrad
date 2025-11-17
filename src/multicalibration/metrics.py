@@ -7,19 +7,17 @@ import math
 import sys
 import time
 import tracemalloc
-
 from collections.abc import Callable
 from typing import Any, Dict, Protocol, Tuple
 
 import numpy as np
 import pandas as pd
-from multicalibration import utils
-from multicalibration.segmentation import get_segment_masks
 from numpy import typing as npt
 from scipy import stats
-
 from sklearn import metrics as skmetrics
 
+from multicalibration import utils
+from multicalibration.segmentation import get_segment_masks
 
 logger: logging.Logger = logging.getLogger(__name__)
 CALIBRATION_ERROR_NUM_BINS = 40
