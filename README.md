@@ -47,3 +47,6 @@ pre-commit run --all-files
 # Run specific hook
 pre-commit run black --all-files
 ```
+
+## Continuous integration status
+[![CI](https://github.com/facebookincubator/MCGrad/actions/workflows/main.yaml/badge.svg)](https://github.com/facebookincubator/MCGrad/actions/workflows/main.yaml)
