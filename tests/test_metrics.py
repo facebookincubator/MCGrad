@@ -7,7 +7,6 @@ from collections.abc import Callable
 from functools import partial
 
 import numpy as np
-
 import pandas as pd
 import pytest
 import scipy
@@ -1669,3 +1668,84 @@ def test_ecce_and_standard_deviation_return_zero_for_empty_segment(rng):
     )[0]
 
     assert c_jk == k_ub == k_std, "Expected 0 for empty segment"
+
+
+@pytest.mark.parametrize(
+    "predictions,labels,sample_weight",
+    [
+        # Minimum viable case (2 points)
+        (np.array([0.1, 0.9]), np.array([0, 1]), None),
+        # Edge case: all same predictions
+        (np.array([0.5, 0.5, 0.5, 0.5]), np.array([0, 1, 0, 1]), None),
+        # Edge case: boundary values (0 and 1)
+        (np.array([0.0, 1.0, 0.5]), np.array([0, 1, 0]), None),
+        # With sample weights
+        (np.array([0.1, 0.5, 0.9]), np.array([0, 1, 1]), np.array([1.0, 2.0, 1.0])),
+        # Edge case: very small differences
+        (np.array([0.500, 0.501, 0.502]), np.array([0, 1, 0]), None),
+    ],
+)
+def test_kuiper_label_based_standard_deviation_edge_cases(
+    predictions, labels, sample_weight
+):
+    result = metrics.kuiper_label_based_standard_deviation(
+        predictions, labels, sample_weight
+    )
+    assert result >= 0
+    assert not np.isnan(result)
+
+
+def test_kuiper_label_based_standard_deviation_perfect_calibration():
+    # Perfect calibration should give near-zero deviation
+    predictions = np.array([0.0, 0.25, 0.5, 0.75, 1.0])
+    labels = np.array([0.0, 0.25, 0.5, 0.75, 1.0])
+    result = metrics.kuiper_label_based_standard_deviation(predictions, labels)
+    assert result == pytest.approx(0, abs=1e-10)
+
+
+def test_kuiper_label_based_standard_deviation_requires_labels():
+    with pytest.raises(ValueError, match="Labels are required"):
+        metrics.kuiper_label_based_standard_deviation(
+            np.array([0.1, 0.5, 0.9]), labels=None
+        )
+
+
+def test_calibration_free_normalized_entropy_higher_for_reversed_predictions():
+    labels = np.array([0, 0, 0, 1, 1, 1])
+    well_calibrated = np.array([0.1, 0.2, 0.3, 0.7, 0.8, 0.9])
+    poorly_calibrated = np.array([0.9, 0.8, 0.7, 0.3, 0.2, 0.1])
+
+    result_good = metrics.calibration_free_normalized_entropy(
+        labels=labels, predictions=well_calibrated
+    )
+    result_bad = metrics.calibration_free_normalized_entropy(
+        labels=labels, predictions=poorly_calibrated
+    )
+
+    assert result_bad > result_good
+
+
+def test_rank_calibration_error_zero_for_perfect_ranking():
+    labels = np.array([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
+    perfect_predictions = labels * 2.0
+
+    result = metrics._rank_calibration_error(
+        labels=labels, predicted_labels=perfect_predictions
+    )
+
+    assert isinstance(result[0], (float, np.floating))
+    assert result[0] == pytest.approx(0, abs=1e-10)
+
+
+def test_rank_calibration_error_higher_for_reversed_ranking():
+    labels = np.array([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
+    reversed_predictions = 1.0 - labels
+
+    result_reversed = metrics._rank_calibration_error(
+        labels=labels, predicted_labels=reversed_predictions
+    )
+    result_perfect = metrics._rank_calibration_error(
+        labels=labels, predicted_labels=labels
+    )
+
+    assert result_reversed[0] > result_perfect[0]
