@@ -2048,3 +2048,92 @@ def test_mcboost_internal_state_reset_when_fitting_again(calibrator_class, rng):
         == len(mcboost._performance_metrics["avg_train_performance_dummy_score_func"])
         - 1
     ), "The internal state - including number of Boosters & evaluations of MCBoost - should be reset when fitting MCBoost multiple times."
+
+
+def test_swiss_cheese_platt_scaling_with_categorical_features_output_in_zero_one():
+    df_train = pd.DataFrame(
+        {
+            "prediction": [0.1, 0.9, 0.2, 0.8, 0.3, 0.7],
+            "label": [0, 1, 0, 1, 0, 1],
+            "cat_feat": ["A", "B", "A", "B", "A", "B"],
+        }
+    )
+
+    df_test = pd.DataFrame(
+        {
+            "prediction": [0.15, 0.25, 0.35],
+            "cat_feat": ["A", "B", "A"],
+        }
+    )
+
+    scps = methods.SwissCheesePlattScaling()
+    scps.fit(
+        df_train, "prediction", "label", categorical_feature_column_names=["cat_feat"]
+    )
+    predictions = scps.predict(
+        df_test, "prediction", categorical_feature_column_names=["cat_feat"]
+    )
+
+    assert len(predictions) == len(df_test)
+    assert all(0 <= p <= 1 for p in predictions)
+
+
+def test_swiss_cheese_platt_scaling_without_features_equivalent_to_platt_when_same_regularization():
+    from unittest.mock import patch
+
+    from sklearn.linear_model import LogisticRegression
+
+    df_train = pd.DataFrame(
+        {
+            "prediction": [0.1, 0.9, 0.2, 0.8, 0.3, 0.7],
+            "label": [0, 1, 0, 1, 0, 1],
+        }
+    )
+    df_test = pd.DataFrame({"prediction": [0.15, 0.25, 0.35, 0.5, 0.6, 0.75]})
+
+    # Patch SwissCheesePlattScaling to use penalty=None like PlattScaling
+    original_train_model = methods.SwissCheesePlattScaling.train_model
+
+    def patched_train_model(
+        self,
+        df,
+        prediction_column_name,
+        label_column_name,
+        weight_column_name=None,
+        categorical_feature_column_names=None,
+        numerical_feature_column_names=None,
+    ):
+        result = original_train_model(
+            self,
+            df,
+            prediction_column_name,
+            label_column_name,
+            weight_column_name,
+            categorical_feature_column_names,
+            numerical_feature_column_names,
+        )
+        # Replace the trained model with one using penalty=None
+        self.log_reg = LogisticRegression(penalty=None).fit(
+            df[self.features],
+            df[label_column_name].values.astype(float),
+            sample_weight=(
+                df[weight_column_name].values.astype(float)
+                if weight_column_name
+                else None
+            ),
+        )
+        return self.log_reg
+
+    with patch.object(
+        methods.SwissCheesePlattScaling, "train_model", patched_train_model
+    ):
+        scps = methods.SwissCheesePlattScaling()
+        scps.fit(df_train, "prediction", "label")
+        scps_predictions = scps.predict(df_test, "prediction")
+
+    ps = methods.PlattScaling()
+    ps.fit(df_train, "prediction", "label")
+    ps_predictions = ps.predict(df_test, "prediction")
+
+    # With same regularization (penalty=None), they should be equivalent
+    assert np.allclose(scps_predictions, ps_predictions)

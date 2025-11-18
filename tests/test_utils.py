@@ -392,3 +392,18 @@ def test_convert_arrow_to_numpy_with_unsupported_type_remains_unchanged():
     result_df = utils.convert_arrow_columns_to_numpy(df)
     assert isinstance(result_df["col1"].values, np.ndarray)
     assert result_df["col1"].dtype == object
+
+
+def test_logistic_vectorized_returns_valid_probabilities():
+    log_odds = np.array([-10, -1, 0, 1, 10])
+    result = utils.logistic_vectorized(log_odds)
+    assert np.all(result > 0) and np.all(result < 1)
+
+
+def test_logistic_vectorized_with_extreme_values():
+    log_odds = np.array([-1000, -100, 100, 1000])
+    result = utils.logistic_vectorized(log_odds)
+    assert result[0] < 1e-300
+    assert result[1] < 1e-40
+    assert result[2] > 0.999  # Very close to 1
+    assert result[3] > 0.999  # Very close to 1
