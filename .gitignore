@@ -3,3 +3,7 @@
 
 # Distribution / packaging
 *.egg-info/
+
+# Pyre type checker
+.pyre/
+__pycache__/

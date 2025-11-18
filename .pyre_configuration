@@ -1,0 +1,11 @@
+{
+    "source_directories": [
+        "src"
+    ],
+    "typeshed": "third_party/typeshed",
+    "site_package_search_strategy": "pep561",
+    "strict": false,
+    "ignore_all_errors": [
+        "src/multicalibration/__pycache__"
+    ]
+}
