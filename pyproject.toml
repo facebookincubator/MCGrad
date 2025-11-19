@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "MCGrad"
 version = "0.1.0"
 description = "Production-ready multicalibration for machine learning"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 readme = "README.md"
 dependencies = [
     "numpy>=1.20.0,<2.0.0",  # Pin to 1.x for ax-platform 0.3.x compatibility

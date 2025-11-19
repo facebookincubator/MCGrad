@@ -345,8 +345,8 @@ def test_warm_starting_trials_produces_the_right_number_of_sobol_and_bayesian_tr
         }
     )
 
-    n_warmup_random_trials = 1
-    total_trials = 3
+    n_warmup_random_trials = 2
+    total_trials = 5
 
     _, trial_results = tune_mcboost_params(
         model=methods.MCBoost(num_rounds=0, early_stopping=False),
@@ -361,6 +361,7 @@ def test_warm_starting_trials_produces_the_right_number_of_sobol_and_bayesian_tr
     )
 
     value_counter = trial_results["generation_node"].value_counts().to_dict()
+    print(f"{value_counter=}")
     sobol_count = value_counter["GenerationStep_0"]
     BoTorch_count = value_counter["GenerationStep_1"]
 
