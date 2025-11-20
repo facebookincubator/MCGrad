@@ -11,3 +11,11 @@ node_modules/
 website/build/
 website/.docusaurus/
 website/node_modules/
+
+# Test coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.pytest_cache/
