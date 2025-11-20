@@ -226,12 +226,7 @@ def tune_mcboost_params(
         choose_generation_strategy_kwargs={
             "num_trials": n_trials
             - 1,  # -1 is because we add an initial trial with default parameters
-            # +1 to account for the manually added trial with default parameters.
-            "num_initialization_trials": (
-                n_warmup_random_trials + 1
-                if n_warmup_random_trials is not None
-                else None
-            ),
+            "num_initialization_trials": n_warmup_random_trials,
         },
     )
 
