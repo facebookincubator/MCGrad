@@ -37,6 +37,21 @@ jobs:
       run: |
         pytest tests/ -v
 
+    - name: Generate coverage report
+      run: |
+        pytest tests/ --cov=src/multicalibration --cov-report=term --cov-report=html --cov-report=xml
+      continue-on-error: true
+
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: coverage-report-${{ matrix.python-version }}
+        path: |
+          htmlcov/
+          coverage.xml
+        retention-days: 30
+
   docs:
     runs-on: ubuntu-latest
     steps:
