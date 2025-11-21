@@ -1,0 +1,27 @@
+{
+  "id": "api/methods",
+  "title": "Methods",
+  "description": "Multi-calibration methods for improving model calibration.",
+  "source": "@site/docs/api/methods.md",
+  "sourceDirName": "api",
+  "slug": "/api/methods",
+  "permalink": "/MCGrad/docs/api/methods",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/facebookincubator/MCGrad/tree/main/website/docs/api/methods.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "sidebar_position": 1
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Quick Start",
+    "permalink": "/MCGrad/docs/quickstart"
+  },
+  "next": {
+    "title": "Metrics",
+    "permalink": "/MCGrad/docs/api/metrics"
+  }
+}

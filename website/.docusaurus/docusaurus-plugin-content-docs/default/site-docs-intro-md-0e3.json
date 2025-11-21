@@ -1,0 +1,23 @@
+{
+  "id": "intro",
+  "title": "Introduction to MCGrad",
+  "description": "Multi-calibration means calibration across segments of the data. It is the form of calibration with highest relevance to the business metrics of ML-based systems.",
+  "source": "@site/docs/intro.md",
+  "sourceDirName": ".",
+  "slug": "/intro",
+  "permalink": "/MCGrad/docs/intro",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/facebookincubator/MCGrad/tree/main/website/docs/intro.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "sidebar_position": 1
+  },
+  "sidebar": "tutorialSidebar",
+  "next": {
+    "title": "Installation",
+    "permalink": "/MCGrad/docs/installation"
+  }
+}

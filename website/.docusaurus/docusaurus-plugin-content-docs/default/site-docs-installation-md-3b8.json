@@ -1,0 +1,27 @@
+{
+  "id": "installation",
+  "title": "Installation",
+  "description": "Requirements",
+  "source": "@site/docs/installation.md",
+  "sourceDirName": ".",
+  "slug": "/installation",
+  "permalink": "/MCGrad/docs/installation",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/facebookincubator/MCGrad/tree/main/website/docs/installation.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 3,
+  "frontMatter": {
+    "sidebar_position": 3
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Introduction to MCGrad",
+    "permalink": "/MCGrad/docs/intro"
+  },
+  "next": {
+    "title": "Quick Start",
+    "permalink": "/MCGrad/docs/quickstart"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "id": "api/segmentation",
+  "title": "Segmentation",
+  "description": "Tools for defining and working with data segments.",
+  "source": "@site/docs/api/segmentation.md",
+  "sourceDirName": "api",
+  "slug": "/api/segmentation",
+  "permalink": "/MCGrad/docs/api/segmentation",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/facebookincubator/MCGrad/tree/main/website/docs/api/segmentation.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 4,
+  "frontMatter": {
+    "sidebar_position": 4
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Plotting",
+    "permalink": "/MCGrad/docs/api/plotting"
+  },
+  "next": {
+    "title": "Tuning",
+    "permalink": "/MCGrad/docs/api/tuning"
+  }
+}

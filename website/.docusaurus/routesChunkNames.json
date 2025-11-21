@@ -1,0 +1,113 @@
+{
+  "/MCGrad/__docusaurus/debug-36c": {
+    "__comp": "__comp---theme-debug-config-23-a-2ff",
+    "__context": {
+      "plugin": "plugin---mc-grad-docusaurus-debugb-38-2d2"
+    }
+  },
+  "/MCGrad/__docusaurus/debug/config-721": {
+    "__comp": "__comp---theme-debug-config-23-a-2ff",
+    "__context": {
+      "plugin": "plugin---mc-grad-docusaurus-debugb-38-2d2"
+    }
+  },
+  "/MCGrad/__docusaurus/debug/content-971": {
+    "__comp": "__comp---theme-debug-contentba-8-ce7",
+    "__context": {
+      "plugin": "plugin---mc-grad-docusaurus-debugb-38-2d2"
+    },
+    "__props": "__props---mc-grad-docusaurus-debug-content-8-c-1-d73"
+  },
+  "/MCGrad/__docusaurus/debug/globalData-092": {
+    "__comp": "__comp---theme-debug-global-dataede-0fa",
+    "__context": {
+      "plugin": "plugin---mc-grad-docusaurus-debugb-38-2d2"
+    }
+  },
+  "/MCGrad/__docusaurus/debug/metadata-f7d": {
+    "__comp": "__comp---theme-debug-site-metadata-68-e-3d4",
+    "__context": {
+      "plugin": "plugin---mc-grad-docusaurus-debugb-38-2d2"
+    }
+  },
+  "/MCGrad/__docusaurus/debug/registry-39e": {
+    "__comp": "__comp---theme-debug-registry-679-501",
+    "__context": {
+      "plugin": "plugin---mc-grad-docusaurus-debugb-38-2d2"
+    }
+  },
+  "/MCGrad/__docusaurus/debug/routes-8df": {
+    "__comp": "__comp---theme-debug-routes-946-699",
+    "__context": {
+      "plugin": "plugin---mc-grad-docusaurus-debugb-38-2d2"
+    }
+  },
+  "/MCGrad/docs-850": {
+    "__comp": "__comp---theme-docs-root-5-e-9-0b6",
+    "__context": {
+      "plugin": "plugin---mc-grad-docsaba-b60"
+    }
+  },
+  "/MCGrad/docs-6ae": {
+    "__comp": "__comp---theme-doc-version-roota-7-b-5de",
+    "__props": "__props---mc-grad-docs-8-d-4-ea9"
+  },
+  "/MCGrad/docs-011": {
+    "__comp": "__comp---theme-doc-roota-94-67a"
+  },
+  "/MCGrad/docs/api/methods-1f4": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---mc-grad-docs-api-methods-2-ec-d19"
+  },
+  "/MCGrad/docs/api/metrics-e72": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---mc-grad-docs-api-metrics-9-b-9-3c7"
+  },
+  "/MCGrad/docs/api/plotting-6f3": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---mc-grad-docs-api-plotting-4-b-8-84f"
+  },
+  "/MCGrad/docs/api/segmentation-78b": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---mc-grad-docs-api-segmentation-0-cf-8ba"
+  },
+  "/MCGrad/docs/api/tuning-79b": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---mc-grad-docs-api-tuninge-7-d-66b"
+  },
+  "/MCGrad/docs/api/utils-fe9": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---mc-grad-docs-api-utils-14-f-527"
+  },
+  "/MCGrad/docs/contributing-dd7": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---mc-grad-docs-contributing-4-d-5-407"
+  },
+  "/MCGrad/docs/installation-31a": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---mc-grad-docs-installation-3-b-8-86e"
+  },
+  "/MCGrad/docs/intro-cdb": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---mc-grad-docs-intro-0-e-3-e3f"
+  },
+  "/MCGrad/docs/methodology-3a1": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---mc-grad-docs-methodologycae-696"
+  },
+  "/MCGrad/docs/quickstart-4f3": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---mc-grad-docs-quickstart-807-7ae"
+  },
+  "/MCGrad/docs/why-mcboost-042": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---mc-grad-docs-why-mcboost-00-e-f28"
+  },
+  "/MCGrad/-583": {
+    "__comp": "__comp---site-src-pages-index-jsc-4-f-f99",
+    "__context": {
+      "plugin": "plugin---mc-grad-a-74-c41"
+    },
+    "config": "config---mc-grad-5-e-9-44d"
+  }
+}

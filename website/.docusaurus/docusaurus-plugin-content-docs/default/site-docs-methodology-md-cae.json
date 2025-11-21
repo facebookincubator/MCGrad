@@ -1,0 +1,18 @@
+{
+  "id": "methodology",
+  "title": "Methodology",
+  "description": "This page provides an overview of how MCBoost works under the hood.",
+  "source": "@site/docs/methodology.md",
+  "sourceDirName": ".",
+  "slug": "/methodology",
+  "permalink": "/MCGrad/docs/methodology",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/facebookincubator/MCGrad/tree/main/website/docs/methodology.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 5,
+  "frontMatter": {
+    "sidebar_position": 5
+  }
+}

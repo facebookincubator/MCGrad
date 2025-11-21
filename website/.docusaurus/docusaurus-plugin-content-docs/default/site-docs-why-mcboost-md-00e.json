@@ -1,0 +1,18 @@
+{
+  "id": "why-mcboost",
+  "title": "Why MCBoost?",
+  "description": "MCBoost offers significant advantages over traditional calibration methods like Isotonic Regression.",
+  "source": "@site/docs/why-mcboost.md",
+  "sourceDirName": ".",
+  "slug": "/why-mcboost",
+  "permalink": "/MCGrad/docs/why-mcboost",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/facebookincubator/MCGrad/tree/main/website/docs/why-mcboost.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 2,
+  "frontMatter": {
+    "sidebar_position": 2
+  }
+}

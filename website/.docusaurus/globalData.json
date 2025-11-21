@@ -1,0 +1,86 @@
+{
+  "docusaurus-plugin-content-docs": {
+    "default": {
+      "path": "/MCGrad/docs",
+      "versions": [
+        {
+          "name": "current",
+          "label": "Next",
+          "isLast": true,
+          "path": "/MCGrad/docs",
+          "mainDocId": "intro",
+          "docs": [
+            {
+              "id": "api/methods",
+              "path": "/MCGrad/docs/api/methods",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "api/metrics",
+              "path": "/MCGrad/docs/api/metrics",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "api/plotting",
+              "path": "/MCGrad/docs/api/plotting",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "api/segmentation",
+              "path": "/MCGrad/docs/api/segmentation",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "api/tuning",
+              "path": "/MCGrad/docs/api/tuning",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "api/utils",
+              "path": "/MCGrad/docs/api/utils",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "contributing",
+              "path": "/MCGrad/docs/contributing",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "installation",
+              "path": "/MCGrad/docs/installation",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "intro",
+              "path": "/MCGrad/docs/intro",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "methodology",
+              "path": "/MCGrad/docs/methodology"
+            },
+            {
+              "id": "quickstart",
+              "path": "/MCGrad/docs/quickstart",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "why-mcboost",
+              "path": "/MCGrad/docs/why-mcboost"
+            }
+          ],
+          "draftIds": [],
+          "sidebars": {
+            "tutorialSidebar": {
+              "link": {
+                "path": "/MCGrad/docs/intro",
+                "label": "intro"
+              }
+            }
+          }
+        }
+      ],
+      "breadcrumbs": true
+    }
+  }
+}

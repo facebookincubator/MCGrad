@@ -1,0 +1,27 @@
+{
+  "id": "api/metrics",
+  "title": "Metrics",
+  "description": "Metrics for evaluating calibration quality.",
+  "source": "@site/docs/api/metrics.md",
+  "sourceDirName": "api",
+  "slug": "/api/metrics",
+  "permalink": "/MCGrad/docs/api/metrics",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/facebookincubator/MCGrad/tree/main/website/docs/api/metrics.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 2,
+  "frontMatter": {
+    "sidebar_position": 2
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Methods",
+    "permalink": "/MCGrad/docs/api/methods"
+  },
+  "next": {
+    "title": "Plotting",
+    "permalink": "/MCGrad/docs/api/plotting"
+  }
+}

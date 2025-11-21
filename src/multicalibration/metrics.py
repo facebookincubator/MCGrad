@@ -1196,6 +1196,7 @@ def _rank_calibration_error(
     :return: tuple (RCE, label_cdfs, prediction_cdfs)
     """
     # break ties
+    labels = 1 - labels
     eps = np.random.uniform(0, 1, labels.shape[0]) * CALIBRATION_ERROR_EPSILON
     labels = labels + eps
     predicted_labels = predicted_labels + eps

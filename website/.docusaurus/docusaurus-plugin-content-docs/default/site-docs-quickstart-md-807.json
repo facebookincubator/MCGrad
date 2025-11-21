@@ -1,0 +1,27 @@
+{
+  "id": "quickstart",
+  "title": "Quick Start",
+  "description": "This guide will help you get started with MCBoost for multi-calibration.",
+  "source": "@site/docs/quickstart.md",
+  "sourceDirName": ".",
+  "slug": "/quickstart",
+  "permalink": "/MCGrad/docs/quickstart",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/facebookincubator/MCGrad/tree/main/website/docs/quickstart.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 4,
+  "frontMatter": {
+    "sidebar_position": 4
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Installation",
+    "permalink": "/MCGrad/docs/installation"
+  },
+  "next": {
+    "title": "Methods",
+    "permalink": "/MCGrad/docs/api/methods"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "id": "api/plotting",
+  "title": "Plotting",
+  "description": "Visualization tools for calibration analysis.",
+  "source": "@site/docs/api/plotting.md",
+  "sourceDirName": "api",
+  "slug": "/api/plotting",
+  "permalink": "/MCGrad/docs/api/plotting",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/facebookincubator/MCGrad/tree/main/website/docs/api/plotting.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 3,
+  "frontMatter": {
+    "sidebar_position": 3
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Metrics",
+    "permalink": "/MCGrad/docs/api/metrics"
+  },
+  "next": {
+    "title": "Segmentation",
+    "permalink": "/MCGrad/docs/api/segmentation"
+  }
+}

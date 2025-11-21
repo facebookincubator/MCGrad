@@ -1,0 +1,23 @@
+{
+  "id": "contributing",
+  "title": "Contributing",
+  "description": "We welcome contributions to MCGrad! This guide will help you get started.",
+  "source": "@site/docs/contributing.md",
+  "sourceDirName": ".",
+  "slug": "/contributing",
+  "permalink": "/MCGrad/docs/contributing",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/facebookincubator/MCGrad/tree/main/website/docs/contributing.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 7,
+  "frontMatter": {
+    "sidebar_position": 7
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Utils",
+    "permalink": "/MCGrad/docs/api/utils"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "id": "api/tuning",
+  "title": "Tuning",
+  "description": "Hyperparameter tuning for calibration methods.",
+  "source": "@site/docs/api/tuning.md",
+  "sourceDirName": "api",
+  "slug": "/api/tuning",
+  "permalink": "/MCGrad/docs/api/tuning",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/facebookincubator/MCGrad/tree/main/website/docs/api/tuning.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 5,
+  "frontMatter": {
+    "sidebar_position": 5
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Segmentation",
+    "permalink": "/MCGrad/docs/api/segmentation"
+  },
+  "next": {
+    "title": "Utils",
+    "permalink": "/MCGrad/docs/api/utils"
+  }
+}
