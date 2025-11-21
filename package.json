@@ -1,0 +1,12 @@
+{
+  "name": "mcgrad-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "cd website && npm start",
+    "build": "cd website && npm run build",
+    "deploy": "cd website && npm run deploy",
+    "website:install": "cd website && npm install"
+  },
+  "description": "MCGrad monorepo with Python package and Docusaurus documentation"
+}
