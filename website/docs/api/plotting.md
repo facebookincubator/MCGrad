@@ -18,14 +18,23 @@ help(plotting)
 ## Calibration Curves
 
 ```python
-from multicalibration.plotting import plot_calibration_curve
+from multicalibration import plotting
+import matplotlib.pyplot as plt
 
-fig = plot_calibration_curve(
-    predictions=preds,
-    labels=labels,
-    n_bins=10
+# Create a figure and axis
+fig, ax = plt.subplots()
+
+# Plot calibration curve
+plotting.plot_calibration_curve(
+    scores=calibrated_predictions,
+    y=labels,
+    df=df,
+    segment_cols=['country', 'content_type'],
+    ax=ax,
+    num_bins=10
 )
-fig.show()
+
+plt.show()
 ```
 
 ## Multi-Calibration Analysis
@@ -33,14 +42,20 @@ fig.show()
 Visualize calibration across segments:
 
 ```python
-from multicalibration.plotting import plot_segment_calibration
+from multicalibration import plotting
+import matplotlib.pyplot as plt
 
-fig = plot_segment_calibration(
-    predictions=preds,
-    labels=labels,
-    segments=features
+fig, ax = plt.subplots()
+
+plotting.plot_calibration_curve_by_segment(
+    scores=calibrated_predictions,
+    y=labels,
+    df=df,
+    segment_cols=['country', 'content_type'],
+    ax=ax
 )
-fig.show()
+
+plt.show()
 ```
 
 See the [source code](https://github.com/facebookincubator/MCGrad/blob/main/src/multicalibration/plotting.py) for more visualization options.

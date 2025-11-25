@@ -15,7 +15,31 @@ help(metrics)
 ```
 :::
 
-## Calibration Metrics
+## Multi-Calibration Metrics
+
+### Multicalibration Error (MCE)
+
+Measures calibration quality across multiple segments of the data, not just globally.
+
+```python
+from multicalibration.metrics import MulticalibrationError
+
+mce = MulticalibrationError(
+    df=df,
+    label_column='label',
+    score_column='prediction',
+    categorical_segment_columns=['country', 'content_type'],
+    numerical_segment_columns=['numeric_feature']
+)
+
+print(f"MCE: {mce.mce}%")
+print(f"P-value: {mce.p_value}")
+print(f"Sigma scale: {mce.mce_sigma_scale}")
+```
+
+The MulticalibrationError metric is based on the Kuiper statistic and provides a principled way to measure multi-calibration quality. For details on the methodology, see:
+
+**Guy, I., Haimovich, D., Linder, F., Okati, N., Perini, L., Tax, N., & Tygert, M. (2025).** [Measuring multi-calibration](https://arxiv.org/abs/2506.11251). arXiv:2506.11251.
 
 ### Expected Calibration Error (ECE)
 
@@ -25,41 +49,17 @@ Measures the average difference between predicted probabilities and observed fre
 from multicalibration.metrics import expected_calibration_error
 
 ece = expected_calibration_error(
-    predictions=preds,
     labels=labels,
-    n_bins=10
+    predicted_scores=predictions,
+    num_bins=10
 )
 ```
 
-###Maximum Calibration Error (MCE)
+### Maximum Calibration Error
 
-Measures the maximum difference between predicted probabilities and observed frequencies.
+Measures the maximum difference between predicted probabilities and observed frequencies within bins.
 
-```python
-from multicalibration.metrics import maximum_calibration_error
-
-mce = maximum_calibration_error(
-    predictions=preds,
-    labels=labels,
-    n_bins=10
-)
-```
-
-## Multi-Calibration Metrics
-
-### Segment Calibration Error
-
-Evaluates calibration within specific segments.
-
-```python
-from multicalibration.metrics import segment_calibration_error
-
-segment_errors = segment_calibration_error(
-    predictions=preds,
-    labels=labels,
-    segments=segment_ids
-)
-```
+This is available as a derived metric from the calibration error calculation.
 
 ## Predictive Performance Metrics
 
