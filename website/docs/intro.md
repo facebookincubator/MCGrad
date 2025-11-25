@@ -10,9 +10,9 @@ sidebar_position: 1
 
 ## Why Improve Multi-Calibration?
 
-1. **Metrics aren't enough** - Predictive performance metrics (e.g. NE, PRAUC) aren't sufficient. Multi-calibration is also important for the performance of ML-based systems. Any system which assumes that predictions are probabilities would benefit: threshold-based actions, value models, ranking, auctions, etc.
+1. **Metrics aren't enough** - Predictive performance metrics (e.g., NE, PRAUC) are not sufficient on their own. Multi-calibration is also important for the performance of ML-based systems. Any system that assumes predictions are probabilities would benefit from better calibration: threshold-based actions, value models, ranking, auctions, etc.
 
-2. **Improves predictive performance** - Improving multi-calibration often results in significant NE/PRAUC gains!
+2. **Improves predictive performance** - Improving multi-calibration often results in significant gains in predictive metrics like NE (Normalized Entropy) and PRAUC (Precision-Recall Area Under Curve)!
 
 ## How MCBoost Helps
 
@@ -29,7 +29,7 @@ ReviewBot is an LLM developed by Integrity which predicts violation probabilitie
 The resulting predictions are multi-calibrated, meaning they're calibrated:
 - Globally
 - For specific segments like `country=US`
-- For `content_type=photo`  
+- For `content_type=photo`
 - For `surface=feed`
 - For intersections like `country=US AND content_type=photo AND surface=feed`
 
@@ -38,3 +38,9 @@ The resulting predictions are multi-calibrated, meaning they're calibrated:
 - [Installation](installation.md) - Get started with MCGrad
 - [Why MCBoost?](why-mcboost.md) - Learn more about the benefits
 - [Quick Start](quickstart.md) - Start using MCBoost
+
+## Research
+
+MCGrad is based on research in multicalibration:
+
+- **Perini, L., Haimovich, D., Linder, F., Tax, N., Karamshuk, D., Vojnovic, M., Okati, N., & Apostolopoulos, P. A. (2025).** [MCGrad: Multicalibration at Web Scale](https://arxiv.org/abs/2509.19884). arXiv:2509.19884. To appear in KDD 2026.

@@ -24,12 +24,12 @@ Where `g(X)` represents any segment defined by the features.
 
 MCBoost uses gradient boosting (LightGBM) to iteratively improve calibration across segments:
 
-1. **Initialize** with base model predictions
+1. **Initialize** - Start with the base model predictions
 2. **Iterate** over boosting rounds:
-   - Identify segments with largest calibration errors
-   - Train weak learner to correct those errors
-   - Update predictions
-3. **Regularize** to prevent overfitting
+   - Identify segments with the largest calibration errors
+   - Train a weak learner to correct those errors
+   - Update predictions by adding the corrections
+3. **Regularize** - Apply regularization techniques to prevent overfitting
 
 ## Why Gradient Boosting?
 
@@ -70,8 +70,15 @@ The implementation uses:
 
 For a detailed theoretical analysis and experimental results, see our paper:
 
-**MCBoost: A Tool for Multi-Calibration**
-ArXiv: [2509.19884](https://arxiv.org/pdf/2509.19884)
+**Perini, L., Haimovich, D., Linder, F., Tax, N., Karamshuk, D., Vojnovic, M., Okati, N., & Apostolopoulos, P. A. (2025).** [MCGrad: Multicalibration at Web Scale](https://arxiv.org/abs/2509.19884). arXiv:2509.19884. To appear in KDD 2026.
+
+### Related Work
+
+For more on multicalibration theory and applications:
+
+- **Measuring Multi-Calibration:** Guy, I., Haimovich, D., Linder, F., Okati, N., Perini, L., Tax, N., & Tygert, M. (2025). [Measuring multi-calibration](https://arxiv.org/abs/2506.11251). arXiv:2506.11251.
+
+- **Multicalibration Applications:** Baldeschi, R. C., Di Gregorio, S., Fioravanti, S., Fusco, F., Guy, I., Haimovich, D., Leonardi, S., et al. (2025). [Multicalibration yields better matchings](https://arxiv.org/abs/2511.11413). arXiv:2511.11413.
 
 ## Next Steps
 

@@ -2,7 +2,7 @@
 
 Production-ready multicalibration for machine learning.
 
-**MCBoost** is a scalable and easy-to-use tool for multi-calibration, ensuring your ML model predictions are calibrated not just globally, but across virtually any segment defined by your features.
+**MCBoost** is a scalable and easy-to-use tool for multi-calibration. It ensures your ML model predictions are well-calibrated not just globally (across all data), but also across virtually any segment defined by your features (e.g., by country, content type, or any combination).
 
 ## 🌟 Key Features
 
@@ -26,18 +26,29 @@ from multicalibration import methods
 import numpy as np
 import pandas as pd
 
-# Your model predictions and segment features
-predictions = np.array([0.1, 0.3, 0.7, 0.9, 0.5, 0.2])
-features = pd.DataFrame({
-    'country': ['US', 'UK', 'US', 'UK', 'US', 'UK'],
-    'content_type': ['photo', 'video', 'photo', 'video', 'photo', 'video'],
+# Prepare your data in a DataFrame
+df = pd.DataFrame({
+    'prediction': np.array([0.1, 0.3, 0.7, 0.9, 0.5, 0.2]),  # Your model's predictions
+    'label': np.array([0, 0, 1, 1, 1, 0]),  # Ground truth labels
+    'country': ['US', 'UK', 'US', 'UK', 'US', 'UK'],  # Categorical features
+    'content_type': ['photo', 'video', 'photo', 'video', 'photo', 'video'],  # defining segments
 })
-labels = np.array([0, 0, 1, 1, 1, 0])
 
 # Apply MCBoost
 mcboost = methods.MCBoost()
-mcboost.fit(predictions, features, labels)
-calibrated_predictions = mcboost.predict(predictions, features)
+mcboost.fit(
+    df_train=df,
+    prediction_column_name='prediction',
+    label_column_name='label',
+    categorical_feature_column_names=['country', 'content_type']
+)
+
+# Get calibrated predictions
+calibrated_predictions = mcboost.predict(
+    df=df,
+    prediction_column_name='prediction',
+    categorical_feature_column_names=['country', 'content_type']
+)
 ```
 
 ## 📦 Installation
@@ -96,15 +107,27 @@ We welcome contributions! See [Contributing Guide](https://facebookincubator.git
 
 ## 📖 Citation
 
+If you use MCGrad in your research, please cite:
+
 ```bibtex
-@article{mcboost2024,
-  title = {{MCBoost: A Tool for Multi-Calibration}},
-  author = {Meta Central Applied Science Team},
-  journal = {arXiv preprint arXiv:2509.19884},
-  year = {2024},
-  url = {https://arxiv.org/pdf/2509.19884}
+@article{perini2025mcgrad,
+  title={{MCGrad: Multicalibration at Web Scale}},
+  author={Perini, Lorenzo and Haimovich, Daniel and Linder, Fridolin and Tax, Niek and Karamshuk, Dima and Vojnovic, Milan and Okati, Nastaran and Apostolopoulos, Pavlos Athanasios},
+  journal={arXiv preprint arXiv:2509.19884},
+  year={2025},
+  note={To appear in KDD 2026}
 }
 ```
+
+**Paper:** [MCGrad: Multicalibration at Web Scale](https://arxiv.org/abs/2509.19884) (KDD 2026)
+
+### Related Publications
+
+For more on multicalibration theory and applications:
+
+- **Measuring Multi-Calibration:** Guy, I., Haimovich, D., Linder, F., Okati, N., Perini, L., Tax, N., & Tygert, M. (2025). [Measuring multi-calibration](https://arxiv.org/abs/2506.11251). arXiv:2506.11251.
+
+- **Multicalibration Applications:** Baldeschi, R. C., Di Gregorio, S., Fioravanti, S., Fusco, F., Guy, I., Haimovich, D., Leonardi, S., et al. (2025). [Multicalibration yields better matchings](https://arxiv.org/abs/2511.11413). arXiv:2511.11413.
 
 ## 📊 CI Status
 

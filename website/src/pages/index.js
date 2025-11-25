@@ -15,7 +15,7 @@ import Layout from '@theme/Layout';
 const features = [
   {
     content:
-      'MCBoost ensures calibration not just globally, but across virtually any segment defined using input features.',
+      'MCBoost ensures calibration not just globally, but also across virtually any segment defined using your input features.',
     title: 'Powerful Multi-Calibration',
   },
   {
@@ -45,23 +45,33 @@ const Feature = ({title, content}) => {
 };
 
 const codeExample = `from multicalibration import MCBoost
+import pandas as pd
 import numpy as np
 
-# Your model predictions and features
-predictions = np.array([...])  # Base model predictions
-features = pd.DataFrame({
-    'country': [...],
-    'content_type': [...],
+# Prepare your data in a DataFrame
+df = pd.DataFrame({
+    'prediction': np.array([...]),  # Base model predictions
+    'label': np.array([...]),       # Ground truth
+    'country': [...],                # Categorical features
+    'content_type': [...],           # defining segments
     'surface': [...],
 })
-labels = np.array([...])  # Ground truth
 
 # Train MCBoost
 mcboost = MCBoost()
-mcboost.fit(predictions, features, labels)
+mcboost.fit(
+    df_train=df,
+    prediction_column_name='prediction',
+    label_column_name='label',
+    categorical_feature_column_names=['country', 'content_type', 'surface']
+)
 
 # Get multi-calibrated predictions
-calibrated_predictions = mcboost.predict(predictions, features)
+calibrated_predictions = mcboost.predict(
+    df=df,
+    prediction_column_name='prediction',
+    categorical_feature_column_names=['country', 'content_type', 'surface']
+)
 `;
 
 const QuickStart = () => (
@@ -89,14 +99,14 @@ const QuickStart = () => (
   </div>
 );
 
-const papertitle = `MCBoost: A Tool for Multi-Calibration`;
+const papertitle = `MCGrad: Multicalibration at Web Scale`;
 const paper_bibtex = `
-@article{mcboost2024,
-  title = {{MCBoost: A Tool for Multi-Calibration}},
-  author = {Meta Central Applied Science Team},
+@article{perini2025mcgrad,
+  title = {{MCGrad: Multicalibration at Web Scale}},
+  author = {Perini, Lorenzo and Haimovich, Daniel and Linder, Fridolin and Tax, Niek and Karamshuk, Dima and Vojnovic, Milan and Okati, Nastaran and Apostolopoulos, Pavlos Athanasios},
   journal = {arXiv preprint arXiv:2509.19884},
-  year = {2024},
-  url = {https://arxiv.org/pdf/2509.19884}
+  year = {2025},
+  note = {To appear in KDD 2026}
 }`;
 
 const Reference = () => (

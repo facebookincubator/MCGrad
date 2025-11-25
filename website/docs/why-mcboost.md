@@ -8,9 +8,9 @@ MCBoost offers significant advantages over traditional calibration methods like 
 
 ## The Problem with Traditional Calibration
 
-While methods like Isotonic Regression work well globally, they fail when looking at specific segments.
+While methods like Isotonic Regression work well globally, they fail to maintain calibration when looking at specific segments of the data.
 
-When examining segments (e.g., reactively reported Videos vs. proactively reported Posts), Isotonic Regression results in major deviations while MCBoost maintains excellent calibration.
+For example, when examining different segments (e.g., reactively reported Videos vs. proactively reported Posts), Isotonic Regression results in major calibration deviations, while MCBoost maintains excellent calibration across all segments.
 
 ## Key Benefits
 
@@ -69,4 +69,4 @@ North Star Metric Impact Estimators provide experiment feedback. MCBoost produce
 
 - [Methodology](methodology.md) - Deep dive into how MCBoost works
 - [Quick Start](quickstart.md) - Start using MCBoost
-- [Research Paper](https://arxiv.org/pdf/2509.19884) - Read the full paper
+- [Research Paper](https://arxiv.org/abs/2509.19884) - MCGrad: Multicalibration at Web Scale (KDD 2026)

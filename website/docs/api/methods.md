@@ -27,19 +27,41 @@ MCBoost takes base model predictions and features, then builds a lightweight cal
 
 ```python
 from multicalibration.methods import MCBoost
+import pandas as pd
+import numpy as np
 
-# Initialize
+# Initialize MCBoost
 mcboost = MCBoost(
-    n_estimators=100,
+    num_rounds=100,
     learning_rate=0.1,
     max_depth=3
 )
 
+# Prepare your data
+df_train = pd.DataFrame({
+    'prediction': np.array([...]),  # Your model's predictions
+    'label': np.array([...]),        # Ground truth labels
+    'country': [...],                 # Categorical features
+    'content_type': [...],            # defining segments
+    'numeric_feature': [...],         # Numerical features
+})
+
 # Fit on training data
-mcboost.fit(predictions, features, labels)
+mcboost.fit(
+    df_train=df_train,
+    prediction_column_name='prediction',
+    label_column_name='label',
+    categorical_feature_column_names=['country', 'content_type'],
+    numerical_feature_column_names=['numeric_feature']
+)
 
 # Get calibrated predictions
-calibrated_preds = mcboost.predict(predictions, features)
+calibrated_preds = mcboost.predict(
+    df=df_train,
+    prediction_column_name='prediction',
+    categorical_feature_column_names=['country', 'content_type'],
+    numerical_feature_column_names=['numeric_feature']
+)
 ```
 
 ### Key Parameters
