@@ -4,32 +4,53 @@
 import json
 import logging
 import time
-import warnings
+
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from dataclasses import dataclass
 from enum import Enum
 from functools import partial
-from typing import Any, Dict, Generic, TypeVar, cast
+
+from typing import Any, cast, Dict, Generic, TypeVar
 
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
+from multicalibration import utils
+# @oss-disable[end= ]: from multicalibration.mcnet import CoreMCNet
+from multicalibration.metrics import ScoreFunctionInterface, wrap_sklearn_metric_func
 from numpy import typing as npt
-from sklearn import isotonic
-from sklearn import metrics as skmetrics
+from sklearn import isotonic, metrics as skmetrics
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.model_selection import KFold, StratifiedKFold
 from sklearn.preprocessing import KBinsDiscretizer, OneHotEncoder
 from typing_extensions import Self
 
-from multicalibration import utils
-
-# from multicalibration.mcnet import CoreMCNet  # mcnet.py not included in this release
-from multicalibration.metrics import ScoreFunctionInterface, wrap_sklearn_metric_func
-
 logger: logging.Logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class MCBoostProcessedData:
+    features: npt.NDArray
+    predictions: npt.NDArray
+    weights: npt.NDArray
+    output_presence_mask: npt.NDArray
+    categorical_feature_names: list[str]
+    numerical_feature_names: list[str]
+    labels: npt.NDArray | None = None
+
+    def __getitem__(self, index: npt.NDArray) -> "MCBoostProcessedData":
+        return MCBoostProcessedData(
+            features=self.features[index],
+            predictions=self.predictions[index],
+            weights=self.weights[index],
+            output_presence_mask=self.output_presence_mask[index],
+            categorical_feature_names=self.categorical_feature_names,
+            numerical_feature_names=self.numerical_feature_names,
+            labels=self.labels[index] if self.labels is not None else None,
+        )
 
 
 class BaseCalibrator(ABC):
@@ -234,6 +255,7 @@ class BaseMCBoost(BaseCalibrator, ABC):
         save_training_performance: bool = False,
         monitored_metrics_during_training: list[ScoreFunctionInterface] | None = None,
         allow_missing_segment_feature_values: bool = DEFAULT_ALLOW_MISSING_SEGMENT_FEATURE_VALUES,
+        random_state: int | np.random.Generator | None = 42,
     ) -> None:
         """
         :param encode_categorical_variables: whether to encode categorical variables using a modified label encoding (when True),
@@ -261,6 +283,11 @@ class BaseMCBoost(BaseCalibrator, ABC):
         :param allow_missing_segment_feature_values: whether to allow missing values in the segment feature data. If set to True, missing values are used for training and prediction. If set to False, training with missing values will raise an Exception and prediction
             with missing values will return None.
         """
+        self.random_state = random_state
+        if isinstance(random_state, np.random.Generator):
+            self._rng: np.random.Generator = random_state
+        else:
+            self._rng: np.random.Generator = np.random.default_rng(random_state)
 
         if early_stopping_score_func is not None:
             assert (
@@ -344,7 +371,9 @@ class BaseMCBoost(BaseCalibrator, ABC):
         self.N_FOLDS: int = (
             1  # Because we make a single train/test split when using holdout
             if (self.EARLY_STOPPING_ESTIMATION_METHOD == EstimationMethod.HOLDOUT)
-            else self.DEFAULT_HYPERPARAMS["n_folds"] if n_folds is None else n_folds
+            else self.DEFAULT_HYPERPARAMS["n_folds"]
+            if n_folds is None
+            else n_folds
         )
 
         self.mr: list[lgb.Booster] = []
@@ -376,6 +405,9 @@ class BaseMCBoost(BaseCalibrator, ABC):
         self.allow_missing_segment_feature_values = allow_missing_segment_feature_values
         self.categorical_feature_names: list[str] | None = None
         self.numerical_feature_names: list[str] | None = None
+
+    def _next_seed(self) -> int:
+        return int(self._rng.integers(0, 2**32 - 1))
 
     def _set_lightgbm_params(self, lightgbm_params: dict[str, Any] | None) -> None:
         """
@@ -416,7 +448,7 @@ class BaseMCBoost(BaseCalibrator, ABC):
         self.lightgbm_params: dict[str, Any] = {
             **params_to_set,
             "objective": self._objective,
-            "seed": 42,
+            "seed": self._next_seed(),
             "deterministic": True,
             "verbosity": -1,
         }
@@ -491,6 +523,70 @@ class BaseMCBoost(BaseCalibrator, ABC):
                     "Missing values found in segment feature data and `allow_missing_segment_feature_values` is set to False. If you want to enable native missing value support, set `allow_missing_segment_feature_values=True` in the constructor of MCBoost."
                 )
 
+    def _preprocess_input_data(
+        self,
+        df: pd.DataFrame,
+        prediction_column_name: str,
+        label_column_name: str | None,
+        weight_column_name: str | None,
+        categorical_feature_column_names: list[str],
+        numerical_feature_column_names: list[str],
+        is_fit_phase: bool = False,
+    ) -> MCBoostProcessedData:
+        """
+        Prepares processed data representation by extracting features once and computing the presence mask.
+
+        This method extracts features, transforms predictions, and computes the presence mask
+        all in one go, avoiding redundant operations later.
+
+        :param df: DataFrame containing the data
+        :param prediction_column_name: Name of the prediction column
+        :param label_column_name: Optional name of the label column (required for fit, optional for predict)
+        :param weight_column_name: Optional name of the weight column
+        :param categorical_feature_column_names: List of categorical feature column names
+        :param numerical_feature_column_names: List of numerical feature column names
+        :param is_fit_phase: Whether this is during fit phase (for encoder training)
+        :return: MCBoostProcessedData object with extracted features and metadata
+        """
+        logger.info(
+            f"Preprocessing input data with {len(df)} rows; in_fit_phase = {is_fit_phase}"
+        )
+        x = self.extract_features(
+            df=df,
+            categorical_feature_column_names=categorical_feature_column_names,
+            numerical_feature_column_names=numerical_feature_column_names,
+            is_fit_phase=is_fit_phase,
+        )
+
+        predictions = self._transform_predictions(df[prediction_column_name].values)
+        y = (
+            df[label_column_name].values.astype(float)
+            if label_column_name is not None
+            else None
+        )
+        w = (
+            df[weight_column_name].values.astype(float)
+            if weight_column_name
+            else np.ones(len(df))
+        )
+
+        presence_mask = self._get_output_presence_mask(
+            df,
+            prediction_column_name,
+            categorical_feature_column_names or [],
+            numerical_feature_column_names or [],
+        )
+
+        return MCBoostProcessedData(
+            features=x,
+            predictions=predictions,
+            weights=w,
+            output_presence_mask=presence_mask,
+            categorical_feature_names=categorical_feature_column_names,
+            numerical_feature_names=numerical_feature_column_names,
+            labels=y,
+        )
+
     def fit(
         self,
         df_train: pd.DataFrame,
@@ -510,24 +606,19 @@ class BaseMCBoost(BaseCalibrator, ABC):
         )
 
         self.reset_training_state()
+
+        # Store feature names to be used in feature importance later
         self.categorical_feature_names = categorical_feature_column_names or []
         self.numerical_feature_names = numerical_feature_column_names or []
 
-        x = self.extract_features(
+        preprocessed_data = self._preprocess_input_data(
             df=df_train,
             prediction_column_name=prediction_column_name,
-            categorical_feature_column_names=categorical_feature_column_names,
-            numerical_feature_column_names=numerical_feature_column_names,
+            label_column_name=label_column_name,
+            weight_column_name=weight_column_name,
+            categorical_feature_column_names=categorical_feature_column_names or [],
+            numerical_feature_column_names=numerical_feature_column_names or [],
             is_fit_phase=True,
-        )
-        predictions = self._transform_predictions(
-            df_train[prediction_column_name].values
-        )
-        y = df_train[label_column_name].values.astype(float)
-        w = (
-            df_train[weight_column_name].values.astype(float)
-            if weight_column_name
-            else None
         )
 
         num_rounds = self.NUM_ROUNDS
@@ -541,28 +632,23 @@ class BaseMCBoost(BaseCalibrator, ABC):
                 f"Early stopping activated, max_num_rounds={self.NUM_ROUNDS}{timeout_msg}"
             )
 
-            num_rounds = self.determine_best_num_rounds(
-                df_train,
-                label_column_name,
-                prediction_column_name,
-                categorical_feature_column_names,
-                numerical_feature_column_names,
-                weight_column_name,
-                skip_input_validation=True,
-            )
+            num_rounds = self._determine_best_num_rounds(preprocessed_data)
 
             if num_rounds > 0:
                 logger.info(f"Fitting final MCBoost model with {num_rounds} rounds")
         else:
             logger.info(f"Early stopping deactivated, fitting {self.NUM_ROUNDS} rounds")
 
+        predictions = preprocessed_data.predictions
         for round_idx in range(num_rounds):
             logger.info(f"Fitting round {round_idx + 1}")
             predictions = self._fit_single_round(
-                x=x,
-                y=y,
+                x=preprocessed_data.features,
+                # pyre-ignore[6] `label_column_name` is a mandatory argument and therefore passed to _preprocess_input_data
+                # if lables are not available that function would have raised an error. We can therefore assume that labels are not None.
+                y=preprocessed_data.labels,
                 prediction=predictions,
-                w=w,
+                w=preprocessed_data.weights,
                 categorical_feature_column_names=categorical_feature_column_names,
                 numerical_feature_column_names=numerical_feature_column_names,
             )
@@ -669,44 +755,45 @@ class BaseMCBoost(BaseCalibrator, ABC):
         return_all_rounds: bool = False,
         **kwargs: Any,
     ) -> npt.NDArray:
-        presence_mask = self._get_output_presence_mask(
-            df,
-            prediction_column_name,
-            categorical_feature_column_names or [],
-            numerical_feature_column_names or [],
-        )
-        x = self.extract_features(
+        preprocessed_data = self._preprocess_input_data(
             df=df,
             prediction_column_name=prediction_column_name,
-            categorical_feature_column_names=categorical_feature_column_names,
-            numerical_feature_column_names=numerical_feature_column_names,
-        )
-        predictions = self._predict(
-            x, df[prediction_column_name].values, return_all_rounds
+            label_column_name=None,
+            weight_column_name=None,
+            categorical_feature_column_names=categorical_feature_column_names or [],
+            numerical_feature_column_names=numerical_feature_column_names or [],
+            is_fit_phase=False,
         )
 
-        return np.where(presence_mask, predictions, np.nan)
+        predictions = self._predict(
+            preprocessed_data.features,
+            preprocessed_data.predictions,
+            return_all_rounds,
+        )
+
+        return np.where(preprocessed_data.output_presence_mask, predictions, np.nan)
 
     def _predict(
         self,
         x: npt.NDArray,
-        preds: npt.NDArray,
+        transformed_predictions: npt.NDArray,
         return_all_rounds: bool = False,
     ) -> npt.NDArray:
         """
         Predicts the calibrated probabilities using the trained model.
 
         :param x: the segment features.
-        :param preds: the uncalibrated predictions that we are looking to calibrate.
+        :param transformed_predictions: the transformed (e.g., logit) predictions that we are looking to calibrate.
         """
         assert len(self.mr) == len(self.unshrink_factors)
         if len(self.mr) < 1:
             logger.warning(
                 "MCBoost has not been fit. Returning the uncalibrated predictions."
             )
-            return preds.reshape(1, -1) if return_all_rounds else preds
+            inverse_preds = self._inverse_transform_predictions(transformed_predictions)
+            return inverse_preds.reshape(1, -1) if return_all_rounds else inverse_preds
 
-        predictions = self._transform_predictions(preds)
+        predictions = transformed_predictions
         x = np.c_[x, predictions]
         predictions_per_round = np.zeros((len(self.mr), len(predictions)))
         for i in range(len(self.mr)):
@@ -731,7 +818,6 @@ class BaseMCBoost(BaseCalibrator, ABC):
     def extract_features(
         self,
         df: pd.DataFrame,
-        prediction_column_name: str,
         categorical_feature_column_names: list[str] | None,
         numerical_feature_column_names: list[str] | None,
         is_fit_phase: bool = False,
@@ -768,21 +854,13 @@ class BaseMCBoost(BaseCalibrator, ABC):
         x = np.concatenate((cat_features, num_features), axis=1)
         return x
 
-    def determine_best_num_rounds(
+    def _determine_best_num_rounds(
         self,
-        df_train: pd.DataFrame,
-        label_column_name: str,
-        prediction_column_name: str,
-        categorical_feature_column_names: list[str] | None,
-        numerical_feature_column_names: list[str] | None,
-        weight_column_name: str | None,
-        skip_input_validation: bool = False,
+        data_train: MCBoostProcessedData,
     ) -> int:
         logger.info("Determining optimal number of rounds")
-
-        if not skip_input_validation:
-            self._check_predictions(df_train, prediction_column_name)
-            self._check_labels(df_train, label_column_name)
+        if data_train.labels is None:
+            raise ValueError("_determine_best_num_rounds() requires labels.")
 
         patience_counter = 0
 
@@ -796,11 +874,7 @@ class BaseMCBoost(BaseCalibrator, ABC):
 
         # The train/test splitter (trainTestSplitter) must have a random_state set to ensure that the folds are the same across runs.
         if (
-            self._determine_estimation_method(
-                df_train[weight_column_name]
-                if weight_column_name
-                else np.ones(len(df_train))  # Use uniform weights
-            )
+            self._determine_estimation_method(data_train.weights)
             == EstimationMethod.CROSS_VALIDATION
         ):
             logger.info(
@@ -813,7 +887,7 @@ class BaseMCBoost(BaseCalibrator, ABC):
                 f"Running early stopping using holdout set of size {self.VALID_SIZE}"
             )
             trainTestSplitter = self._holdout_splitter
-            final_n_folds = 1  # Because we make a single train/test split
+            final_n_folds = 1
 
         best_score = -np.inf
 
@@ -827,9 +901,7 @@ class BaseMCBoost(BaseCalibrator, ABC):
 
             if self.EARLY_STOPPING_TIMEOUT is not None and self._get_elapsed_time(
                 start_time
-            ) > cast(
-                int, self.EARLY_STOPPING_TIMEOUT
-            ):  # Cast is needed to prevent code-verification issues
+            ) > cast(int, self.EARLY_STOPPING_TIMEOUT):
                 logger.warning(
                     f"Stopping early stopping upon exceeding the {self.EARLY_STOPPING_TIMEOUT:,}-second timeout; "
                     + "MCBoost results will likely improve by increasing `early_stopping_timeout` or setting it to None"
@@ -847,19 +919,15 @@ class BaseMCBoost(BaseCalibrator, ABC):
 
             fold_num = 0
             for train_index, valid_index in trainTestSplitter.split(
-                df_train, df_train[label_column_name].values
+                data_train.features, data_train.labels
             ):
-                df_train_cv, df_valid_cv = (
-                    df_train.iloc[train_index],
-                    df_train.iloc[valid_index],
-                )
+                data_train_cv = data_train[train_index]
+                data_valid_cv = data_train[valid_index]
+
                 if num_rounds == 0:
-                    # Get predictions from the uncalibrated model for step 0
-                    with warnings.catch_warnings():
-                        warnings.simplefilter("ignore")
-                        df_train["mcboost_preds"] = df_train[
-                            prediction_column_name
-                        ].values
+                    current_predictions = self._inverse_transform_predictions(
+                        data_train.predictions
+                    )
                 else:
                     if fold_num not in mcboost_per_fold:
                         mcboost = self._create_instance_for_cv(
@@ -870,71 +938,52 @@ class BaseMCBoost(BaseCalibrator, ABC):
                             num_rounds=0,
                         )
                         mcboost_per_fold[fold_num] = mcboost
+                        predictions_per_fold[fold_num] = data_train_cv.predictions
 
-                        predictions_per_fold[fold_num] = self._transform_predictions(
-                            df_train_cv[prediction_column_name].values
-                        )
-
-                    x = mcboost.extract_features(
-                        df=df_train_cv,
-                        prediction_column_name=prediction_column_name,
-                        categorical_feature_column_names=categorical_feature_column_names,
-                        numerical_feature_column_names=numerical_feature_column_names,
-                        is_fit_phase=True,
-                    )
-                    y = df_train_cv[label_column_name].values.astype(float)
-                    w = (
-                        df_train_cv[weight_column_name].values.astype(float)
-                        if weight_column_name
-                        else None
-                    )
-                    new_predictions = mcboost_per_fold[fold_num]._fit_single_round(
-                        x=x,
-                        y=y,
+                    new_predictions = mcboost_per_fold[
+                        fold_num
+                    ]._fit_single_round(
+                        x=data_train_cv.features,
+                        y=data_train_cv.labels,  # pyre-ignore[6]: we assert that data_train_cv.labels is not None above
                         prediction=predictions_per_fold[fold_num],
-                        w=w,
-                        categorical_feature_column_names=categorical_feature_column_names,
-                        numerical_feature_column_names=numerical_feature_column_names,
+                        w=data_train_cv.weights,
+                        categorical_feature_column_names=data_train_cv.categorical_feature_names,
+                        numerical_feature_column_names=data_train_cv.numerical_feature_names,
                     )
                     predictions_per_fold[fold_num] = new_predictions
+
                     if self.save_training_performance:
-                        full_preds = mcboost_per_fold[fold_num].predict(
-                            df=df_train,
-                            prediction_column_name=prediction_column_name,
-                            categorical_feature_column_names=categorical_feature_column_names,
-                            numerical_feature_column_names=numerical_feature_column_names,
+                        full_preds = mcboost_per_fold[fold_num]._predict(
+                            x=data_train.features,
+                            transformed_predictions=data_train.predictions,
+                            return_all_rounds=False,
                         )
+                        current_predictions = full_preds
                     else:
-                        mcboost_valid_preds = mcboost_per_fold[fold_num].predict(
-                            df=df_valid_cv,
-                            prediction_column_name=prediction_column_name,
-                            categorical_feature_column_names=categorical_feature_column_names,
-                            numerical_feature_column_names=numerical_feature_column_names,
+                        mcboost_valid_preds = mcboost_per_fold[fold_num]._predict(
+                            x=data_valid_cv.features,
+                            transformed_predictions=data_valid_cv.predictions,
+                            return_all_rounds=False,
                         )
-                        full_preds = np.zeros((df_train.shape[0],))
-                        full_preds[valid_index] = mcboost_valid_preds
-                    with warnings.catch_warnings():
-                        warnings.simplefilter("ignore")
-                        df_train["mcboost_preds"] = full_preds
+                        current_predictions = np.zeros(len(data_train.features))
+                        current_predictions[valid_index] = mcboost_valid_preds
 
                 for metric_idx, monitored_metric in enumerate(
                     self.monitored_metrics_during_training
                 ):
                     valid_monitored_metrics_per_round[metric_idx, fold_num] = (
-                        monitored_metric(
-                            df=df_train.iloc[valid_index],
-                            label_column=label_column_name,
-                            score_column="mcboost_preds",
-                            weight_column=weight_column_name,
+                        self._compute_metric_on_internal_data(
+                            monitored_metric,
+                            data_valid_cv,
+                            current_predictions[valid_index],
                         )
                     )
                     if self.save_training_performance:
                         train_monitored_metrics_per_round[metric_idx, fold_num] = (
-                            monitored_metric(
-                                df=df_train.iloc[train_index],
-                                label_column=label_column_name,
-                                score_column="mcboost_preds",
-                                weight_column=weight_column_name,
+                            self._compute_metric_on_internal_data(
+                                monitored_metric,
+                                data_train_cv,
+                                current_predictions[train_index],
                             )
                         )
 
@@ -998,9 +1047,6 @@ class BaseMCBoost(BaseCalibrator, ABC):
 
         logger.info(f"Determined {best_num_rounds} to be best number of rounds")
 
-        # Throw warnings if
-        # (1) the final validation MCE > MCE_STRONG_EVIDENCE_THRESHOLD (mce_below_strong_evidence_threshold is False), or
-        # (2) the final validation MCE >= initial validation MCE (self.mce_below_initial is False).
         for monitored_metric in self.monitored_metrics_during_training:
             if monitored_metric.name == "Multicalibration Error<br>(mce_sigma_scale)":
                 mce_at_best_num_rounds = self._performance_metrics[
@@ -1029,6 +1075,30 @@ class BaseMCBoost(BaseCalibrator, ABC):
                     )
 
         return best_num_rounds
+
+    def _compute_metric_on_internal_data(
+        self,
+        metric: ScoreFunctionInterface,
+        data: MCBoostProcessedData,
+        predictions: npt.NDArray,
+    ) -> float:
+        """
+        Compatibility wrapper for MCBoostProcessedData -> ScoreFunctionInterface.
+        """
+        feature_columns = data.categorical_feature_names + data.numerical_feature_names
+        df = pd.DataFrame(
+            data.features,
+            columns=feature_columns,
+        )
+        df["label"] = data.labels
+        df["prediction"] = predictions
+        df["weight"] = data.weights
+        return metric(
+            df=df,
+            label_column="label",
+            score_column="prediction",
+            weight_column="weight",
+        )
 
     def _get_elapsed_time(self, start_time: float) -> int:
         """
@@ -1239,7 +1309,7 @@ class MCBoost(BaseMCBoost):
         return StratifiedKFold(
             n_splits=self.N_FOLDS,
             shuffle=True,
-            random_state=42,
+            random_state=self._next_seed(),
         )
 
     @property
@@ -1247,7 +1317,7 @@ class MCBoost(BaseMCBoost):
         return utils.TrainTestSplitWrapper(
             test_size=self.VALID_SIZE,
             shuffle=True,
-            random_state=42,
+            random_state=self._next_seed(),
             stratify=True,
         )
 
@@ -1349,7 +1419,7 @@ class RegressionMCBoost(BaseMCBoost):
         return KFold(
             n_splits=self.N_FOLDS,
             shuffle=True,
-            random_state=42,
+            random_state=self._next_seed(),
         )
 
     @property
@@ -1357,7 +1427,7 @@ class RegressionMCBoost(BaseMCBoost):
         return utils.TrainTestSplitWrapper(
             test_size=self.VALID_SIZE,
             shuffle=True,
-            random_state=42,
+            random_state=self._next_seed(),
             stratify=False,
         )
 

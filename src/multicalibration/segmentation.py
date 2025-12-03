@@ -11,6 +11,7 @@ import pandas as pd
 from numpy import typing as npt
 from pandas.api.types import is_numeric_dtype
 
+
 logger: logging.Logger = logging.getLogger(__name__)
 
 CATEGORICAL_COLLAPSE_VALUE: str = "__OTHER"
