@@ -19,7 +19,7 @@ dependencies = [
     "pyarrow>=10.0.0",
     "matplotlib>=3.3.0",
     "cffi>=1.15.0",
-    "ax-platform>=1.1.2,<1.2.0",  # Version 1.2.0 has behavioral changes that affect our tests
+    "ax-platform>=1.2.1",
 ]
 
 [project.optional-dependencies]

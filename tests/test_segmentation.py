@@ -4,6 +4,7 @@
 
 
 import numpy as np
+
 import pandas as pd
 import pytest
 
@@ -66,8 +67,8 @@ def test_that_get_segment_masks_works_with_single_segment_feature():
     indices = [idx_arr for idx_arr, _, _ in generator][0]
     number_of_segments = len(np.where(np.array(indices).sum(axis=1) > 0)[0])
 
-    assert number_of_segments == (
-        max_values_per_segment_feature + 1
+    assert (
+        number_of_segments == (max_values_per_segment_feature + 1)
     )  # max_values_per_segment_feature + 1 because we have the full data as the first segment
 
 

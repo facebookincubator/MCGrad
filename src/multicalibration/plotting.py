@@ -8,15 +8,14 @@ from typing import Any, Protocol, Tuple
 import numpy as np
 import pandas as pd
 import plotly.subplots as sp
-from matplotlib import pyplot as plt
-from numpy import typing as npt
-from plotly import express as px
-from plotly import graph_objects as go
-from plotly.subplots import make_subplots
-from sklearn import metrics as skmetrics
 
+from matplotlib import pyplot as plt
 from multicalibration import methods, metrics, utils
 from multicalibration.utils import BinningMethodInterface
+from numpy import typing as npt
+from plotly import express as px, graph_objects as go
+from plotly.subplots import make_subplots
+from sklearn import metrics as skmetrics
 
 
 def plot_score_distribution(

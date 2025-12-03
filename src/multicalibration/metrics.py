@@ -7,17 +7,19 @@ import math
 import sys
 import time
 import tracemalloc
+
 from collections.abc import Callable
 from typing import Any, Dict, Protocol, Tuple
 
 import numpy as np
 import pandas as pd
-from numpy import typing as npt
-from scipy import stats
-from sklearn import metrics as skmetrics
-
 from multicalibration import utils
 from multicalibration.segmentation import get_segment_masks
+from numpy import typing as npt
+from scipy import stats
+
+from sklearn import metrics as skmetrics
+
 
 logger: logging.Logger = logging.getLogger(__name__)
 CALIBRATION_ERROR_NUM_BINS = 40
@@ -1543,7 +1545,6 @@ class MulticalibrationError:
             segment_chunk_feature_values,
         ) in segments_generator:
             if self.max_n_segments is not None and tot_segments >= self.max_n_segments:
-                logger.warning(f"Reached max number of segments {self.max_n_segments}")
                 break
 
             segments_masks.append(segments_chunk_mask)
@@ -1580,8 +1581,7 @@ class MulticalibrationError:
 
         for i, segment in enumerate(segments):
             statistics[
-                self.chunk_size
-                * i : min(
+                self.chunk_size * i : min(
                     self.chunk_size * (i + 1),
                     self.total_number_segments,
                 )
@@ -1643,8 +1643,7 @@ class MulticalibrationError:
         sigmas = np.zeros(self.total_number_segments, dtype=self.precision_dtype)
         for i, segment in enumerate(segments):
             sigmas[
-                self.chunk_size
-                * i : min(
+                self.chunk_size * i : min(
                     self.chunk_size * (i + 1),
                     self.total_number_segments,
                 )
@@ -1827,12 +1826,15 @@ def wrap_multicalibration_error_metric(
     assert (
         categorical_segment_columns is not None or numerical_segment_columns is not None
     ), "No segment columns provided. Please provide either categorical_segment_columns or numerical_segment_columns."
-    assert metric_version in [
-        "mce",
-        "mce_sigma_scale",
-        "mce_absolute",
-        "p_value",
-    ], f"`metric_version` has to be one of ['mce', 'mce_sigma_scale', 'mce_absolute', 'p_value']. Got `{metric_version}`."
+    assert (
+        metric_version
+        in [
+            "mce",
+            "mce_sigma_scale",
+            "mce_absolute",
+            "p_value",
+        ]
+    ), f"`metric_version` has to be one of ['mce', 'mce_sigma_scale', 'mce_absolute', 'p_value']. Got `{metric_version}`."
 
     class WrappedFuncMCE(ScoreFunctionInterface):
         name = f"Multicalibration Error<br>({metric_version})"
