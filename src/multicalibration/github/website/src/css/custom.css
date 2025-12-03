@@ -1,0 +1,48 @@
+/**
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:root {
+  --ifm-color-primary: #1877f2;
+  --ifm-color-primary-dark: #0c66da;
+  --ifm-color-primary-darker: #0b61ce;
+  --ifm-color-primary-darkest: #0950a9;
+  --ifm-color-primary-light: #3b8df3;
+  --ifm-color-primary-lighter: #4894f4;
+  --ifm-color-primary-lightest: #6aa7f6;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #4c9aff;
+  --ifm-color-primary-dark: #2684ff;
+  --ifm-color-primary-darker: #1877f2;
+  --ifm-color-primary-darkest: #0c66da;
+  --ifm-color-primary-light: #72acff;
+  --ifm-color-primary-lighter: #85b8ff;
+  --ifm-color-primary-lightest: #b2d0ff;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}
+
+.feature h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.feature p {
+  color: var(--ifm-color-content-secondary);
+}
+
+.hero__title {
+  font-size: 4rem;
+  font-weight: 800;
+}
+
+.hero__subtitle {
+  font-size: 1.5rem;
+}
