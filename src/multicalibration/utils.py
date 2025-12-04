@@ -1,15 +1,20 @@
 # pyre-unsafe
 import ast
+import functools
 import hashlib
 import logging
 import math
+import os
+import threading
+import time
 import warnings
 from collections.abc import Collection, Iterable
 from typing import Any, Dict, Protocol, Tuple
 
 import numpy as np
-
 import pandas as pd
+
+import psutil
 import torch
 from scipy import stats
 from scipy.optimize._linesearch import LineSearchWarning
@@ -722,3 +727,60 @@ def _process_numerical_features(
 
     combined_features = torch.cat([num_data_filled, presence_mask], dim=1)
     return combined_features
+
+
+def log_peak_rss(samples_per_second=10.0):
+    """
+    Decorator factory to log peak RSS while a function runs.
+
+    samples_per_second: how often to sample memory, e.g.
+        @log_peak_rss()        # 10 samples per second (default)
+        @log_peak_rss(2.0)     # 2 samples per second
+    """
+    if samples_per_second <= 0:
+        raise ValueError("samples_per_second must be > 0")
+
+    sample_interval = 1.0 / samples_per_second
+
+    def decorator(func):
+        log = logging.getLogger(func.__module__)
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            # Construct process object per call (cheap and fork-safe)
+            process = psutil.Process(os.getpid())
+
+            start_rss = process.memory_info().rss
+            peak_rss = start_rss
+            stop_event = threading.Event()
+
+            def sampler():
+                nonlocal peak_rss
+                while not stop_event.is_set():
+                    rss = process.memory_info().rss
+                    if rss > peak_rss:
+                        peak_rss = rss
+                    time.sleep(sample_interval)
+
+            t0 = time.time()
+            thread = threading.Thread(target=sampler, daemon=True)
+            thread.start()
+            try:
+                return func(*args, **kwargs)
+            finally:
+                stop_event.set()
+                thread.join()
+                end_rss = process.memory_info().rss
+                log.info(
+                    "%s: rss_start=%.1f MB, rss_end=%.1f MB, peak_observed=%.1f MB, "
+                    "duration=%.2fs",
+                    func.__name__,
+                    start_rss / 1024**2,
+                    end_rss / 1024**2,
+                    peak_rss / 1024**2,
+                    time.time() - t0,
+                )
+
+        return wrapper
+
+    return decorator
