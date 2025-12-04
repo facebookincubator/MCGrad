@@ -50,6 +50,11 @@ const config = {
             label: 'Documentation',
           },
           {
+            href: 'https://mcgrad.readthedocs.io/',
+            label: 'API Reference',
+            position: 'left',
+          },
+          {
             href: 'https://github.com/facebookincubator/MCGrad',
             label: 'GitHub',
             position: 'right',
