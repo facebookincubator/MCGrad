@@ -12,11 +12,12 @@ import pytest
 import scipy
 import sklearn.metrics as skmetrics
 
-from multicalibration import methods
+from multicalibration import methods, utils
 from multicalibration.metrics import (
     wrap_multicalibration_error_metric,
     wrap_sklearn_metric_func,
 )
+from sklearn.model_selection import KFold, StratifiedKFold
 
 
 @pytest.fixture
@@ -1021,11 +1022,7 @@ def test_mcboost_different_random_states_produce_different_seeds(calibrator_clas
 
 
 @pytest.mark.parametrize(
-    "calibrator_class",
-    [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
-    ],
+    "calibrator_class", [methods.MCBoost, methods.RegressionMCBoost]
 )
 @pytest.mark.parametrize("num_rounds", [(2), (6)])
 def test_early_stopping_stops_at_max_num_rounds(num_rounds: int, calibrator_class, rng):
@@ -1073,6 +1070,82 @@ def test_early_stopping_stops_at_max_num_rounds(num_rounds: int, calibrator_clas
         == len(mcboost._performance_metrics["avg_train_performance_dummy_score_func"])
         - 1
     ), "Early stopping exceeded the maximum number of rounds."
+
+
+@pytest.mark.parametrize(
+    "calibrator_class", [methods.MCBoost, methods.RegressionMCBoost]
+)
+def test_fit_with_provided_df_val_runs_without_errors(calibrator_class, rng):
+    # Setup: create training and validation datasets
+
+    df_train = pd.DataFrame(
+        {
+            "feature1": rng.rand(50),
+            "prediction": rng.rand(50),
+            "label": rng.randint(0, 2, 50),
+        }
+    )
+    df_val = pd.DataFrame(
+        {
+            "feature1": rng.rand(30),
+            "prediction": rng.rand(30),
+            "label": rng.randint(0, 2, 30),
+        }
+    )
+
+    num_rounds = 2
+
+    # We create a dummy score function that always returns increasing values
+    score_increments = np.linspace(0, 0.01, 100)  # 100 steps of tiny increments
+    score_index = [0]  # Use a list to allow modification within the closure
+
+    def dummy_score_func(
+        y_true: np.ndarray, y_score: np.ndarray, sample_weight: np.ndarray | None = None
+    ) -> float:
+        score = score_increments[score_index[0]]
+        score_index[0] += 1
+        return score
+
+    # Execute: fit model with early stopping using provided validation set
+    mcboost = calibrator_class(
+        num_rounds=num_rounds,
+        early_stopping=True,
+        early_stopping_score_func=wrap_sklearn_metric_func(dummy_score_func),
+        early_stopping_minimize_score=False,
+        early_stopping_use_crossvalidation=False,
+        save_training_performance=True,
+        lightgbm_params={"num_iterations": 1},
+    )
+
+    mcboost.fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=[],
+        numerical_feature_column_names=["feature1"],
+        df_val=df_val,
+    )
+
+    assert (
+        num_rounds
+        == len(mcboost.mr)
+        == len(mcboost._performance_metrics["avg_valid_performance_dummy_score_func"])
+        - 1
+        == len(mcboost._performance_metrics["avg_train_performance_dummy_score_func"])
+        - 1
+    ), "Early stopping exceeded the maximum number of rounds."
+
+    # Assert: model can make predictions
+    predictions_val = mcboost.predict(
+        df_val,
+        prediction_column_name="prediction",
+        categorical_feature_column_names=[],
+        numerical_feature_column_names=["feature1"],
+    )
+
+    assert (
+        len(predictions_val) > 0
+    ), f"Predictions should not be empty, but got {len(predictions_val)}"
 
 
 @pytest.mark.parametrize(
@@ -2272,6 +2345,155 @@ def test_prepare_mcboost_processed_data_presence_mask_with_nan_predictions(
 
     assert not internal_data.output_presence_mask[2]
     assert internal_data.output_presence_mask[[0, 1, 3, 4]].all()
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+@pytest.mark.parametrize(
+    "estimation_method,has_custom_validation_set,expected_splitter_type",
+    [
+        (methods.EstimationMethod.CROSS_VALIDATION, False, "cv"),
+        (methods.EstimationMethod.HOLDOUT, False, "holdout"),
+        (
+            methods.EstimationMethod.HOLDOUT,
+            True,
+            "noop splitter",
+        ),
+    ],
+)
+def test_determine_train_test_splitter_returns_correct_splitter(
+    calibrator_class,
+    estimation_method,
+    has_custom_validation_set,
+    expected_splitter_type,
+):
+    # Setup: Create model instance
+    model = calibrator_class(
+        early_stopping=False,
+        num_rounds=1,
+    )
+
+    # Execute: Call the method to determine the splitter
+    splitter = model._determine_train_test_splitter(
+        estimation_method=estimation_method,
+        has_custom_validation_set=has_custom_validation_set,
+    )
+
+    # Assert: Verify the correct splitter type is returned
+    if expected_splitter_type == "cv":
+        # For cross-validation, it should be either KFold or StratifiedKFold
+        assert isinstance(
+            splitter, (StratifiedKFold, KFold)
+        ), "Expected cross-validation splitter"
+    elif expected_splitter_type == "holdout":
+        # For holdout, it should be TrainTestSplitWrapper with positive test_size
+        assert isinstance(
+            splitter, utils.TrainTestSplitWrapper
+        ), "Expected TrainTestSplitWrapper"
+        assert (
+            splitter.test_size > 0.0
+        ), "Expected positive test_size for regular holdout"
+    elif expected_splitter_type == "noop splitter":
+        # For provided holdout, it should be TrainTestSplitWrapper with zero test_size
+        assert isinstance(
+            splitter, utils.NoopSplitterWrapper
+        ), "Expected NoopSplitterWrapper"
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_determine_train_test_splitter_raises_error_for_cv_with_custom_validation_set(
+    calibrator_class,
+):
+    # Setup: Create model instance
+    model = calibrator_class(
+        early_stopping=False,
+        num_rounds=1,
+    )
+
+    # Execute & Assert: Verify ValueError is raised when cross validation is used with custom validation set
+    with pytest.raises(
+        ValueError,
+        match="Custom validation set was provided while cross validation was enabled for early stopping. Please set early_stopping_use_crossvalidation to False or remove df_val",
+    ):
+        model._determine_train_test_splitter(
+            estimation_method=methods.EstimationMethod.CROSS_VALIDATION,
+            has_custom_validation_set=True,
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_determine_train_test_splitter_noop_splitter_returned(
+    calibrator_class,
+):
+    # Setup: Create model instance
+    model = calibrator_class(
+        early_stopping=False,
+        num_rounds=1,
+    )
+
+    # Execute: Get the provided holdout splitter for custom validation set
+    splitter = model._determine_train_test_splitter(
+        estimation_method=methods.EstimationMethod.HOLDOUT,
+        has_custom_validation_set=True,
+    )
+
+    assert isinstance(
+        splitter, utils.NoopSplitterWrapper
+    ), "Expected NoopSplitterWrapper"
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+@pytest.mark.parametrize(
+    "estimation_method,expected_n_folds",
+    [
+        (methods.EstimationMethod.CROSS_VALIDATION, 5),  # Assuming N_FOLDS default is 5
+        (methods.EstimationMethod.HOLDOUT, 1),
+        (methods.EstimationMethod.AUTO, 1),  # AUTO should also return 1 in default case
+    ],
+)
+def test_determine_n_folds_returns_correct_value(
+    calibrator_class,
+    estimation_method,
+    expected_n_folds,
+):
+    # Setup: Create model instance
+    model = calibrator_class(
+        early_stopping=False,
+        num_rounds=1,
+    )
+
+    # Execute: Determine n_folds
+    n_folds = model._determine_n_folds(estimation_method=estimation_method)
+
+    # Assert: Verify correct n_folds is returned
+    # Special handling for CROSS_VALIDATION since N_FOLDS may be set differently
+    if estimation_method == methods.EstimationMethod.CROSS_VALIDATION:
+        assert n_folds == model.N_FOLDS
+    else:
+        assert n_folds == expected_n_folds
 
 
 @pytest.mark.parametrize(
