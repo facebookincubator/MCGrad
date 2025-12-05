@@ -239,6 +239,13 @@ class BaseMCBoost(BaseCalibrator, ABC):
     def _holdout_splitter(self) -> utils.TrainTestSplitWrapper:
         pass
 
+    @property
+    @abstractmethod
+    def _noop_splitter(
+        self,
+    ) -> utils.NoopSplitterWrapper:
+        pass
+
     def __init__(
         self,
         encode_categorical_variables: bool = True,
@@ -523,6 +530,22 @@ class BaseMCBoost(BaseCalibrator, ABC):
                     "Missing values found in segment feature data and `allow_missing_segment_feature_values` is set to False. If you want to enable native missing value support, set `allow_missing_segment_feature_values=True` in the constructor of MCBoost."
                 )
 
+    def _check_input_data(
+        self,
+        df: pd.DataFrame,
+        prediction_column_name: str,
+        label_column_name: str,
+        categorical_feature_column_names: list[str] | None,
+        numerical_feature_column_names: list[str] | None,
+    ) -> None:
+        self._check_predictions(df, prediction_column_name)
+        self._check_labels(df, label_column_name)
+        self._check_segment_features(
+            df,
+            categorical_feature_column_names or [],
+            numerical_feature_column_names or [],
+        )
+
     def _preprocess_input_data(
         self,
         df: pd.DataFrame,
@@ -595,14 +618,15 @@ class BaseMCBoost(BaseCalibrator, ABC):
         weight_column_name: str | None = None,
         categorical_feature_column_names: list[str] | None = None,
         numerical_feature_column_names: list[str] | None = None,
+        df_val: pd.DataFrame | None = None,
         **kwargs: Any,
     ) -> Self:
-        self._check_predictions(df_train, prediction_column_name)
-        self._check_labels(df_train, label_column_name)
-        self._check_segment_features(
+        self._check_input_data(
             df_train,
-            categorical_feature_column_names or [],
-            numerical_feature_column_names or [],
+            prediction_column_name,
+            label_column_name,
+            categorical_feature_column_names,
+            numerical_feature_column_names,
         )
 
         self.reset_training_state()
@@ -621,6 +645,8 @@ class BaseMCBoost(BaseCalibrator, ABC):
             is_fit_phase=True,
         )
 
+        preprocessed_val_data = None
+
         num_rounds = self.NUM_ROUNDS
         if self.EARLY_STOPPING:
             timeout_msg = (
@@ -632,7 +658,29 @@ class BaseMCBoost(BaseCalibrator, ABC):
                 f"Early stopping activated, max_num_rounds={self.NUM_ROUNDS}{timeout_msg}"
             )
 
-            num_rounds = self._determine_best_num_rounds(preprocessed_data)
+            if df_val is not None:
+                self._check_input_data(
+                    df_val,
+                    prediction_column_name,
+                    label_column_name,
+                    categorical_feature_column_names,
+                    numerical_feature_column_names,
+                )
+
+                preprocessed_val_data = self._preprocess_input_data(
+                    df=df_val,
+                    prediction_column_name=prediction_column_name,
+                    label_column_name=label_column_name,
+                    weight_column_name=weight_column_name,
+                    categorical_feature_column_names=categorical_feature_column_names
+                    or [],
+                    numerical_feature_column_names=numerical_feature_column_names or [],
+                    is_fit_phase=False,  # Don't want to fit the encoder on validation data, emulate predict setup
+                )
+
+            num_rounds = self._determine_best_num_rounds(
+                preprocessed_data, preprocessed_val_data
+            )
 
             if num_rounds > 0:
                 logger.info(f"Fitting final MCBoost model with {num_rounds} rounds")
@@ -854,13 +902,62 @@ class BaseMCBoost(BaseCalibrator, ABC):
         x = np.concatenate((cat_features, num_features), axis=1)
         return x
 
+    def _determine_train_test_splitter(
+        self,
+        estimation_method: EstimationMethod,
+        has_custom_validation_set: bool,
+    ) -> (
+        KFold
+        | StratifiedKFold
+        | utils.TrainTestSplitWrapper
+        | utils.NoopSplitterWrapper
+    ):
+        if estimation_method == EstimationMethod.CROSS_VALIDATION:
+            if has_custom_validation_set:
+                raise ValueError(
+                    "Custom validation set was provided while cross validation was enabled for early stopping. Please set early_stopping_use_crossvalidation to False or remove df_val."
+                )
+
+            logger.info("Running early stopping using Cross Validation.")
+            train_test_splitter = self._cv_splitter
+        else:
+            if not has_custom_validation_set:
+                logger.info(
+                    f"Running early stopping using holdout set of size {self.VALID_SIZE}."
+                )
+                train_test_splitter = self._holdout_splitter
+            else:
+                logger.info("Running early stopping using provided validation set.")
+                train_test_splitter = self._noop_splitter
+
+        return train_test_splitter
+
+    def _determine_n_folds(
+        self,
+        estimation_method: EstimationMethod,
+    ) -> int:
+        if estimation_method == EstimationMethod.CROSS_VALIDATION:
+            n_folds = self.N_FOLDS
+            logger.info(f"Using {n_folds} folds for cross-validation.")
+        else:
+            n_folds = 1
+        return n_folds
+
     def _determine_best_num_rounds(
         self,
         data_train: MCBoostProcessedData,
+        data_val: MCBoostProcessedData | None = None,
     ) -> int:
         logger.info("Determining optimal number of rounds")
         if data_train.labels is None:
             raise ValueError("_determine_best_num_rounds() requires labels.")
+
+        estimation_method = self._determine_estimation_method(data_train.weights)
+        train_test_splitter = self._determine_train_test_splitter(
+            estimation_method,
+            data_val is not None,
+        )
+        final_n_folds = self._determine_n_folds(estimation_method)
 
         patience_counter = 0
 
@@ -869,25 +966,6 @@ class BaseMCBoost(BaseCalibrator, ABC):
 
         mcboost_per_fold: Dict[int, BaseMCBoost] = {}
         predictions_per_fold: Dict[int, npt.NDArray] = {}
-
-        final_n_folds: int = 0
-
-        # The train/test splitter (trainTestSplitter) must have a random_state set to ensure that the folds are the same across runs.
-        if (
-            self._determine_estimation_method(data_train.weights)
-            == EstimationMethod.CROSS_VALIDATION
-        ):
-            logger.info(
-                f"Running early stopping using Cross Validation with {self.N_FOLDS} folds"
-            )
-            trainTestSplitter = self._cv_splitter
-            final_n_folds = self.N_FOLDS
-        else:
-            logger.info(
-                f"Running early stopping using holdout set of size {self.VALID_SIZE}"
-            )
-            trainTestSplitter = self._holdout_splitter
-            final_n_folds = 1
 
         best_score = -np.inf
 
@@ -918,15 +996,22 @@ class BaseMCBoost(BaseCalibrator, ABC):
             )
 
             fold_num = 0
-            for train_index, valid_index in trainTestSplitter.split(
+            for train_index, valid_index in train_test_splitter.split(
                 data_train.features, data_train.labels
             ):
                 data_train_cv = data_train[train_index]
-                data_valid_cv = data_train[valid_index]
+                data_valid_cv = data_val or data_train[valid_index]
+
+                logger.info(
+                    "Validation holdout size is: " + str(len(data_valid_cv.features))
+                )
 
                 if num_rounds == 0:
-                    current_predictions = self._inverse_transform_predictions(
-                        data_train.predictions
+                    train_fold_preds = self._inverse_transform_predictions(
+                        data_train_cv.predictions
+                    )
+                    valid_fold_preds = self._inverse_transform_predictions(
+                        data_valid_cv.predictions
                     )
                 else:
                     if fold_num not in mcboost_per_fold:
@@ -951,22 +1036,18 @@ class BaseMCBoost(BaseCalibrator, ABC):
                         numerical_feature_column_names=data_train_cv.numerical_feature_names,
                     )
                     predictions_per_fold[fold_num] = new_predictions
-
                     if self.save_training_performance:
-                        full_preds = mcboost_per_fold[fold_num]._predict(
-                            x=data_train.features,
-                            transformed_predictions=data_train.predictions,
+                        train_fold_preds = mcboost_per_fold[fold_num]._predict(
+                            x=data_train_cv.features,
+                            transformed_predictions=data_train_cv.predictions,
                             return_all_rounds=False,
                         )
-                        current_predictions = full_preds
-                    else:
-                        mcboost_valid_preds = mcboost_per_fold[fold_num]._predict(
-                            x=data_valid_cv.features,
-                            transformed_predictions=data_valid_cv.predictions,
-                            return_all_rounds=False,
-                        )
-                        current_predictions = np.zeros(len(data_train.features))
-                        current_predictions[valid_index] = mcboost_valid_preds
+
+                    valid_fold_preds = mcboost_per_fold[fold_num]._predict(
+                        x=data_valid_cv.features,
+                        transformed_predictions=data_valid_cv.predictions,
+                        return_all_rounds=False,
+                    )
 
                 for metric_idx, monitored_metric in enumerate(
                     self.monitored_metrics_during_training
@@ -975,7 +1056,7 @@ class BaseMCBoost(BaseCalibrator, ABC):
                         self._compute_metric_on_internal_data(
                             monitored_metric,
                             data_valid_cv,
-                            current_predictions[valid_index],
+                            valid_fold_preds,
                         )
                     )
                     if self.save_training_performance:
@@ -983,7 +1064,7 @@ class BaseMCBoost(BaseCalibrator, ABC):
                             self._compute_metric_on_internal_data(
                                 monitored_metric,
                                 data_train_cv,
-                                current_predictions[train_index],
+                                train_fold_preds,  # pyre-ignore[61]: train_fold_preds is not None whenever self.save_training_performance is True
                             )
                         )
 
@@ -1321,6 +1402,12 @@ class MCBoost(BaseMCBoost):
             stratify=True,
         )
 
+    @property
+    def _noop_splitter(
+        self,
+    ) -> utils.NoopSplitterWrapper:
+        return utils.NoopSplitterWrapper()
+
 
 class RegressionMCBoost(BaseMCBoost):
     """
@@ -1430,6 +1517,12 @@ class RegressionMCBoost(BaseMCBoost):
             random_state=self._next_seed(),
             stratify=False,
         )
+
+    @property
+    def _noop_splitter(
+        self,
+    ) -> utils.NoopSplitterWrapper:
+        return utils.NoopSplitterWrapper()
 
 
 class MCNet(BaseCalibrator):

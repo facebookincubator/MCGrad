@@ -456,6 +456,18 @@ class TrainTestSplitWrapper:
         yield train_idx, val_idx
 
 
+class NoopSplitterWrapper:
+    def __init__(
+        self,
+    ) -> None:
+        """
+        This splitter returns the training set as it is and an empty test set.
+        """
+
+    def split(self, X, y, groups=None):
+        yield np.arange(len(y)), []  # train_idx, val_idx
+
+
 def convert_arrow_columns_to_numpy(df: pd.DataFrame) -> pd.DataFrame:
     for col in df.columns:
         if isinstance(df[col].values, pd.core.arrays.ArrowExtensionArray):
