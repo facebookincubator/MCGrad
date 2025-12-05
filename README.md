@@ -17,7 +17,20 @@ Full documentation is available at: https://facebookincubator.github.io/MCGrad/
 
 - [Why MCBoost?](https://facebookincubator.github.io/MCGrad/docs/why-mcboost) - Learn about the benefits
 - [Quick Start](https://facebookincubator.github.io/MCGrad/docs/quickstart) - Get started quickly
-- [API Reference](https://facebookincubator.github.io/MCGrad/docs/api/methods) - Detailed API docs
+- [API Reference](https://mcgrad.readthedocs.io/) - Auto-generated API documentation from Python docstrings
+
+### Two Documentation Systems
+
+This project uses a dual documentation approach:
+
+1. **User Guide (Docusaurus)** - Available at https://facebookincubator.github.io/MCGrad/
+   - Getting started guides, tutorials, and conceptual documentation
+   - Built from the `website/` directory
+
+2. **API Reference (Sphinx)** - Available at https://multicalibration.readthedocs.io/
+   - Auto-generated from Python docstrings
+   - Detailed API documentation for all classes and functions
+   - Built from the `sphinx/` directory
 
 ## 🚀 Quick Start
 
