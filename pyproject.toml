@@ -20,6 +20,7 @@ dependencies = [
     "matplotlib>=3.3.0",
     "cffi>=1.15.0",
     "ax-platform>=1.2.1",
+    "psutil>=7.1.0",
 ]
 
 [project.optional-dependencies]

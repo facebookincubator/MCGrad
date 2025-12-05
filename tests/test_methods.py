@@ -18,6 +18,7 @@ from multicalibration.metrics import (
     wrap_sklearn_metric_func,
 )
 
+
 @pytest.fixture
 def rng():
     return np.random.RandomState(42)
