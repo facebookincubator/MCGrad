@@ -86,6 +86,23 @@ const config = {
               },
             ],
           },
+          {
+            title: 'Legal',
+            items: [
+              {
+                label: 'Privacy',
+                href: 'https://opensource.fb.com/legal/privacy/',
+                target: '_blank',
+                rel: 'noreferrer noopener',
+              },
+              {
+                label: 'Terms',
+                href: 'https://opensource.fb.com/legal/terms/',
+                target: '_blank',
+                rel: 'noreferrer noopener',
+              },
+            ],
+          },
         ],
         copyright: `Copyright © ${new Date().getFullYear()} Meta Platforms, Inc.`,
       },
