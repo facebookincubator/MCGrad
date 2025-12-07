@@ -252,7 +252,7 @@ def tune_mcboost_params(
         best_params = best_params[0]
 
     logger.info(f"Best parameters: {best_params}")
-    logger.info(f"Fitting MCBoost model with best parameters")
+    logger.info("Fitting MCBoost model with best parameters")
 
     with _suppress_logger(methods.logger):
         model._set_lightgbm_params(best_params)
