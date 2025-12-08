@@ -39,7 +39,7 @@ def plot_pr_curve(
     sample_weight: npt.NDArray | None = None,
 ) -> None:
     precision, recall, _ = skmetrics.precision_recall_curve(
-        y_true=y, probas_pred=scores, sample_weight=sample_weight
+        y, scores, sample_weight=sample_weight
     )
     ax.scatter(recall, precision)
     ax.set_xlim([0, 1])
