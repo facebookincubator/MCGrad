@@ -841,7 +841,7 @@ class BaseMCBoost(BaseCalibrator, ABC):
             inverse_preds = self._inverse_transform_predictions(transformed_predictions)
             return inverse_preds.reshape(1, -1) if return_all_rounds else inverse_preds
 
-        predictions = transformed_predictions
+        predictions = transformed_predictions.copy()
         x = np.c_[x, predictions]
         predictions_per_round = np.zeros((len(self.mr), len(predictions)))
         for i in range(len(self.mr)):
