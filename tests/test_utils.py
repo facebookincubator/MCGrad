@@ -410,3 +410,12 @@ def test_logistic_vectorized_with_extreme_values():
     assert result[1] < 1e-40
     assert result[2] > 0.999  # Very close to 1
     assert result[3] > 0.999  # Very close to 1
+
+
+def test_OrdinalEncoderWithUnknownSupport_transform_before_fit_raises_error():
+    encoder = utils.OrdinalEncoderWithUnknownSupport()
+    df = pd.DataFrame({"City": ["Paris", "Tokyo"]})
+    with pytest.raises(
+        ValueError, match="fit method should be called before transform"
+    ):
+        encoder.transform(df.values)

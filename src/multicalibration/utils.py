@@ -166,47 +166,6 @@ def make_equisized_bins(
     return bins
 
 
-def _compute_prop_positive_ci(
-    label_weighted: Iterable,
-    sample_weight: Iterable,
-    assigned_bin: Iterable,
-    bins: Collection[Any],
-    alpha,
-) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Computes the confidence interval for the proportion in each bin using the Clopper-Pearson method
-    (https://en.wikipedia.org/wiki/Binomial_proportion_confidence_interval#Clopper%E2%80%93Pearson_interval)
-    """
-
-    label_binned_preds = pd.DataFrame(
-        {
-            "label_weighted": label_weighted,
-            "sample_weight": sample_weight,
-            "assigned_bin": assigned_bin,
-        }
-    )
-
-    bin_stats = (
-        label_binned_preds[["assigned_bin", "label_weighted", "sample_weight"]]
-        .groupby("assigned_bin")
-        .agg(["sum"])
-    )
-
-    def _row_ci(row):
-        n_positive = row["label_weighted"]["sum"]
-        n = row["sample_weight"]["sum"]
-        lower = stats.beta.ppf(alpha / 2, n_positive, n - n_positive + 1)
-        upper = stats.beta.ppf(1 - alpha / 2, n_positive + 1, n - n_positive)
-        return pd.Series({"lower": lower, "upper": upper})
-
-    cis = bin_stats.apply(_row_ci, axis=1)
-    # pyre-ignore, index takes some complicated Union of types. Collection[Any] is fine
-    all_cis = pd.DataFrame(index=bins, columns=["lower", "upper"], data=np.nan)
-    all_cis.update(cis)
-
-    return all_cis.lower.values, all_cis.upper.values
-
-
 def positive_label_proportion(
     labels: np.ndarray,
     predictions: np.ndarray,
@@ -216,7 +175,9 @@ def positive_label_proportion(
     use_weights_in_sample_size: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
-    Computes the proportion of positive labels in each bin.
+    Computes the proportion of positive labels in each bin. Additionally, it computes the lower and upper bounds of the Confidence Interval for the proportion
+    using the Clopper-Pearson method (https://en.wikipedia.org/wiki/Binomial_proportion_confidence_interval#Clopper%E2%80%93Pearson_interval).
+
     :param labels: array of labels
     :param predictions: array of predictions
     :param bins: array of bin boundaries
