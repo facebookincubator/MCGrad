@@ -123,29 +123,35 @@ const Reference = () => (
 
 const SuccessStories = () => (
   <div className="padding--xl" style={{'background-color': 'var(--ifm-color-emphasis-100)'}}>
-    <h2 className="text--center padding--md">Success Stories</h2>
+    <h2 className="section-title">Success Stories</h2>
     <div className="row">
       <div className="col col--4 padding--md">
-        <h3>Integrity ReviewBot</h3>
-        <p>
-          LLM for automated enforcement decisions. MCBoost improved calibration across market and content type,
-          reducing multi-calibration error by <strong>6x</strong> and improving PRAUC by <strong>12pp</strong> on average.
-          This resulted in <strong>+10pp LLM automation rate</strong>.
-        </p>
+        <div className="success-story-card">
+          <h3>Integrity ReviewBot</h3>
+          <p>
+            LLM for automated enforcement decisions. MCBoost improved calibration across market and content type,
+            reducing multi-calibration error by <strong>6x</strong> and improving PRAUC by <strong>12pp</strong> on average.
+            This resulted in <strong>+10pp LLM automation rate</strong>.
+          </p>
+        </div>
       </div>
       <div className="col col--4 padding--md">
-        <h3>Instagram Age Prediction</h3>
-        <p>
-          Used to gate teen experiences. MCBoost ensured consistent performance across markets and population groups,
-          reducing teen miss rate (FNR) by <strong>1.84%</strong> while holding precision constant.
-        </p>
+        <div className="success-story-card">
+          <h3>Instagram Age Prediction</h3>
+          <p>
+            Used to gate teen experiences. MCBoost ensured consistent performance across markets and population groups,
+            reducing teen miss rate (FNR) by <strong>1.84%</strong> while holding precision constant.
+          </p>
+        </div>
       </div>
       <div className="col col--4 padding--md">
-        <h3>Confidence Aware NSMIEs</h3>
-        <p>
-          North Star Metric Impact Estimators provide experiment feedback. MCBoost produced confidence-aware
-          severity-weighted views prevalence, unblocking label-free precision readouts.
-        </p>
+        <div className="success-story-card">
+          <h3>Confidence Aware NSMIEs</h3>
+          <p>
+            North Star Metric Impact Estimators provide experiment feedback. MCBoost produced confidence-aware
+            severity-weighted views prevalence, unblocking label-free precision readouts.
+          </p>
+        </div>
       </div>
     </div>
   </div>
@@ -155,11 +161,16 @@ const MyPage = () => {
   const {siteConfig} = useDocusaurusContext();
   return (
     <Layout title={siteConfig.title} description={siteConfig.tagline}>
-      <div className="hero text--center" style={{height: '30rem'}}>
+      <div className="hero text--center" style={{minHeight: '35rem', display: 'flex', alignItems: 'center'}}>
         <div className="container">
           <div className="padding-vert--md">
+            <img
+              src={useBaseUrl('/img/logo.png')}
+              alt="MCGrad Logo"
+              className="hero-logo"
+            />
             <h1 className="hero__title">MCGrad</h1>
-            <p className="hero__subtitle text--secondary">
+            <p className="hero__subtitle">
               {siteConfig.tagline}
             </p>
           </div>
@@ -177,8 +188,8 @@ const MyPage = () => {
           </div>
         </div>
       </div>
-      <div className="padding--xl">
-        <h2 className="text--center padding--md">Key Features</h2>
+      <div className="padding-top--lg padding-bottom--xl padding-horiz--xl" style={{backgroundColor: 'var(--ifm-background-surface-color)'}}>
+        <h2 className="section-title" style={{marginTop: '0', paddingTop: '2rem'}}>Key Features</h2>
         {features && features.length > 0 && (
           <div className="row">
             {features.map(({title, content}) => (

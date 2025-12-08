@@ -46,6 +46,10 @@ const config = {
     ({
       navbar: {
         title: 'MCGrad',
+        logo: {
+          alt: 'MCGrad Logo',
+          src: 'img/logo.png',
+        },
         items: [
           {
             type: 'docSidebar',
