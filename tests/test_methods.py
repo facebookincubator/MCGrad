@@ -2558,3 +2558,195 @@ def test_prepare_mcboost_processed_data_presence_mask_with_missing_segment_featu
 
     assert not internal_data.output_presence_mask[2]
     assert internal_data.output_presence_mask[[0, 1, 3, 4]].all()
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_predict_does_not_modify_input_predictions_array(calibrator_class, rng):
+    """
+    Test that _predict does not modify the input predictions array in-place.
+
+    This is a regression test for a bug where _predict would alias the input
+    array instead of copying it, causing in-place modifications via += and *= operators.
+    """
+    n_samples = 100
+    df = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.3, 0.7, n_samples),
+            "label": rng.randint(0, 2, n_samples),
+            "feature1": rng.choice(["A", "B"], n_samples),
+        }
+    )
+
+    mcboost = calibrator_class(early_stopping=False, num_rounds=2)
+
+    mcboost.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["feature1"],
+    )
+
+    test_df = df.head(10)
+    preprocessed_data = mcboost._preprocess_input_data(
+        df=test_df,
+        prediction_column_name="prediction",
+        label_column_name=None,
+        weight_column_name=None,
+        categorical_feature_column_names=["feature1"],
+        numerical_feature_column_names=[],
+        is_fit_phase=False,
+    )
+
+    original_predictions = preprocessed_data.predictions.copy()
+
+    _ = mcboost._predict(
+        x=preprocessed_data.features,
+        transformed_predictions=preprocessed_data.predictions,
+        return_all_rounds=False,
+    )
+
+    np.testing.assert_array_equal(
+        preprocessed_data.predictions,
+        original_predictions,
+    )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_early_stopping_produces_same_model_as_manual_num_rounds(calibrator_class, rng):
+    """
+    Test that early stopping with N rounds produces the same model as manually setting num_rounds=N.
+
+    This is a regression test for a bug where:
+    1. Early stopping determines N rounds is optimal
+    2. During early stopping, _predict modifies preprocessed_data.predictions in-place
+    3. Final model training uses the modified predictions instead of original ones
+    4. Result: Different model than manually setting num_rounds=N
+    """
+    n_samples = 300
+    df = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.2, 0.8, n_samples),
+            "label": rng.randint(0, 2, n_samples),
+            "feature1": rng.choice(["A", "B", "C"], n_samples),
+            "feature2": rng.randn(n_samples),
+        }
+    )
+
+    mcboost_with_es = calibrator_class(
+        early_stopping=True,
+        num_rounds=10,
+        save_training_performance=True,
+        patience=0,
+    )
+
+    mcboost_with_es.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["feature1"],
+        numerical_feature_column_names=["feature2"],
+    )
+
+    num_rounds_determined = len(mcboost_with_es.mr)
+
+    mcboost_manual = calibrator_class(
+        early_stopping=False, num_rounds=num_rounds_determined, random_state=42
+    )
+
+    mcboost_manual.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["feature1"],
+        numerical_feature_column_names=["feature2"],
+    )
+
+    test_df = df.sample(50, random_state=999)
+
+    predictions_with_es = mcboost_with_es.predict(
+        df=test_df,
+        prediction_column_name="prediction",
+        categorical_feature_column_names=["feature1"],
+        numerical_feature_column_names=["feature2"],
+    )
+
+    predictions_manual = mcboost_manual.predict(
+        df=test_df,
+        prediction_column_name="prediction",
+        categorical_feature_column_names=["feature1"],
+        numerical_feature_column_names=["feature2"],
+    )
+
+    np.testing.assert_allclose(
+        predictions_with_es,
+        predictions_manual,
+        rtol=1e-10,
+        atol=1e-10,
+    )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_multiple_predict_calls_produce_consistent_results(calibrator_class, rng):
+    """
+    Test that calling predict multiple times on the same data produces identical results.
+
+    This verifies that predict does not have side effects that alter subsequent predictions.
+    """
+    n_samples = 80
+    df = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.2, 0.8, n_samples),
+            "label": rng.randint(0, 2, n_samples),
+            "feature1": rng.choice(["P", "Q", "R"], n_samples),
+        }
+    )
+
+    mcboost = calibrator_class(early_stopping=False, num_rounds=2, random_state=42)
+
+    mcboost.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["feature1"],
+    )
+
+    test_df = df.sample(20, random_state=123)
+
+    predictions_first = mcboost.predict(
+        df=test_df,
+        prediction_column_name="prediction",
+        categorical_feature_column_names=["feature1"],
+    )
+
+    predictions_second = mcboost.predict(
+        df=test_df,
+        prediction_column_name="prediction",
+        categorical_feature_column_names=["feature1"],
+    )
+
+    predictions_third = mcboost.predict(
+        df=test_df,
+        prediction_column_name="prediction",
+        categorical_feature_column_names=["feature1"],
+    )
+
+    np.testing.assert_array_equal(predictions_first, predictions_second)
+    np.testing.assert_array_equal(predictions_second, predictions_third)
