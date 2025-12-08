@@ -1002,10 +1002,6 @@ class BaseMCBoost(BaseCalibrator, ABC):
                 data_train_cv = data_train[train_index]
                 data_valid_cv = data_val or data_train[valid_index]
 
-                logger.info(
-                    "Validation holdout size is: " + str(len(data_valid_cv.features))
-                )
-
                 if num_rounds == 0:
                     train_fold_preds = self._inverse_transform_predictions(
                         data_train_cv.predictions
