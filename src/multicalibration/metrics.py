@@ -518,6 +518,19 @@ def multicalibration_error(
 
     total_weight = segments_df.sample_weight.sum()
 
+    # Handle the case when there are no segmentation columns, in which case
+    # we compute the error for the entire dataset as a single segment
+    if len(segmentation_cols) == 0:
+        return metric(
+            labels=labels,
+            predicted_scores=predictions,
+            sample_weight=sample_weight
+            if sample_weight is not None
+            else np.ones_like(labels),
+            num_bins=num_bins,
+            epsilon=epsilon,
+        )
+
     grouping_cols = (
         segmentation_cols if len(segmentation_cols) > 1 else segmentation_cols[0]
     )
