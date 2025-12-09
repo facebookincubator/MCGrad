@@ -371,3 +371,15 @@ def test_that_get_segment_masks_works_with_arbitrary_input_index_when_missing_va
     assert np.array_equal(np.where(indices[2])[0], np.array([2, 3]))  # segment_A = None
     assert np.array_equal(np.where(indices[3])[0], np.array([4]))  # segment_A = 'c'
     assert np.array_equal(np.where(indices[4])[0], np.array([5]))  # segment_A = 'd'
+
+
+def test_extract_masks_returns_empty_mask_when_key_not_found():
+    precomputed_masks = {("column_A", "value1"): np.array([True, False, True])}
+    selected_values = (("value2", "column_A"),)
+    df_length = 3
+
+    result = segmentation._extract_masks(precomputed_masks, selected_values, df_length)
+
+    # Result should be an all-False mask when key is not found
+    expected = np.zeros(df_length, dtype=np.bool_)
+    assert np.array_equal(result, expected)
