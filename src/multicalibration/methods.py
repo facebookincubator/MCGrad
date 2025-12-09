@@ -1160,7 +1160,6 @@ class BaseMCBoost(BaseCalibrator, ABC):
 
         # We use a rule-of-thumb to determine whether to use cross-validation or holdout for early stopping.
         # Namely, if the effective sample size is less than 2.5M, we use cross-validation, otherwise we use holdout.
-        # See N6787810 for more details.
         ess = self._compute_effective_sample_size(weights)
 
         if ess < self.ESS_THRESHOLD_FOR_CROSS_VALIDATION:
