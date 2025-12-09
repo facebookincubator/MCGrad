@@ -603,7 +603,7 @@ def test_additive_adjustment_calibrator_with_clip_gives_expected_result(
         (methods.MultiplicativeAdjustment, {}),
         (methods.AdditiveAdjustment, {}),
         (methods.IdentityCalibrator, {}),
-        (methods.SwissCheesePlattScaling, {}),
+        (methods.PlattScalingWithFeatures, {}),
     ],
 )
 def test_calibration_methods_use_weight_column_correctly(

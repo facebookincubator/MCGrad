@@ -1627,7 +1627,7 @@ class IdentityCalibrator(BaseCalibrator):
         return df[prediction_column_name].values
 
 
-class SwissCheesePlattScaling(BaseCalibrator):
+class PlattScalingWithFeatures(BaseCalibrator):
     """
     A variant of Platt scaling that incorporates additional categorical and numerical features alongside logits.
     Numerical features are discretized into bins.
@@ -1783,6 +1783,11 @@ class SwissCheesePlattScaling(BaseCalibrator):
             numerical_feature_column_names=numerical_feature_column_names,
         )
         return self.log_reg.predict_proba(df[self.features])[:, 1]
+
+
+# For backwards compatibility, we keep the original class name @oss-disable
+# @oss-disable[end= ]: class SwissCheesePlattScaling(PlattScalingWithFeatures):
+    # @oss-disable[end= ]: pass
 
 
 TCalibrator = TypeVar("TCalibrator", bound=BaseCalibrator)
