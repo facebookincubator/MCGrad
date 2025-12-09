@@ -1691,7 +1691,7 @@ def test_mce_below_initial_and_mce_below_strong_evidence_threshold_are_false_whe
         and mcboost.mce_below_strong_evidence_threshold is not None
     ), f"MCE is greater than {mcboost.MCE_STRONG_EVIDENCE_THRESHOLD}. Thus, mce_below_strong_evidence_threshold must be False."
     assert (
-        not mcboost.mce_is_satisfactory and mcboost.mce_is_satisfactory is not None
+        not mcboost._mce_is_satisfactory and mcboost._mce_is_satisfactory is not None
     ), "MCE is neither below the initial value nor below strong evidence threshold. Thus, mce_is_satisfactory must be False."
 
 
@@ -1706,7 +1706,7 @@ def test_extract_features_categorical_features_overflow(calibrator_class):
     mcboost = calibrator_class(encode_categorical_variables=False)
     x_cat = np.array([np.iinfo(np.int32).max + 1, np.nan, 0])
     with pytest.raises(ValueError) as exc_info:
-        mcboost.extract_features(
+        mcboost._extract_features(
             df=pd.DataFrame({"cat_feature": x_cat}),
             categorical_feature_column_names=["cat_feature"],
             numerical_feature_column_names=None,
@@ -1726,7 +1726,7 @@ def test_extract_features_categorical_features_negative(calibrator_class):
     mcboost = calibrator_class(encode_categorical_variables=False)
     x_cat = np.array([-1, np.nan, 0])
     with pytest.raises(ValueError) as exc_info:
-        mcboost.extract_features(
+        mcboost._extract_features(
             df=pd.DataFrame({"cat_feature": x_cat}),
             categorical_feature_column_names=["cat_feature"],
             numerical_feature_column_names=None,
@@ -1745,7 +1745,7 @@ def test_extract_features_categorical_features_negative(calibrator_class):
 def test_extract_features_categorical_features_valid(calibrator_class):
     mcboost = calibrator_class(encode_categorical_variables=False)
     x_cat = np.array([1, np.nan, 0])
-    mcboost.extract_features(
+    mcboost._extract_features(
         df=pd.DataFrame({"cat_feature": x_cat}),
         categorical_feature_column_names=["cat_feature"],
         numerical_feature_column_names=None,
@@ -1762,7 +1762,7 @@ def test_extract_features_categorical_features_valid(calibrator_class):
 def test_extract_features_numerical_features_valid(calibrator_class):
     mcboost = calibrator_class(encode_categorical_variables=False)
     x_num = np.array([1.0, np.nan, 0])
-    mcboost.extract_features(
+    mcboost._extract_features(
         df=pd.DataFrame({"num_feature": x_num}),
         categorical_feature_column_names=None,
         numerical_feature_column_names=["num_feature"],
@@ -2271,7 +2271,7 @@ def test_prepare_mcboost_processed_data_matches_individual_operations(calibrator
         is_fit_phase=True,
     )
 
-    x_direct = model.extract_features(
+    x_direct = model._extract_features(
         df=df,
         categorical_feature_column_names=cat_features,
         numerical_feature_column_names=num_features,
