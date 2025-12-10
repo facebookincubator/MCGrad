@@ -59,6 +59,7 @@ def sample_val_data(rng):
 def mock_mcboost_model(rng):
     model = Mock(spec=methods.MCBoost)
     model.predict = Mock(return_value=rng.uniform(0.1, 0.9, 80))
+    model.EARLY_STOPPING_ESTIMATION_METHOD = methods.EstimationMethod.HOLDOUT
     return model
 
 
@@ -510,3 +511,216 @@ def test_tune_mcboost_params_fallback_to_train_test_split(
     predict_calls = mock_mcboost_model.predict.call_args_list
     for call in predict_calls:
         assert call.kwargs["df"] is val_data
+
+
+@pytest.mark.arm64_incompatible
+@patch("multicalibration.tuning.normalized_entropy")
+def test_tune_mcboost_params_pass_df_val_into_tuning_true(
+    mock_normalized_entropy,
+    sample_data,
+    sample_val_data,
+    mock_mcboost_model,
+):
+    """Test that df_val is passed to model.fit during tuning when pass_df_val_into_tuning=True."""
+    mock_normalized_entropy.return_value = 0.5
+
+    tune_mcboost_params(
+        model=mock_mcboost_model,
+        df_train=sample_data,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        df_val=sample_val_data,
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=["num_feature"],
+        n_trials=2,
+        pass_df_val_into_tuning=True,
+        pass_df_val_into_final_fit=False,
+    )
+
+    # Get all fit calls
+    fit_calls = mock_mcboost_model.fit.call_args_list
+
+    # All tuning fit calls (all except the last one) should have df_val=sample_val_data
+    tuning_fit_calls = fit_calls[:-1]
+    for call in tuning_fit_calls:
+        assert call[1]["df_val"] is sample_val_data
+
+    # The final fit call should have df_val=None (since pass_df_val_into_final_fit=False)
+    final_fit_call = fit_calls[-1]
+    assert final_fit_call[1]["df_val"] is None
+
+
+@pytest.mark.arm64_incompatible
+@patch("multicalibration.tuning.normalized_entropy")
+def test_tune_mcboost_params_pass_df_val_into_tuning_false(
+    mock_normalized_entropy,
+    sample_data,
+    sample_val_data,
+    mock_mcboost_model,
+):
+    """Test that df_val is not passed to model.fit during tuning when pass_df_val_into_tuning=False."""
+    mock_normalized_entropy.return_value = 0.5
+
+    tune_mcboost_params(
+        model=mock_mcboost_model,
+        df_train=sample_data,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        df_val=sample_val_data,
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=["num_feature"],
+        n_trials=2,
+        pass_df_val_into_tuning=False,
+        pass_df_val_into_final_fit=False,
+    )
+
+    # All fit calls should have df_val=None
+    fit_calls = mock_mcboost_model.fit.call_args_list
+    for call in fit_calls:
+        assert call[1]["df_val"] is None
+
+
+@pytest.mark.arm64_incompatible
+@patch("multicalibration.tuning.normalized_entropy")
+def test_tune_mcboost_params_pass_df_val_into_final_fit_true(
+    mock_normalized_entropy,
+    sample_data,
+    sample_val_data,
+    mock_mcboost_model,
+):
+    """Test that df_val is passed to model.fit during final fit when pass_df_val_into_final_fit=True."""
+    mock_normalized_entropy.return_value = 0.5
+
+    tune_mcboost_params(
+        model=mock_mcboost_model,
+        df_train=sample_data,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        df_val=sample_val_data,
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=["num_feature"],
+        n_trials=2,
+        pass_df_val_into_tuning=False,
+        pass_df_val_into_final_fit=True,
+    )
+
+    # Get all fit calls
+    fit_calls = mock_mcboost_model.fit.call_args_list
+
+    # All tuning fit calls (all except the last one) should have df_val=None
+    tuning_fit_calls = fit_calls[:-1]
+    for call in tuning_fit_calls:
+        assert call[1]["df_val"] is None
+
+    # The final fit call should have df_val=sample_val_data
+    final_fit_call = fit_calls[-1]
+    assert final_fit_call[1]["df_val"] is sample_val_data
+
+
+@pytest.mark.arm64_incompatible
+@patch("multicalibration.tuning.normalized_entropy")
+def test_tune_mcboost_params_pass_df_val_into_final_fit_false(
+    mock_normalized_entropy,
+    sample_data,
+    sample_val_data,
+    mock_mcboost_model,
+):
+    """Test that df_val is not passed to model.fit during final fit when pass_df_val_into_final_fit=False."""
+    mock_normalized_entropy.return_value = 0.5
+
+    tune_mcboost_params(
+        model=mock_mcboost_model,
+        df_train=sample_data,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        df_val=sample_val_data,
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=["num_feature"],
+        n_trials=2,
+        pass_df_val_into_tuning=False,
+        pass_df_val_into_final_fit=False,
+    )
+
+    # The final fit call should have df_val=None
+    fit_calls = mock_mcboost_model.fit.call_args_list
+    final_fit_call = fit_calls[-1]
+    assert final_fit_call[1]["df_val"] is None
+
+
+@pytest.mark.arm64_incompatible
+@patch("multicalibration.tuning.normalized_entropy")
+def test_tune_mcboost_params_pass_df_val_into_both_tuning_and_final_fit(
+    mock_normalized_entropy,
+    sample_data,
+    sample_val_data,
+    mock_mcboost_model,
+):
+    """Test that df_val is passed to both tuning and final fit when both flags are True."""
+    mock_normalized_entropy.return_value = 0.5
+
+    tune_mcboost_params(
+        model=mock_mcboost_model,
+        df_train=sample_data,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        df_val=sample_val_data,
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=["num_feature"],
+        n_trials=2,
+        pass_df_val_into_tuning=True,
+        pass_df_val_into_final_fit=True,
+    )
+
+    # All fit calls should have df_val=sample_val_data
+    fit_calls = mock_mcboost_model.fit.call_args_list
+    for call in fit_calls:
+        assert call[1]["df_val"] is sample_val_data
+
+
+@pytest.mark.arm64_incompatible
+@pytest.mark.parametrize(
+    "pass_df_val_into_tuning,pass_df_val_into_final_fit",
+    [
+        (False, False),
+        (True, False),
+        (False, True),
+        (True, True),
+    ],
+)
+@patch("multicalibration.tuning.normalized_entropy")
+def test_tune_mcboost_params_df_val_passing_defaults_to_false(
+    mock_normalized_entropy,
+    sample_data,
+    sample_val_data,
+    mock_mcboost_model,
+    pass_df_val_into_tuning,
+    pass_df_val_into_final_fit,
+):
+    """Test all combinations of pass_df_val_into_tuning and pass_df_val_into_final_fit flags."""
+    mock_normalized_entropy.return_value = 0.5
+
+    tune_mcboost_params(
+        model=mock_mcboost_model,
+        df_train=sample_data,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        df_val=sample_val_data,
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=["num_feature"],
+        n_trials=2,
+        pass_df_val_into_tuning=pass_df_val_into_tuning,
+        pass_df_val_into_final_fit=pass_df_val_into_final_fit,
+    )
+
+    fit_calls = mock_mcboost_model.fit.call_args_list
+
+    # Verify tuning fit calls
+    tuning_fit_calls = fit_calls[:-1]
+    expected_tuning_df_val = sample_val_data if pass_df_val_into_tuning else None
+    for call in tuning_fit_calls:
+        assert call[1]["df_val"] is expected_tuning_df_val
+
+    # Verify final fit call
+    final_fit_call = fit_calls[-1]
+    expected_final_df_val = sample_val_data if pass_df_val_into_final_fit else None
+    assert final_fit_call[1]["df_val"] is expected_final_df_val
