@@ -852,10 +852,6 @@ def test_multi_RCE_is_more_for_groups_with_worse_ranking_quality(rng):
 
 
 def test_normalized_entropy_gives_expected_result():
-    """
-    The multicalibration test case for the normalized entropy (NE) metric shares the input data
-    and expected values with the F6 implementation of NE: https://www.internalfb.com/diff/D30597707.
-    """
     y_pred = np.array([0.2, 0.3, 0.5, 0.1, 0.3, 0.5, 0.2])
     y_true = np.array([0, 0, 1, 0, 1, 0, 1])
     result = metrics.normalized_entropy(y_true, y_pred)
@@ -867,7 +863,6 @@ def test_normalized_entropy_gives_expected_result():
     "y_pred,y_true,sample_weight,expected",
     [
         (
-            # NE unit test of F6, like in D30597707, with equal sample weights, which should give same result
             np.array([0.2, 0.3, 0.5, 0.1, 0.3, 0.5, 0.2]),
             np.array([0, 0, 1, 0, 1, 0, 1]),
             np.array([2, 2, 2, 2, 2, 2, 2]),
@@ -884,11 +879,6 @@ def test_normalized_entropy_gives_expected_result():
 def test_normalized_entropy_with_sample_weights_gives_expected_result(
     y_pred, y_true, sample_weight, expected
 ):
-    """
-    The multicalibration test case for the normalized entropy (NE) metric shares the input data
-    and expected values with the F6 implementation of NE: https://www.internalfb.com/diff/D30597707.
-    """
-
     result = metrics.normalized_entropy(y_true, y_pred, sample_weight=sample_weight)
     assert result == pytest.approx(expected)
 
