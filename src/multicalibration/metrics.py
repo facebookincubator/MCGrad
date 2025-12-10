@@ -46,9 +46,8 @@ def _calibration_error(
     :param bin_error_func: Function to calculate the error between the empirically observed rate and the estimated rate
     :param adjust_unjoined: Boolean flag indicating whether the input data is "unjoined data". In unjoined data there is
                            always a row with a negative label and there will be another row with positive label if it is a positive instance.
-                           This means that for positive instances there are two rows: one with a positive and one with a negative label. This
-                           is often used in datasets from the Ads organization. On unjoined datasets we need to make an adjustment to get an
-                           unbiased estimate of calibration error
+                           This means that for positive instances there are two rows: one with a positive and one with a negative label. On
+                           unjoined datasets we need to make an adjustment to get an unbiased estimate of calibration error
     :param sample_weight: Array of weights for each instance. If None, then all instances are considered to have weight 1
     :return: The calibration error as a float
     """
@@ -919,8 +918,6 @@ def kuiper_calibration(
 
 def kuiper_distribution(x: float) -> float:
     """
-    Source: https://github.com/facebookresearch/ecevecce/blob/main/codes/dists.py
-
     Evaluates the cumulative distribution function for the range
     (maximum minus minimum) of the standard Brownian motion on [0, 1].
 
@@ -986,7 +983,7 @@ def kuiper_test(
     :return: A tuple containing the Kuiper statistic and the corresponding p-value.
     """
 
-    KUIPER_MAX: float = 8.26732673  # See diff D76596250
+    KUIPER_MAX: float = 8.26732673
     KUIPER_MIN: float = 1e-20
 
     kuiper_statistic = kuiper_calibration(
@@ -1409,7 +1406,6 @@ def calibration_free_normalized_entropy(
 ) -> float:
     """
     Calculates the Calibration-Free normalized entropy.
-    Follows the logic from: https://fb.workplace.com/notes/743728179515952/.
 
     :param labels: Ground truth (correct) labels for n_samples samples.
     :param predictions: Predicted probabilities, as returned by a classifier's predict_proba method.
@@ -1461,8 +1457,6 @@ class MulticalibrationError:
     ) -> None:
         """
         Calculates the multicalibration error with respect to a set of segments for a given dataset.
-
-        See this wiki for a detailed description of the metric: https://www.internalfb.com/wiki/MCBoost/Measuring_Multicalibration/Methodology_Deep_Dive
 
         :param df: A pandas DataFrame containing the data.
         :param label_column: The name of the column in `df` that contains the true labels.
