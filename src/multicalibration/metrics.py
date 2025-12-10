@@ -234,6 +234,8 @@ def fpr(
     sample_weight: npt.NDArray | None = None,
     **kwargs: Any,
 ) -> float:
+    if len(labels) == 0:
+        return 0.0
     cm = skmetrics.confusion_matrix(
         y_true=labels.astype(int), y_pred=predicted_labels, sample_weight=sample_weight
     )
