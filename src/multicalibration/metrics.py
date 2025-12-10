@@ -1201,6 +1201,7 @@ def _rank_calibration_error(
     labels: npt.NDArray,
     predicted_labels: npt.NDArray,
     num_bins: int = CALIBRATION_ERROR_NUM_BINS,
+    rng: np.random.RandomState | None = None,
 ) -> tuple[float, npt.NDArray, npt.NDArray]:
     """
     Calculates rank calibration error as proposed in: https://arxiv.org/pdf/2404.03163
@@ -1211,7 +1212,8 @@ def _rank_calibration_error(
     :return: tuple (RCE, label_cdfs, prediction_cdfs)
     """
     # break ties
-    eps = np.random.uniform(0, 1, labels.shape[0]) * CALIBRATION_ERROR_EPSILON
+    rng = np.random.RandomState(42) if rng is None else rng
+    eps = rng.uniform(0, 1, labels.shape[0]) * CALIBRATION_ERROR_EPSILON
     labels = labels + eps
     predicted_labels = predicted_labels + eps
 
@@ -1229,10 +1231,7 @@ def _rank_calibration_error(
         prediction_means[i - 1] = np.mean(sorted_predictions[low:high])
 
     label_cdfs = np.array(
-        [
-            (np.sum([label_means[i] >= label_means])) / (num_bins)
-            for i in range(num_bins)
-        ]
+        [np.sum(label_means[i] >= label_means) / num_bins for i in range(num_bins)]
     )
 
     prediction_cdfs = np.array(

@@ -345,9 +345,9 @@ def test_multi_cg_gives_same_result_as_cg_per_segment(rank_discount, rng):
     df["segment_1"] = rng.choice(["A", "B"], size=len(df))
     df["segment_2"] = rng.choice(["C", "D"], size=len(df))
 
-    min_segmens_size = df.groupby(by=["segment_1", "segment_2"]).count().values.min()
-    print(f"{min_segmens_size=}")
-    k = min(k, min_segmens_size)
+    min_segments_size = df.groupby(by=["segment_1", "segment_2"]).count().values.min()
+    print(f"{min_segments_size=}")
+    k = min(k, min_segments_size)
 
     multi_cg_scores = metrics.multi_cg_score(
         labels=df["label"],
@@ -1224,7 +1224,7 @@ def test_mce_speedup_returns_values_equal_for_different_chunk_sizes(rng):
     assert np.equal(mce_chunk25.segment_sigmas, mce_chunk7.segment_sigmas).all()
 
 
-def mce_sorting_does_not_modify_original_df(rng):
+def test_mce_sorting_does_not_modify_original_df(rng):
     # Check that the original df remains unchanged after being passed into the MCE metric and locally sorted
     n_cat_fts = 3
     n_num_fts = 3
