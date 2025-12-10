@@ -331,7 +331,7 @@ class BaseMCBoost(BaseCalibrator, ABC):
                 logger.warning(
                     "Model has already been fit. To avoid inconsistent state all training state will be reset after setting lightgbm_params."
                 )
-                self.reset_training_state()
+                self._reset_training_state()
         except AttributeError:
             pass
 
@@ -385,7 +385,7 @@ class BaseMCBoost(BaseCalibrator, ABC):
             }
         ).sort_values("importance", ascending=False)
 
-    def reset_training_state(self) -> None:
+    def _reset_training_state(self) -> None:
         self.mr = []
         self.unshrink_factors = []
         self.mce_below_initial = None
@@ -396,7 +396,7 @@ class BaseMCBoost(BaseCalibrator, ABC):
         self.numerical_feature_names = None
 
     @property
-    def mce_is_satisfactory(self) -> bool | None:
+    def _mce_is_satisfactory(self) -> bool | None:
         return self.mce_below_initial and self.mce_below_strong_evidence_threshold
 
     @property
@@ -470,7 +470,7 @@ class BaseMCBoost(BaseCalibrator, ABC):
         logger.info(
             f"Preprocessing input data with {len(df)} rows; in_fit_phase = {is_fit_phase}"
         )
-        x = self.extract_features(
+        x = self._extract_features(
             df=df,
             categorical_feature_column_names=categorical_feature_column_names,
             numerical_feature_column_names=numerical_feature_column_names,
@@ -525,7 +525,7 @@ class BaseMCBoost(BaseCalibrator, ABC):
             numerical_feature_column_names,
         )
 
-        self.reset_training_state()
+        self._reset_training_state()
 
         # Store feature names to be used in feature importance later
         self.categorical_feature_names = categorical_feature_column_names or []
@@ -617,7 +617,7 @@ class BaseMCBoost(BaseCalibrator, ABC):
 
         self.mr.append(
             lgb.train(
-                params=self.get_lgbm_params(x),
+                params=self._get_lgbm_params(x),
                 train_set=lgb.Dataset(
                     x,
                     label=y,
@@ -749,7 +749,7 @@ class BaseMCBoost(BaseCalibrator, ABC):
 
         return predictions_per_round if return_all_rounds else predictions_per_round[-1]
 
-    def get_lgbm_params(self, x: npt.NDArray) -> dict[str, Any]:
+    def _get_lgbm_params(self, x: npt.NDArray) -> dict[str, Any]:
         lgb_params = self.lightgbm_params.copy()
         if self.MONOTONE_T:
             score_constraint = [1]
@@ -759,7 +759,7 @@ class BaseMCBoost(BaseCalibrator, ABC):
             )
         return lgb_params
 
-    def extract_features(
+    def _extract_features(
         self,
         df: pd.DataFrame,
         categorical_feature_column_names: list[str] | None,
@@ -1642,7 +1642,7 @@ class PlattScalingWithFeatures(BaseCalibrator):
         self.kbd_columns: list[str] | None = None
         self.features: list[str] | None = None
 
-    def fit_feature_encoders(
+    def _fit_feature_encoders(
         self,
         df: pd.DataFrame,
         categorical_feature_column_names: list[str] | None,
@@ -1660,7 +1660,7 @@ class PlattScalingWithFeatures(BaseCalibrator):
         else:
             self.kbd = None
 
-    def convert_df(
+    def _convert_df(
         self,
         df: pd.DataFrame,
         prediction_column_name: str,
@@ -1702,7 +1702,7 @@ class PlattScalingWithFeatures(BaseCalibrator):
 
         return df
 
-    def train_model(
+    def _train_model(
         self,
         df: pd.DataFrame,
         prediction_column_name: str,
@@ -1744,18 +1744,18 @@ class PlattScalingWithFeatures(BaseCalibrator):
         **kwargs: Any,
     ) -> Self:
         df_train = df_train.copy().reset_index().fillna(0)
-        self.fit_feature_encoders(
+        self._fit_feature_encoders(
             df_train, categorical_feature_column_names, numerical_feature_column_names
         )
 
-        df_train = self.convert_df(
+        df_train = self._convert_df(
             df_train,
             prediction_column_name,
             categorical_feature_column_names,
             numerical_feature_column_names,
         )
 
-        log_reg = self.train_model(
+        log_reg = self._train_model(
             df_train,
             prediction_column_name,
             label_column_name,
@@ -1776,7 +1776,7 @@ class PlattScalingWithFeatures(BaseCalibrator):
     ) -> npt.NDArray:
         df = df.copy().reset_index().fillna(0)
 
-        df = self.convert_df(
+        df = self._convert_df(
             df=df,
             prediction_column_name=prediction_column_name,
             categorical_feature_column_names=categorical_feature_column_names,
