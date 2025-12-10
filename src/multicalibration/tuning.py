@@ -133,6 +133,8 @@ def tune_mcboost_params(
     n_trials: int = 20,
     n_warmup_random_trials: int | None = None,
     parameter_configurations: list[ParameterConfig] | None = None,
+    pass_df_val_into_tuning: bool = False,
+    pass_df_val_into_final_fit: bool = False,
 ) -> tuple[methods.MCBoost | None, pd.DataFrame]:
     # Make a description for this function
     """
@@ -151,6 +153,8 @@ def tune_mcboost_params(
            Defaults to None, which uses calculate_num_initialization_trials to determine the number of warmup trials, which uses the following rules:
            (i) At least 16 (Twice the number of tunable parameters), (ii) At most 1/5th of num_trials.
     :param parameter_configurations: The list of parameter configurations to tune. If None, the default parameter configurations are used.
+    :param pass_df_val_into_tuning: Whether to pass the validation data into the tuning process. If True, the validation data is passed into the tuning process.
+    :param pass_df_val_into_final_fit: Whether to pass the validation data into the final fit. If True, the validation data is passed into the final fit.
     """
 
     if df_val is None:
@@ -161,6 +165,22 @@ def tune_mcboost_params(
             stratify=df_train[label_column_name],
         )
     assert df_val is not None
+
+    if (
+        model.EARLY_STOPPING_ESTIMATION_METHOD
+        == methods.EstimationMethod.CROSS_VALIDATION
+        and (pass_df_val_into_tuning or pass_df_val_into_final_fit)
+    ):
+        raise ValueError(
+            "Early stopping with cross validation is not supported when passing validation data into tuning or final fit."
+        )
+
+    df_param_val: pd.DataFrame | None = None
+    if pass_df_val_into_tuning:
+        logger.info(
+            f"Passing validation data with {len(df_val)} into fit during tuning process"
+        )
+        df_param_val = df_val
 
     if parameter_configurations is None:
         parameter_configurations = default_parameter_configurations
@@ -178,6 +198,7 @@ def tune_mcboost_params(
             categorical_feature_column_names=categorical_feature_column_names,
             numerical_feature_column_names=numerical_feature_column_names,
             weight_column_name=weight_column_name,
+            df_val=df_param_val,
         )
 
         prediction = model.predict(
@@ -257,6 +278,11 @@ def tune_mcboost_params(
     with _suppress_logger(methods.logger):
         model._set_lightgbm_params(best_params)
 
+    df_final_val: pd.DataFrame | None = None
+    if pass_df_val_into_final_fit:
+        logger.info(f"Passing validation data with {len(df_val)} into final fit")
+        df_final_val = df_val
+
     model.fit(
         df_train=df_train,
         prediction_column_name=prediction_column_name,
@@ -264,6 +290,7 @@ def tune_mcboost_params(
         categorical_feature_column_names=categorical_feature_column_names,
         numerical_feature_column_names=numerical_feature_column_names,
         weight_column_name=weight_column_name,
+        df_val=df_final_val,
     )
 
     return model, trial_results
