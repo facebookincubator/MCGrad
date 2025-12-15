@@ -193,9 +193,11 @@ class BaseMCBoost(BaseCalibrator, ABC):
             self._rng: np.random.Generator = np.random.default_rng(random_state)
 
         if early_stopping_score_func is not None:
-            assert (
-                early_stopping_minimize_score is not None
-            ), "If using a custom score function the attribute `early_stopping_minimize_score` has to be set."
+            if early_stopping_minimize_score is None:
+                raise ValueError(
+                    "If using a custom score function the attribute "
+                    "`early_stopping_minimize_score` has to be set."
+                )
             self.early_stopping_score_func: ScoreFunctionInterface = (
                 early_stopping_score_func
             )
@@ -204,9 +206,14 @@ class BaseMCBoost(BaseCalibrator, ABC):
             # Note: When changing the default score function, make sure to update the default value of `early_stopping_minimize_score` in the next line accordingly.
             self.early_stopping_score_func = self._default_early_stopping_metric
             self.early_stopping_minimize_score: bool = True
-            assert (
-                early_stopping_minimize_score is None
-            ), f"`early_stopping_minimize_score` is only relevant when using a custom score function. The default score function is {self.early_stopping_score_func.name} for which `early_stopping_minimize_score` is set to {self.early_stopping_minimize_score} automatically."
+            if early_stopping_minimize_score is not None:
+                raise ValueError(
+                    f"`early_stopping_minimize_score` is only relevant when using a "
+                    f"custom score function. The default score function is "
+                    f"{self.early_stopping_score_func.name} for which "
+                    f"`early_stopping_minimize_score` is set to "
+                    f"{self.early_stopping_minimize_score} automatically."
+                )
 
         self._set_lightgbm_params(lightgbm_params)
 
@@ -344,9 +351,12 @@ class BaseMCBoost(BaseCalibrator, ABC):
         if lightgbm_params is not None:
             params_to_set.update(lightgbm_params)
 
-        assert (
-            "num_rounds" not in params_to_set
-        ), "avoid using `num_rounds` in `lightgbm_params` due to a naming conflict with `num_rounds` in MCBoost. Use any of the other aliases instead (https://lightgbm.readthedocs.io/en/latest/Parameters.html)"
+        if "num_rounds" in params_to_set:
+            raise ValueError(
+                "Avoid using `num_rounds` in `lightgbm_params` due to a naming "
+                "conflict with `num_rounds` in MCBoost. Use any of the other aliases "
+                "instead (https://lightgbm.readthedocs.io/en/latest/Parameters.html)"
+            )
 
         self.lightgbm_params: dict[str, Any] = {
             **params_to_set,
