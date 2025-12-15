@@ -248,15 +248,13 @@ class BaseMCBoost(BaseCalibrator, ABC):
             # Override the timeout when early stopping is disabled
             early_stopping_timeout = None
 
-        self.EARLY_STOPPING_ESTIMATION_METHOD: EstimationMethod = (
-            EstimationMethod.CROSS_VALIDATION
-            if early_stopping_use_crossvalidation
-            else (
-                EstimationMethod.AUTO
-                if early_stopping_use_crossvalidation is None
-                else EstimationMethod.HOLDOUT
-            )
-        )
+        self.EARLY_STOPPING_ESTIMATION_METHOD: EstimationMethod
+        if early_stopping_use_crossvalidation is True:
+            self.EARLY_STOPPING_ESTIMATION_METHOD = EstimationMethod.CROSS_VALIDATION
+        elif early_stopping_use_crossvalidation is None:
+            self.EARLY_STOPPING_ESTIMATION_METHOD = EstimationMethod.AUTO
+        else:
+            self.EARLY_STOPPING_ESTIMATION_METHOD = EstimationMethod.HOLDOUT
 
         if self.EARLY_STOPPING_ESTIMATION_METHOD == EstimationMethod.HOLDOUT:
             if n_folds is not None:
