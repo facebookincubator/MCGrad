@@ -357,12 +357,11 @@ class BaseMCBoost(BaseCalibrator, ABC):
         }
 
     def feature_importance(self) -> pd.DataFrame:
-        """
-        Returns a dataframe with the feature importance of the final model.
+        """Returns the feature importance of the first MCBoost round.
 
         Importance is defined as the total gain from splits on a feature from the first round of MCBoost.
 
-        :return: a dataframe with the feature importance.
+        :return: A dataframe with columns 'feature' and 'importance', sorted by importance in descending order
         """
         if (
             not self.mr
@@ -401,6 +400,14 @@ class BaseMCBoost(BaseCalibrator, ABC):
 
     @property
     def performance_metrics(self) -> dict[str, list[float]]:
+        """Returns the performance metrics collected during early stopping procedure.
+
+        Metrics are tracked for each round of MCBoost during the early stopping phase. The dictionary
+        contains metric names as keys and lists of values (one per round) as values. Metrics include
+        the early stopping metric and any additional monitored metrics specified during initialization.
+
+        :return: Dictionary mapping metric names to lists of values per round
+        """
         if not self._performance_metrics:  # empty
             raise ValueError(
                 "Performance metrics are only available after the model has been fit with `early_stopping=True`"
@@ -517,6 +524,22 @@ class BaseMCBoost(BaseCalibrator, ABC):
         df_val: pd.DataFrame | None = None,
         **kwargs: Any,
     ) -> Self:
+        """Fit the MCBoost calibration model on the provided training data.
+
+        :param df_train: The dataframe containing the training data
+        :param prediction_column_name: Name of the column in dataframe df that contains the uncalibrated predictions
+        :param label_column_name: Name of the column in dataframe df that contains the ground truth labels
+        :param weight_column_name: Name of the column in dataframe df that contains the instance weights
+        :param categorical_feature_column_names: List of column names in the df that contain the categorical
+            segmentation features
+        :param numerical_feature_column_names: List of column names in the df that contain the numerical
+            segmentation features
+        :param df_val: Optional validation dataframe for early stopping. When provided with early stopping enabled,
+            this validation set will be used instead of a holdout from the training data. early_stopping_use_crossvalidation has
+            to be set to False for this to work.
+        :param kwargs: Additional keyword arguments
+        :return: The fitted calibrator instance
+        """
         self._check_input_data(
             df_train,
             prediction_column_name,
@@ -699,6 +722,21 @@ class BaseMCBoost(BaseCalibrator, ABC):
         return_all_rounds: bool = False,
         **kwargs: Any,
     ) -> npt.NDArray:
+        """Apply the MCBoost calibration model to a DataFrame.
+
+        This requires the `fit` method to have been previously called on this calibrator object.
+
+        :param df: The dataframe containing the data to calibrate
+        :param prediction_column_name: Name of the column in dataframe df that contains the predictions
+        :param categorical_feature_column_names: List of column names in the df that contain the categorical
+            segmentation features
+        :param numerical_feature_column_names: List of column names in the df that contain the numerical
+            segmentation features
+        :param return_all_rounds: If True, returns predictions for all MCBoost rounds as a 2D array of shape
+            (num_rounds, num_samples). If False, returns only the final round predictions as a 1D array
+        :param kwargs: Additional keyword arguments
+        :return: Array of calibrated predictions. Shape depends on return_all_rounds parameter
+        """
         preprocessed_data = self._preprocess_input_data(
             df=df,
             prediction_column_name=prediction_column_name,
@@ -1080,10 +1118,12 @@ class BaseMCBoost(BaseCalibrator, ABC):
         return int(time.time() - start_time)
 
     def serialize(self) -> str:
-        """
-        Serializes the model into a JSON string.
+        """Serializes the fitted MCBoost model to a JSON string.
 
-        :return: serialised model.
+        The serialized model includes all boosters, unshrink factors, encoder state, and configuration parameters,
+        allowing the model to be saved and restored later.
+
+        :return: JSON string containing the serialized model
         """
         serialized_boosters = [booster.model_to_string() for booster in self.mr]
         json_obj: dict[str, Any] = {
@@ -1111,6 +1151,13 @@ class BaseMCBoost(BaseCalibrator, ABC):
 
     @classmethod
     def deserialize(cls, model_str: str) -> Self:
+        """Deserializes an MCBoost model from a JSON string.
+
+        Reconstructs a fitted MCBoost model from a previously serialized representation.
+
+        :param model_str: JSON string containing the serialized model
+        :return: A fitted MCBoost instance with all state restored
+        """
         json_obj = json.loads(model_str)
         model = cls()
         model.mr = []
@@ -1417,7 +1464,9 @@ class RegressionMCBoost(BaseMCBoost):
 
 
 class PlattScaling(BaseCalibrator):
-    """
+    """Platt scaling calibration method.
+
+
     Provides an implementation of Platt scaling, which is just a Logistic Regression applied to the logits.
 
     References:
@@ -1440,6 +1489,17 @@ class PlattScaling(BaseCalibrator):
         numerical_feature_column_names: list[str] | None = None,
         **kwargs: Any,
     ) -> Self:
+        """Fit the Platt scaling model on the provided training data.
+
+        :param df_train: The dataframe containing the training data
+        :param prediction_column_name: Name of the column in dataframe df that contains the predictions
+        :param label_column_name: Name of the column in dataframe df that contains the ground truth labels
+        :param weight_column_name: Name of the column in dataframe df that contains the instance weights
+        :param categorical_feature_column_names: Ignored for Platt scaling (no multicalibration)
+        :param numerical_feature_column_names: Ignored for Platt scaling (no multicalibration)
+        :param kwargs: Additional keyword arguments
+        :return: The fitted calibrator instance
+        """
         y = df_train[label_column_name].values.astype(float)
         y_hat = df_train[prediction_column_name].values.astype(float)
         w = df_train[weight_column_name] if weight_column_name else np.ones_like(y)
@@ -1457,6 +1517,17 @@ class PlattScaling(BaseCalibrator):
         numerical_feature_column_names: list[str] | None = None,
         **kwargs: Any,
     ) -> npt.NDArray:
+        """Apply the Platt scaling model to a DataFrame.
+
+        This requires the `fit` method to have been previously called on this calibrator object.
+
+        :param df: The dataframe containing the data to calibrate
+        :param prediction_column_name: Name of the column in dataframe df that contains the predictions
+        :param categorical_feature_column_names: Ignored for Platt scaling (no multicalibration)
+        :param numerical_feature_column_names: Ignored for Platt scaling (no multicalibration)
+        :param kwargs: Additional keyword arguments
+        :return: Array of calibrated predictions
+        """
         y_hat = df[prediction_column_name].values.astype(float)
 
         logits = utils.logit(y_hat).reshape(-1, 1)
@@ -1464,7 +1535,9 @@ class PlattScaling(BaseCalibrator):
 
 
 class IsotonicRegression(BaseCalibrator):
-    """
+    """Isotonic regression calibration method.
+
+
     Provides an implementation of Isotonic regression. For input values outside of the training
     domain, predictions are set to the value corresponding to the nearest training interval endpoint.
 
@@ -1476,6 +1549,11 @@ class IsotonicRegression(BaseCalibrator):
     """
 
     def __init__(self) -> None:
+        """Initializes an IsotonicRegression calibrator.
+
+        Creates an isotonic regression model that enforces monotonicity constraints. For input values outside
+        of the training domain, predictions are set to the value corresponding to the nearest training interval endpoint.
+        """
         self.isoreg = isotonic.IsotonicRegression()
 
     def fit(
@@ -1488,6 +1566,17 @@ class IsotonicRegression(BaseCalibrator):
         numerical_feature_column_names: list[str] | None = None,
         **kwargs: Any,
     ) -> Self:
+        """Fit the isotonic regression calibration model on the provided training data.
+
+        :param df_train: The dataframe containing the training data
+        :param prediction_column_name: Name of the column in dataframe df that contains the predictions
+        :param label_column_name: Name of the column in dataframe df that contains the ground truth labels
+        :param weight_column_name: Name of the column in dataframe df that contains the instance weights
+        :param categorical_feature_column_names: Ignored for isotonic regression (no multicalibration)
+        :param numerical_feature_column_names: Ignored for isotonic regression (no multicalibration)
+        :param kwargs: Additional keyword arguments
+        :return: The fitted calibrator instance
+        """
         y = df_train[label_column_name].values.astype(float)
         y_hat = df_train[prediction_column_name].values.astype(float)
         w = df_train[weight_column_name] if weight_column_name else np.ones_like(y)
@@ -1507,6 +1596,17 @@ class IsotonicRegression(BaseCalibrator):
         numerical_feature_column_names: list[str] | None = None,
         **kwargs: Any,
     ) -> npt.NDArray:
+        """Apply the isotonic regression calibration model to a DataFrame.
+
+        This requires the `fit` method to have been previously called on this calibrator object.
+
+        :param df: The dataframe containing the data to calibrate
+        :param prediction_column_name: Name of the column in dataframe df that contains the predictions
+        :param categorical_feature_column_names: Ignored for isotonic regression (no multicalibration)
+        :param numerical_feature_column_names: Ignored for isotonic regression (no multicalibration)
+        :param kwargs: Additional keyword arguments
+        :return: Array of calibrated predictions
+        """
         y_hat = df[prediction_column_name].values.astype(float)
         return self.isoreg.transform(y_hat)
 
@@ -1518,6 +1618,9 @@ class MultiplicativeAdjustment(BaseCalibrator):
     """
 
     def __init__(self, clip_to_zero_one: bool = True) -> None:
+        """
+        :param clip_to_zero_one: If True, clips calibrated predictions to the [0, 1] range.
+        """
         self.multiplier: float | None = None
         self.clip_to_zero_one = clip_to_zero_one
 
@@ -1531,6 +1634,17 @@ class MultiplicativeAdjustment(BaseCalibrator):
         numerical_feature_column_names: list[str] | None = None,
         **kwargs: Any,
     ) -> Self:
+        """Fit the multiplicative adjustment calibration model on the provided training data.
+
+        :param df_train: The dataframe containing the training data
+        :param prediction_column_name: Name of the column in dataframe df that contains the predictions
+        :param label_column_name: Name of the column in dataframe df that contains the ground truth labels
+        :param weight_column_name: Name of the column in dataframe df that contains the instance weights
+        :param categorical_feature_column_names: Ignored for multiplicative adjustment (no multicalibration)
+        :param numerical_feature_column_names: Ignored for multiplicative adjustment (no multicalibration)
+        :param kwargs: Additional keyword arguments
+        :return: The fitted calibrator instance
+        """
         w = (
             df_train[weight_column_name]
             if weight_column_name
@@ -1549,6 +1663,17 @@ class MultiplicativeAdjustment(BaseCalibrator):
         numerical_feature_column_names: list[str] | None = None,
         **kwargs: Any,
     ) -> npt.NDArray:
+        """Apply the multiplicative adjustment calibration model to a DataFrame.
+
+        This requires the `fit` method to have been previously called on this calibrator object.
+
+        :param df: The dataframe containing the data to calibrate
+        :param prediction_column_name: Name of the column in dataframe df that contains the predictions
+        :param categorical_feature_column_names: Ignored for multiplicative adjustment (no multicalibration)
+        :param numerical_feature_column_names: Ignored for multiplicative adjustment (no multicalibration)
+        :param kwargs: Additional keyword arguments
+        :return: Array of calibrated predictions
+        """
         preds = df[prediction_column_name].values * self.multiplier
         if self.clip_to_zero_one:
             preds = np.clip(preds, 0, 1)
@@ -1562,6 +1687,9 @@ class AdditiveAdjustment(BaseCalibrator):
     """
 
     def __init__(self, clip_to_zero_one: bool = True) -> None:
+        """
+        :param clip_to_zero_one: If True, clips calibrated predictions to the [0, 1] range.
+        """
         self.offset: float | None = None
         self.clip_to_zero_one = clip_to_zero_one
 
@@ -1575,6 +1703,17 @@ class AdditiveAdjustment(BaseCalibrator):
         numerical_feature_column_names: list[str] | None = None,
         **kwargs: Any,
     ) -> Self:
+        """Fit the additive adjustment calibration model on the provided training data.
+
+        :param df_train: The dataframe containing the training data
+        :param prediction_column_name: Name of the column in dataframe df that contains the predictions
+        :param label_column_name: Name of the column in dataframe df that contains the ground truth labels
+        :param weight_column_name: Name of the column in dataframe df that contains the instance weights
+        :param categorical_feature_column_names: Ignored for additive adjustment (no multicalibration)
+        :param numerical_feature_column_names: Ignored for additive adjustment (no multicalibration)
+        :param kwargs: Additional keyword arguments
+        :return: The fitted calibrator instance
+        """
         w = (
             df_train[weight_column_name]
             if weight_column_name
@@ -1593,6 +1732,17 @@ class AdditiveAdjustment(BaseCalibrator):
         numerical_feature_column_names: list[str] | None = None,
         **kwargs: Any,
     ) -> npt.NDArray:
+        """Apply the additive adjustment calibration model to a DataFrame.
+
+        This requires the `fit` method to have been previously called on this calibrator object.
+
+        :param df: The dataframe containing the data to calibrate
+        :param prediction_column_name: Name of the column in dataframe df that contains the predictions
+        :param categorical_feature_column_names: Ignored for additive adjustment (no multicalibration)
+        :param numerical_feature_column_names: Ignored for additive adjustment (no multicalibration)
+        :param kwargs: Additional keyword arguments
+        :return: Array of calibrated predictions
+        """
         preds = df[prediction_column_name].values + self.offset
         if self.clip_to_zero_one:
             preds = np.clip(preds, 0, 1)
@@ -1614,6 +1764,17 @@ class IdentityCalibrator(BaseCalibrator):
         numerical_feature_column_names: list[str] | None = None,
         **kwargs: Any,
     ) -> Self:
+        """Fit the identity calibrator (no-op, returns uncalibrated predictions).
+
+        :param df_train: The dataframe containing the training data (ignored)
+        :param prediction_column_name: Name of the column in dataframe df that contains the predictions (ignored)
+        :param label_column_name: Name of the column in dataframe df that contains the ground truth labels (ignored)
+        :param weight_column_name: Name of the column in dataframe df that contains the instance weights (ignored)
+        :param categorical_feature_column_names: Ignored
+        :param numerical_feature_column_names: Ignored
+        :param kwargs: Additional keyword arguments (ignored)
+        :return: The calibrator instance
+        """
         return self
 
     def predict(
@@ -1624,6 +1785,15 @@ class IdentityCalibrator(BaseCalibrator):
         numerical_feature_column_names: list[str] | None = None,
         **kwargs: Any,
     ) -> npt.NDArray:
+        """Apply the identity calibrator (returns uncalibrated predictions).
+
+        :param df: The dataframe containing the data
+        :param prediction_column_name: Name of the column in dataframe df that contains the predictions
+        :param categorical_feature_column_names: Ignored
+        :param numerical_feature_column_names: Ignored
+        :param kwargs: Additional keyword arguments (ignored)
+        :return: Array of uncalibrated predictions
+        """
         return df[prediction_column_name].values
 
 
@@ -1743,6 +1913,19 @@ class PlattScalingWithFeatures(BaseCalibrator):
         numerical_feature_column_names: list[str] | None = None,
         **kwargs: Any,
     ) -> Self:
+        """Fit the Platt scaling with features model on the provided training data.
+
+        :param df_train: The dataframe containing the training data
+        :param prediction_column_name: Name of the column in dataframe df that contains the predictions
+        :param label_column_name: Name of the column in dataframe df that contains the ground truth labels
+        :param weight_column_name: Name of the column in dataframe df that contains the instance weights
+        :param categorical_feature_column_names: List of column names in the df that contain the categorical
+            segmentation features (these will be one-hot encoded)
+        :param numerical_feature_column_names: List of column names in the df that contain the numerical
+            segmentation features (these will be discretized into bins)
+        :param kwargs: Additional keyword arguments
+        :return: The fitted calibrator instance
+        """
         df_train = df_train.copy().reset_index().fillna(0)
         self._fit_feature_encoders(
             df_train, categorical_feature_column_names, numerical_feature_column_names
@@ -1774,6 +1957,19 @@ class PlattScalingWithFeatures(BaseCalibrator):
         numerical_feature_column_names: list[str] | None = None,
         **kwargs: Any,
     ) -> npt.NDArray:
+        """Apply the Platt scaling with features model to a DataFrame.
+
+        This requires the `fit` method to have been previously called on this calibrator object.
+
+        :param df: The dataframe containing the data to calibrate
+        :param prediction_column_name: Name of the column in dataframe df that contains the predictions
+        :param categorical_feature_column_names: List of column names in the df that contain the categorical
+            segmentation features (must match the features used during training)
+        :param numerical_feature_column_names: List of column names in the df that contain the numerical
+            segmentation features (must match the features used during training)
+        :param kwargs: Additional keyword arguments
+        :return: Array of calibrated predictions
+        """
         df = df.copy().reset_index().fillna(0)
 
         df = self._convert_df(
@@ -1809,6 +2005,10 @@ class SegmentwiseCalibrator(Generic[TCalibrator], BaseCalibrator):
         calibrator_class: type[TCalibrator],
         calibrator_kwargs: dict[str, Any] | None = None,
     ) -> None:
+        """
+        :param calibrator_class: The calibrator class to use for each segment (must be a subclass of BaseCalibrator)
+        :param calibrator_kwargs: Optional keyword arguments to pass when instantiating calibrators for each segment
+        """
         self.calibrator_class = calibrator_class
         self.calibrator_kwargs = calibrator_kwargs or {}
 
@@ -1832,6 +2032,22 @@ class SegmentwiseCalibrator(Generic[TCalibrator], BaseCalibrator):
         numerical_feature_column_names: list[str] | None = None,
         **kwargs: Any,
     ) -> Self:
+        """Fit segment-specific calibration models on the provided training data.
+
+        Data is partitioned into segments based on categorical features, and a separate calibrator is fit
+        for each segment.
+
+        :param df_train: The dataframe containing the training data
+        :param prediction_column_name: Name of the column in dataframe df that contains the predictions
+        :param label_column_name: Name of the column in dataframe df that contains the ground truth labels
+        :param weight_column_name: Name of the column in dataframe df that contains the instance weights
+        :param categorical_feature_column_names: List of column names in the df that contain the categorical
+            segmentation features (passed to individual calibrators)
+        :param numerical_feature_column_names: List of column names in the df that contain the numerical
+            segmentation features (passed to individual calibrators)
+        :param kwargs: Additional keyword arguments
+        :return: The fitted calibrator instance
+        """
         if categorical_feature_column_names is None:
             categorical_feature_column_names = []
         if numerical_feature_column_names is None:
@@ -1862,6 +2078,20 @@ class SegmentwiseCalibrator(Generic[TCalibrator], BaseCalibrator):
         numerical_feature_column_names: list[str] | None = None,
         **kwargs: Any,
     ) -> npt.NDArray:
+        """Apply segment-specific calibration models to a DataFrame.
+
+        This requires the `fit` method to have been previously called on this calibrator object.
+        For any unseen segments, the identity calibrator is used (returns uncalibrated predictions).
+
+        :param df: The dataframe containing the data to calibrate
+        :param prediction_column_name: Name of the column in dataframe df that contains the predictions
+        :param categorical_feature_column_names: List of column names in the df that contain the categorical
+            segmentation features (must match the features used during training)
+        :param numerical_feature_column_names: List of column names in the df that contain the numerical
+            segmentation features (must match the features used during training)
+        :param kwargs: Additional keyword arguments
+        :return: Array of calibrated predictions
+        """
         if categorical_feature_column_names is None:
             categorical_feature_column_names = []
         if numerical_feature_column_names is None:
