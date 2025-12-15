@@ -1075,13 +1075,9 @@ class BaseMCBoost(BaseCalibrator, ABC):
                     f"avg_valid_performance_{monitored_metric.name}"
                 ][0]
 
-                self.mce_below_initial = (
-                    True if mce_at_best_num_rounds < mce_at_initial_round else False
-                )
+                self.mce_below_initial = mce_at_best_num_rounds < mce_at_initial_round
                 self.mce_below_strong_evidence_threshold = (
-                    True
-                    if mce_at_best_num_rounds < self.MCE_STRONG_EVIDENCE_THRESHOLD
-                    else False
+                    mce_at_best_num_rounds < self.MCE_STRONG_EVIDENCE_THRESHOLD
                 )
 
                 if not self.mce_below_strong_evidence_threshold:
