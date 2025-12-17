@@ -280,7 +280,7 @@ class BaseMCBoost(
             self.DEFAULT_HYPERPARAMS["patience"] if patience is None else patience
         )
 
-        self.EARLY_STOPPING_TIMEOUT: int | None = early_stopping_timeout
+        self.early_stopping_timeout: int | None = early_stopping_timeout
 
         self.N_FOLDS: int = (
             1  # Because we make a single train/test split when using holdout
@@ -583,8 +583,8 @@ class BaseMCBoost(
         num_rounds = self.NUM_ROUNDS
         if self.early_stopping:
             timeout_msg = (
-                f" (timeout: {self.EARLY_STOPPING_TIMEOUT}s)"
-                if self.EARLY_STOPPING_TIMEOUT
+                f" (timeout: {self.early_stopping_timeout}s)"
+                if self.early_stopping_timeout
                 else ""
             )
             logger.info(
@@ -925,11 +925,11 @@ class BaseMCBoost(
                 log_add = " (input prediction for early stopping baseline)"
             logger.info(f"Evaluating round {num_rounds}{log_add}")
 
-            if self.EARLY_STOPPING_TIMEOUT is not None and self._get_elapsed_time(
+            if self.early_stopping_timeout is not None and self._get_elapsed_time(
                 start_time
-            ) > cast(int, self.EARLY_STOPPING_TIMEOUT):
+            ) > cast(int, self.early_stopping_timeout):
                 logger.warning(
-                    f"Stopping early stopping upon exceeding the {self.EARLY_STOPPING_TIMEOUT:,}-second timeout; "
+                    f"Stopping early stopping upon exceeding the {self.early_stopping_timeout:,}-second timeout; "
                     + "MCBoost results will likely improve by increasing `early_stopping_timeout` or setting it to None"
                 )
                 break
