@@ -31,6 +31,8 @@ from typing_extensions import Self
 
 logger: logging.Logger = logging.getLogger(__name__)
 
+# @oss-disable[end= ]: from multicalibration._compat import DeprecatedAttributesMixin
+
 
 @dataclass(frozen=True, slots=True)
 class MCBoostProcessedData:
@@ -60,7 +62,11 @@ class EstimationMethod(Enum):
     AUTO = 3
 
 
-class BaseMCBoost(BaseCalibrator, ABC):
+class BaseMCBoost(
+    # @oss-disable[end= ]: DeprecatedAttributesMixin,
+    BaseCalibrator,
+    ABC,
+):
     """
     Abstract base class for MCBoost models. This class hosts the common functionality for all MCBoost models and defines
     an abstract interface that all MCBoost models must implement.
@@ -218,7 +224,7 @@ class BaseMCBoost(BaseCalibrator, ABC):
         self._set_lightgbm_params(lightgbm_params)
 
         self.encode_categorical_variables = encode_categorical_variables
-        self.MONOTONE_T: bool = (
+        self.monotone_t: bool = (
             self.DEFAULT_HYPERPARAMS["monotone_t"] if monotone_t is None else monotone_t
         )
 
@@ -797,7 +803,7 @@ class BaseMCBoost(BaseCalibrator, ABC):
 
     def _get_lgbm_params(self, x: npt.NDArray) -> dict[str, Any]:
         lgb_params = self.lightgbm_params.copy()
-        if self.MONOTONE_T:
+        if self.monotone_t:
             score_constraint = [1]
             segment_feature_constraints = [0] * (x.shape[1] - 1)
             lgb_params["monotone_constraints"] = (
@@ -955,7 +961,7 @@ class BaseMCBoost(BaseCalibrator, ABC):
                     if fold_num not in mcboost_per_fold:
                         mcboost = self._create_instance_for_cv(
                             encode_categorical_variables=self.encode_categorical_variables,
-                            monotone_t=self.MONOTONE_T,
+                            monotone_t=self.monotone_t,
                             lightgbm_params=self.lightgbm_params,
                             early_stopping=False,
                             num_rounds=0,
