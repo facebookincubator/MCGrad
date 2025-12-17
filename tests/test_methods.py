@@ -1516,7 +1516,7 @@ def test_patience_in_mcboost(patience: int, calibrator_class, rng):
     effective_num_rounds = len(mcboost.mr)
     extra_evaluation_due_to_early_stopping = (
         1
-        if (mcboost.EARLY_STOPPING and effective_num_rounds < mcboost.NUM_ROUNDS)
+        if (mcboost.early_stopping and effective_num_rounds < mcboost.NUM_ROUNDS)
         else 0
     )
 

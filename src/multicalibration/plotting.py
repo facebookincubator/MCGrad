@@ -695,7 +695,7 @@ def plot_learning_curve(
     :param show_all: Whether to show all metrics in the learning curve. If False, only the metric specified in MCBoost's early_stopping_score_func is shown.
     :returns: A Plotly Figure object representing the learning curve.
     """
-    if not mcboost_model.EARLY_STOPPING:
+    if not mcboost_model.early_stopping:
         raise ValueError(
             "Learning curve can only be plotted for models that have been trained with EARLY_STOPPING=True."
         )
@@ -704,7 +704,7 @@ def plot_learning_curve(
     extra_evaluation_due_to_early_stopping = (
         1
         if (
-            mcboost_model.EARLY_STOPPING
+            mcboost_model.early_stopping
             and len(mcboost_model.mr) < mcboost_model.NUM_ROUNDS
         )
         else 0

@@ -228,13 +228,13 @@ class BaseMCBoost(
             self.DEFAULT_HYPERPARAMS["monotone_t"] if monotone_t is None else monotone_t
         )
 
-        self.EARLY_STOPPING: bool = (
+        self.early_stopping: bool = (
             self.DEFAULT_HYPERPARAMS["early_stopping"]
             if early_stopping is None
             else early_stopping
         )
 
-        if not self.EARLY_STOPPING:
+        if not self.early_stopping:
             if patience is not None:
                 raise ValueError(
                     "`patience` must be None when argument `early_stopping` is disabled."
@@ -269,7 +269,7 @@ class BaseMCBoost(
                 )
 
         if num_rounds is None:
-            if self.EARLY_STOPPING:
+            if self.early_stopping:
                 num_rounds = self.MAX_NUM_ROUNDS_EARLY_STOPPING
             else:
                 num_rounds = self.NUM_ROUNDS_DEFAULT_NO_EARLY_STOPPING
@@ -581,7 +581,7 @@ class BaseMCBoost(
         preprocessed_val_data = None
 
         num_rounds = self.NUM_ROUNDS
-        if self.EARLY_STOPPING:
+        if self.early_stopping:
             timeout_msg = (
                 f" (timeout: {self.EARLY_STOPPING_TIMEOUT}s)"
                 if self.EARLY_STOPPING_TIMEOUT
