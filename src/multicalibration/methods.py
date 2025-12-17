@@ -254,15 +254,15 @@ class BaseMCBoost(
             # Override the timeout when early stopping is disabled
             early_stopping_timeout = None
 
-        self.EARLY_STOPPING_ESTIMATION_METHOD: EstimationMethod
+        self.early_stopping_estimation_method: EstimationMethod
         if early_stopping_use_crossvalidation is True:
-            self.EARLY_STOPPING_ESTIMATION_METHOD = EstimationMethod.CROSS_VALIDATION
+            self.early_stopping_estimation_method = EstimationMethod.CROSS_VALIDATION
         elif early_stopping_use_crossvalidation is None:
-            self.EARLY_STOPPING_ESTIMATION_METHOD = EstimationMethod.AUTO
+            self.early_stopping_estimation_method = EstimationMethod.AUTO
         else:
-            self.EARLY_STOPPING_ESTIMATION_METHOD = EstimationMethod.HOLDOUT
+            self.early_stopping_estimation_method = EstimationMethod.HOLDOUT
 
-        if self.EARLY_STOPPING_ESTIMATION_METHOD == EstimationMethod.HOLDOUT:
+        if self.early_stopping_estimation_method == EstimationMethod.HOLDOUT:
             if n_folds is not None:
                 raise ValueError(
                     "`n_folds` must be None when `early_stopping_use_crossvalidation` is disabled."
@@ -284,7 +284,7 @@ class BaseMCBoost(
 
         self.N_FOLDS: int = (
             1  # Because we make a single train/test split when using holdout
-            if (self.EARLY_STOPPING_ESTIMATION_METHOD == EstimationMethod.HOLDOUT)
+            if (self.early_stopping_estimation_method == EstimationMethod.HOLDOUT)
             else self.DEFAULT_HYPERPARAMS["n_folds"]
             if n_folds is None
             else n_folds
@@ -1207,8 +1207,8 @@ class BaseMCBoost(
 
         :return: the estimation method to use.
         """
-        if self.EARLY_STOPPING_ESTIMATION_METHOD != EstimationMethod.AUTO:
-            return self.EARLY_STOPPING_ESTIMATION_METHOD
+        if self.early_stopping_estimation_method != EstimationMethod.AUTO:
+            return self.early_stopping_estimation_method
 
         if self.early_stopping_score_func.name != "log_loss":
             # Automatically infer the estimation method only when using the logistic loss, otherwise use k-fold.
