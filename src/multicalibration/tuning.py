@@ -167,7 +167,7 @@ def tune_mcboost_params(
     assert df_val is not None
 
     if (
-        model.EARLY_STOPPING_ESTIMATION_METHOD
+        model.early_stopping_estimation_method
         == methods.EstimationMethod.CROSS_VALIDATION
         and (pass_df_val_into_tuning or pass_df_val_into_final_fit)
     ):

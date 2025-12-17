@@ -59,7 +59,7 @@ def sample_val_data(rng):
 def mock_mcboost_model(rng):
     model = Mock(spec=methods.MCBoost)
     model.predict = Mock(return_value=rng.uniform(0.1, 0.9, 80))
-    model.EARLY_STOPPING_ESTIMATION_METHOD = methods.EstimationMethod.HOLDOUT
+    model.early_stopping_estimation_method = methods.EstimationMethod.HOLDOUT
     return model
 
 
