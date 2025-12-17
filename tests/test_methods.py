@@ -2493,7 +2493,7 @@ def test_determine_n_folds_returns_correct_value(
     # Assert: Verify correct n_folds is returned
     # Special handling for CROSS_VALIDATION since N_FOLDS may be set differently
     if estimation_method == methods.EstimationMethod.CROSS_VALIDATION:
-        assert n_folds == model.N_FOLDS
+        assert n_folds == model.n_folds
     else:
         assert n_folds == expected_n_folds
 
