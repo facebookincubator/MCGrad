@@ -282,7 +282,7 @@ class BaseMCBoost(
 
         self.early_stopping_timeout: int | None = early_stopping_timeout
 
-        self.N_FOLDS: int = (
+        self.n_folds: int = (
             1  # Because we make a single train/test split when using holdout
             if (self.early_stopping_estimation_method == EstimationMethod.HOLDOUT)
             else self.DEFAULT_HYPERPARAMS["n_folds"]
@@ -885,7 +885,7 @@ class BaseMCBoost(
         estimation_method: EstimationMethod,
     ) -> int:
         if estimation_method == EstimationMethod.CROSS_VALIDATION:
-            n_folds = self.N_FOLDS
+            n_folds = self.n_folds
             logger.info(f"Using {n_folds} folds for cross-validation.")
         else:
             n_folds = 1
@@ -1336,7 +1336,7 @@ class MCBoost(BaseMCBoost):
     @property
     def _cv_splitter(self) -> StratifiedKFold:
         return StratifiedKFold(
-            n_splits=self.N_FOLDS,
+            n_splits=self.n_folds,
             shuffle=True,
             random_state=self._next_seed(),
         )
@@ -1452,7 +1452,7 @@ class RegressionMCBoost(BaseMCBoost):
     @property
     def _cv_splitter(self) -> KFold:
         return KFold(
-            n_splits=self.N_FOLDS,
+            n_splits=self.n_folds,
             shuffle=True,
             random_state=self._next_seed(),
         )
