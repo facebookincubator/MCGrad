@@ -1368,7 +1368,7 @@ def _rank_multicalibration_error(
 
 def normalized_entropy(
     labels: npt.NDArray,
-    predictions: npt.NDArray,
+    predicted_scores: npt.NDArray,
     sample_weight: npt.NDArray | None = None,
 ) -> float:
     """
@@ -1376,14 +1376,14 @@ def normalized_entropy(
     and the log loss obtained from fixed predictions equal to the test set prevalence.
 
     :param labels: Ground truth (correct) labels for n_samples samples.
-    :param predictions: Predicted probabilities, as returned by a classifier’s predict_proba method.
+    :param predicted_scores: Predicted probabilities, as returned by a classifier's predict_proba method.
     :returns: the normalized entropy
     """
     if sample_weight is None:
-        sample_weight = np.ones_like(predictions)
+        sample_weight = np.ones_like(predicted_scores)
 
     prediction_log_loss = skmetrics.log_loss(
-        labels, predictions, sample_weight=sample_weight
+        labels, predicted_scores, sample_weight=sample_weight
     )
 
     prevalence = np.sum(labels * sample_weight) / np.sum(sample_weight)
@@ -1398,7 +1398,7 @@ def normalized_entropy(
 
 def calibration_free_normalized_entropy(
     labels: npt.NDArray,
-    predictions: npt.NDArray,
+    predicted_scores: npt.NDArray,
     sample_weight: npt.NDArray | None = None,
     tolerance: float = 1e-5,
     max_iter: int = 10000,
@@ -1407,24 +1407,24 @@ def calibration_free_normalized_entropy(
     Calculates the Calibration-Free normalized entropy.
 
     :param labels: Ground truth (correct) labels for n_samples samples.
-    :param predictions: Predicted probabilities, as returned by a classifier's predict_proba method.
+    :param predicted_scores: Predicted probabilities, as returned by a classifier's predict_proba method.
     :returns: the calibration-free NE.
     """
     assert (
         len(labels.shape) == 1
     ), "y_pred must be the predicted probability for class 1 only."
 
-    current_calibration = calibration_ratio(labels, predictions, sample_weight)
+    current_calibration = calibration_ratio(labels, predicted_scores, sample_weight)
 
     it = 0
     while abs(current_calibration - 1) > tolerance and it < max_iter:
-        predictions = predictions / (
-            current_calibration + (1 - current_calibration) * predictions
+        predicted_scores = predicted_scores / (
+            current_calibration + (1 - current_calibration) * predicted_scores
         )
-        current_calibration = calibration_ratio(labels, predictions, sample_weight)
+        current_calibration = calibration_ratio(labels, predicted_scores, sample_weight)
         it += 1
 
-    calib_free_ne = normalized_entropy(labels, predictions)
+    calib_free_ne = normalized_entropy(labels, predicted_scores)
     return calib_free_ne
 
 

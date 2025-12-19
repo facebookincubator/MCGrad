@@ -1709,10 +1709,10 @@ def test_calibration_free_normalized_entropy_higher_for_reversed_predictions():
     poorly_calibrated = np.array([0.9, 0.8, 0.7, 0.3, 0.2, 0.1])
 
     result_good = metrics.calibration_free_normalized_entropy(
-        labels=labels, predictions=well_calibrated
+        labels=labels, predicted_scores=well_calibrated
     )
     result_bad = metrics.calibration_free_normalized_entropy(
-        labels=labels, predictions=poorly_calibrated
+        labels=labels, predicted_scores=poorly_calibrated
     )
 
     assert result_bad > result_good
