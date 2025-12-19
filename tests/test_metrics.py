@@ -1659,8 +1659,182 @@ def test_ecce_and_standard_deviation_return_zero_for_empty_segment(rng):
         sample_weight=df["weights"].values,
         segments=masks,
     )[0]
-
     assert c_jk == k_ub == k_std, "Expected 0 for empty segment"
+
+
+def test_predictions_to_labels_does_not_modify_input_dataframes():
+    """Verify predictions_to_labels does not modify input DataFrames."""
+    data = pd.DataFrame(
+        {
+            "prediction": [0.1, 0.2, 0.4, 0.8, 0.9],
+            "segment_a": ["a", "a", "b", "b", "a"],
+            "segment_b": ["i", "j", "i", "j", "i"],
+        }
+    )
+    thresholds = pd.DataFrame(
+        {
+            "segment_a": ["a", "a", "b", "b"],
+            "segment_b": ["i", "j", "i", "j"],
+            "threshold": [0.8, 0.7, 0.6, 0.5],
+        }
+    )
+
+    data_original = data.copy()
+    thresholds_original = thresholds.copy()
+
+    _ = metrics.predictions_to_labels(
+        data=data, prediction_column="prediction", thresholds=thresholds
+    )
+
+    pd.testing.assert_frame_equal(data, data_original)
+    pd.testing.assert_frame_equal(thresholds, thresholds_original)
+
+
+def test_multicalibration_error_does_not_modify_segments_df():
+    """Verify multicalibration_error does not modify input segments_df."""
+    labels = np.linspace(0, 1, 100)
+    predictions = 1 - np.linspace(0, 1, 100)
+    segments_df = pd.DataFrame({"segment": np.array(["A"] * 50 + ["B"] * 50)})
+
+    segments_df_original = segments_df.copy()
+
+    _ = metrics.multicalibration_error(
+        labels, predictions, segments_df, metric=metrics.expected_calibration_error
+    )
+
+    pd.testing.assert_frame_equal(segments_df, segments_df_original)
+
+
+def test_multi_cg_score_does_not_modify_segments_df(rng):
+    """Verify multi_cg_score does not modify input segments_df."""
+    n_samples = 100
+    df = pd.DataFrame(index=range(n_samples))
+    df["label"] = rng.random_sample(n_samples)
+    df["score"] = rng.random_sample(n_samples)
+    df["segment_1"] = rng.choice(["A", "B"], size=len(df))
+    df["segment_2"] = rng.choice(["C", "D"], size=len(df))
+
+    segments_df = df[["segment_1", "segment_2"]].copy()
+    segments_df_original = segments_df.copy()
+
+    _ = metrics.multi_cg_score(
+        labels=df["label"].values,
+        predictions=df["score"].values,
+        segments_df=segments_df,
+        metric=metrics.ndcg_score,
+        rank_discount=utils.rank_no_discount,
+        k=10,
+    )
+
+    pd.testing.assert_frame_equal(segments_df, segments_df_original)
+
+
+def test_rank_multicalibration_error_does_not_modify_segments_df(rng):
+    """Verify rank_multicalibration_error does not modify input segments_df."""
+    y_true = rng.random_sample(100)
+    df = pd.DataFrame({"group": ["A"] * 50 + ["B"] * 50})
+    df["y_score"] = np.zeros(100)
+    df["y_true"] = y_true
+    df.loc[df.group == "A", "y_score"] = df.loc[df.group == "A", "y_true"] * 2.0
+    df.loc[df.group == "B", "y_score"] = df.loc[df.group == "B", "y_true"] * 4.0
+
+    segments_df = df[["group"]].copy()
+    segments_df_original = segments_df.copy()
+
+    _ = metrics.rank_multicalibration_error(
+        labels=df["y_true"].values,
+        predicted_labels=df["y_score"].values,
+        segments_df=segments_df,
+        num_bins=40,
+    )
+
+    pd.testing.assert_frame_equal(segments_df, segments_df_original)
+
+
+@pytest.mark.parametrize(
+    "metric_func",
+    [
+        metrics.kuiper_pvalue_per_segment,
+        metrics.kuiper_statistic_per_segment,
+    ],
+)
+def test_kuiper_per_segment_does_not_modify_segments_df(rng, metric_func):
+    n_samples = 100
+    labels = rng.randint(0, 2, n_samples)
+    predictions = rng.random_sample(n_samples)
+    segments_df = pd.DataFrame({"segment": rng.choice(["A", "B"], size=n_samples)})
+
+    segments_df_original = segments_df.copy()
+
+    _ = metric_func(labels=labels, predictions=predictions, segments_df=segments_df)
+
+    pd.testing.assert_frame_equal(segments_df, segments_df_original)
+
+
+@pytest.mark.parametrize(
+    "metric_func,metric_kwargs,use_sample_weight",
+    [
+        (metrics.expected_calibration_error, {}, True),
+        (metrics.expected_calibration_error, {}, False),
+        (metrics.calibration_ratio, {}, True),
+        (metrics.calibration_ratio, {}, False),
+        (
+            metrics.kuiper_calibration,
+            {"normalization_method": "kuiper_standard_deviation"},
+            True,
+        ),
+        (
+            metrics.kuiper_calibration,
+            {"normalization_method": "kuiper_standard_deviation"},
+            False,
+        ),
+        (metrics.normalized_entropy, {}, True),
+        (metrics.normalized_entropy, {}, False),
+    ],
+)
+def test_metric_does_not_modify_input_arrays(
+    rng, metric_func, metric_kwargs, use_sample_weight
+):
+    labels = rng.randint(0, 2, 100).astype(np.float64)
+    predicted_scores = rng.random_sample(100)
+    sample_weight = rng.random_sample(100) if use_sample_weight else None
+
+    labels_original = labels.copy()
+    predicted_scores_original = predicted_scores.copy()
+    sample_weight_original = sample_weight.copy() if sample_weight is not None else None
+
+    _ = metric_func(
+        labels=labels,
+        predicted_scores=predicted_scores,
+        sample_weight=sample_weight,
+        **metric_kwargs,
+    )
+
+    np.testing.assert_array_equal(labels, labels_original)
+    np.testing.assert_array_equal(predicted_scores, predicted_scores_original)
+    if sample_weight is not None:
+        np.testing.assert_array_equal(sample_weight, sample_weight_original)
+
+
+@pytest.mark.parametrize(
+    "metric_func,metric_kwargs",
+    [
+        (metrics.dcg_score, {"rank_discount": utils.rank_no_discount}),
+        (metrics.ndcg_score, {"rank_discount": utils.rank_no_discount}),
+        (metrics.rank_calibration_error, {}),
+    ],
+)
+def test_ranking_metric_does_not_modify_input_arrays(rng, metric_func, metric_kwargs):
+    labels = rng.random_sample(100)
+    predicted_labels = rng.random_sample(100)
+
+    labels_original = labels.copy()
+    predicted_labels_original = predicted_labels.copy()
+
+    _ = metric_func(labels=labels, predicted_labels=predicted_labels, **metric_kwargs)
+
+    np.testing.assert_array_equal(labels, labels_original)
+    np.testing.assert_array_equal(predicted_labels, predicted_labels_original)
 
 
 @pytest.mark.parametrize(
