@@ -4,25 +4,25 @@ sidebar_position: 5
 
 # Methodology
 
-This page provides an overview of how MCBoost works under the hood.
+This page provides an overview of how MCGrad works under the hood.
 
-## The Multi-Calibration Problem
+## The Multicalibration Problem
 
 Traditional calibration ensures that predictions match outcomes globally:
 ```
 E[Y | f(X) = p] = p
 ```
 
-Multi-calibration extends this to segments:
+Multicalibration extends this to segments:
 ```
 E[Y | f(X) = p, g(X) = v] = p  for all functions g
 ```
 
 Where `g(X)` represents any segment defined by the features.
 
-## MCBoost Algorithm
+## MCGrad Algorithm
 
-MCBoost uses gradient boosting (LightGBM) to iteratively improve calibration across segments:
+MCGrad uses gradient boosting (LightGBM) to iteratively improve calibration across segments:
 
 1. **Initialize** - Start with the base model predictions
 2. **Iterate** over boosting rounds:
@@ -33,7 +33,7 @@ MCBoost uses gradient boosting (LightGBM) to iteratively improve calibration acr
 
 ## Why Gradient Boosting?
 
-LightGBM provides several advantages for multi-calibration:
+LightGBM provides several advantages for multicalibration:
 
 - **Automatic feature selection** - finds relevant segments
 - **Efficient** - handles large datasets and many features
@@ -42,10 +42,10 @@ LightGBM provides several advantages for multi-calibration:
 
 ## Theoretical Guarantees
 
-MCBoost is a likelihood-improving procedure:
+MCGrad is a likelihood-improving procedure:
 - **On training data**: guaranteed to improve or maintain likelihood
 - **On test data**: improved with high probability given proper regularization
-- **Multi-calibration**: achieves near-optimal calibration across exponentially many segments
+- **Multicalibration**: achieves near-optimal calibration across exponentially many segments
 
 ## Implementation Details
 
@@ -57,9 +57,9 @@ The implementation uses:
 
 ## Comparison with Alternatives
 
-| Method | Global Calibration | Multi-Calibration | Data Efficiency | Speed |
+| Method | Global Calibration | Multicalibration | Data Efficiency | Speed |
 |--------|-------------------|-------------------|-----------------|-------|
-| **MCBoost** | ✓ | ✓✓✓ | ✓✓✓ | ✓✓✓ |
+| **MCGrad** | ✓ | ✓✓✓ | ✓✓✓ | ✓✓✓ |
 | Isotonic Regression | ✓ | ✗ | ✓✓ | ✓✓✓ |
 | Platt Scaling | ✓ | ✗ | ✓✓✓ | ✓✓✓ |
 | Temperature Scaling | ✓ | ✗ | ✓✓✓ | ✓✓✓ |
@@ -82,5 +82,5 @@ For more on multicalibration theory and applications:
 
 ## Next Steps
 
-- [Quick Start](quickstart.md) - Start using MCBoost
+- [Quick Start](quickstart.md) - Start using MCGrad
 - [API Reference](api/methods.md) - Explore the implementation

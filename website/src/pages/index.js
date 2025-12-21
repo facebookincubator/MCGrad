@@ -15,8 +15,8 @@ import Layout from '@theme/Layout';
 const features = [
   {
     content:
-      'MCBoost ensures calibration not just globally, but also across virtually any segment defined using your input features.',
-    title: 'Powerful Multi-Calibration',
+      'MCGrad ensures calibration not just globally, but also across virtually any segment defined using your input features.',
+    title: 'Powerful Multicalibration',
   },
   {
     content:
@@ -57,7 +57,7 @@ df = pd.DataFrame({
     'surface': [...],
 })
 
-# Train MCBoost
+# Train MCGrad
 mcboost = MCBoost()
 mcboost.fit(
     df_train=df,
@@ -88,7 +88,7 @@ const QuickStart = () => (
           showLineNumbers>{`pip install git+https://github.com/facebookincubator/MCGrad.git`}</CodeBlock>
       </li>
       <li>
-        Train MCBoost:
+        Train MCGrad:
         <br />
         <br />
         <CodeBlock language="python" showLineNumbers>
@@ -121,42 +121,6 @@ const Reference = () => (
   </div>
 );
 
-const SuccessStories = () => (
-  <div className="padding--xl" style={{'background-color': 'var(--ifm-color-emphasis-100)'}}>
-    <h2 className="section-title">Success Stories</h2>
-    <div className="row">
-      <div className="col col--4 padding--md">
-        <div className="success-story-card">
-          <h3>Integrity ReviewBot</h3>
-          <p>
-            LLM for automated enforcement decisions. MCBoost improved calibration across market and content type,
-            reducing multi-calibration error by <strong>6x</strong> and improving PRAUC by <strong>12pp</strong> on average.
-            This resulted in <strong>+10pp LLM automation rate</strong>.
-          </p>
-        </div>
-      </div>
-      <div className="col col--4 padding--md">
-        <div className="success-story-card">
-          <h3>Instagram Age Prediction</h3>
-          <p>
-            Used to gate teen experiences. MCBoost ensured consistent performance across markets and population groups,
-            reducing teen miss rate (FNR) by <strong>1.84%</strong> while holding precision constant.
-          </p>
-        </div>
-      </div>
-      <div className="col col--4 padding--md">
-        <div className="success-story-card">
-          <h3>Confidence Aware NSMIEs</h3>
-          <p>
-            North Star Metric Impact Estimators provide experiment feedback. MCBoost produced confidence-aware
-            severity-weighted views prevalence, unblocking label-free precision readouts.
-          </p>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
 const MyPage = () => {
   const {siteConfig} = useDocusaurusContext();
   return (
@@ -181,9 +145,9 @@ const MyPage = () => {
               Get Started
             </Link>
             <Link
-              to="/docs/why-mcboost"
+              to="/docs/why-mcgrad"
               className="button button--lg button--outline button--secondary margin--sm">
-              Why MCBoost?
+              Why MCGrad?
             </Link>
           </div>
         </div>
@@ -202,7 +166,6 @@ const MyPage = () => {
           </div>
         )}
       </div>
-      <SuccessStories />
       <QuickStart />
       <Reference />
     </Layout>

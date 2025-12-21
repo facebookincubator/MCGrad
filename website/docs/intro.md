@@ -4,25 +4,25 @@ sidebar_position: 1
 
 # Introduction to MCGrad
 
-**Multi-calibration** means calibration across segments of the data. It is the form of calibration with highest relevance to the business metrics of ML-based systems.
+**Multicalibration** means calibration across segments of the data. It is the form of calibration with highest relevance to the business metrics of ML-based systems.
 
-**MCBoost** is a scalable and easy-to-use tool for multi-calibration, providing production-ready implementations developed by Meta's Central Applied Science team.
+**MCGrad** is a scalable and easy-to-use tool for multicalibration, providing production-ready implementations developed by Meta's Central Applied Science team.
 
-## Why Improve Multi-Calibration?
+## Why Improve Multicalibration?
 
-1. **Metrics aren't enough** - Predictive performance metrics (e.g., NE, PRAUC) are not sufficient on their own. Multi-calibration is also important for the performance of ML-based systems. Any system that assumes predictions are probabilities would benefit from better calibration: threshold-based actions, value models, ranking, auctions, etc.
+1. **Metrics aren't enough** - Predictive performance metrics (e.g., NE, PRAUC) are not sufficient on their own. Multicalibration is also important for the performance of ML-based systems. Any system that assumes predictions are probabilities would benefit from better calibration: threshold-based actions, value models, ranking, auctions, etc.
 
-2. **Improves predictive performance** - Improving multi-calibration often results in significant gains in predictive metrics like NE (Normalized Entropy) and PRAUC (Precision-Recall Area Under Curve)!
+2. **Improves predictive performance** - Improving multicalibration often results in significant gains in predictive metrics like NE (Normalized Entropy) and PRAUC (Precision-Recall Area Under Curve)!
 
-## How MCBoost Helps
+## How MCGrad Helps
 
-MCBoost takes a base model and training data, then builds a lightweight calibration layer on top. The resulting model is calibrated:
+MCGrad takes a base model and training data, then builds a lightweight calibration layer on top.
 - **Globally** - across all data
 - **Per-segment** - across virtually any segment that can be defined using the input features
 
 ## Example Use Case
 
-ReviewBot is an LLM developed by Integrity which predicts violation probabilities across ~50 violation types. MCBoost is trained with:
+ReviewBot is an LLM developed by Integrity which predicts violation probabilities across ~50 violation types. MCGrad is trained with:
 - Base model scores
 - Features: country, content_type, surface, etc.
 
@@ -36,8 +36,8 @@ The resulting predictions are multi-calibrated, meaning they're calibrated:
 ## Next Steps
 
 - [Installation](installation.md) - Get started with MCGrad
-- [Why MCBoost?](why-mcboost.md) - Learn more about the benefits
-- [Quick Start](quickstart.md) - Start using MCBoost
+- [Why MCGrad?](why-mcgrad.md) - Learn more about the benefits
+- [Quick Start](quickstart.md) - Start using MCGrad
 
 ## Research
 

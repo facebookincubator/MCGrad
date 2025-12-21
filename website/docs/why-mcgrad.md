@@ -14,9 +14,9 @@ For example, when examining different segments (e.g., reactively reported Videos
 
 ## Key Benefits
 
-### 1. Powerful Multi-Calibration
+### 1. Powerful Multicalibration
 
-MCGrad can take a virtually unlimited number of features and optimize for multi-calibration with respect to all of them, ensuring good calibration across segments.
+MCGrad can take a virtually unlimited number of features and optimize for multicalibration with respect to all of them, ensuring good calibration across segments.
 
 **Unlike traditional methods**, MCGrad improves calibration not just for a handful of segments, but for a huge number of segments that don't need to be pre-specified.
 

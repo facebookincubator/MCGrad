@@ -39,7 +39,7 @@ MCGrad depends on several core libraries:
 - **scipy** - Scientific computing
 - **scikit-learn** - Machine learning utilities
 - **torch** - PyTorch for deep learning components
-- **lightgbm** - Gradient boosting framework (core for MCBoost)
+- **lightgbm** - Gradient boosting framework (core for MCGrad)
 - **plotly** - Interactive visualizations
 - **matplotlib** - Static visualizations
 
@@ -47,14 +47,31 @@ All dependencies will be automatically installed when you install MCGrad.
 
 ## Verification
 
-Verify your installation:
+Verify your installation by running a minimal example:
 
 ```python
-import multicalibration
-print("MCGrad installed successfully!")
+from multicalibration import methods
+import numpy as np
+import pandas as pd
+
+# Create minimal test data
+df = pd.DataFrame({
+    'prediction': np.array([0.2, 0.8]),
+    'label': np.array([0, 1]),
+    'segment': ['a', 'b']
+})
+
+# Verify MCGrad can be instantiated and fit
+mcboost = methods.MCBoost()
+mcboost.fit(
+    df_train=df,
+    prediction_column_name='prediction',
+    label_column_name='label',
+    categorical_feature_column_names=['segment']
+)
 ```
 
 ## Next Steps
 
-- [Quick Start](quickstart.md) - Start using MCBoost
+- [Quick Start](quickstart.md) - Start using MCGrad
 - [API Reference](api/methods.md) - Explore the API
