@@ -213,7 +213,7 @@ def tune_mcboost_params(
         sample_weight = df_val[weight_column_name] if weight_column_name else None
         return normalized_entropy(
             labels=df_val[label_column_name],
-            predictions=prediction,
+            predicted_scores=prediction,
             sample_weight=sample_weight,
         )
 
