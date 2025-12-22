@@ -17,6 +17,16 @@ from pandas.api.types import is_numeric_dtype
 logger: logging.Logger = logging.getLogger(__name__)
 
 CATEGORICAL_COLLAPSE_VALUE: str = "__OTHER"
+
+
+def _concat_feature_values(feature_values_list: list[pd.DataFrame]) -> pd.DataFrame:
+    """Concatenate feature value DataFrames, handling empty entries."""
+    non_empty_dfs = [df for df in feature_values_list if not df.empty]
+    if non_empty_dfs:
+        return pd.concat(non_empty_dfs, ignore_index=True)
+    return pd.DataFrame(columns=["segment_column", "value", "idx_segment"])
+
+
 NA_SEGMENT_VALUE_CATEGORICAL: str = "__NA"
 NA_SEGMENT_VALUE_NUMERICAL: float = np.nan
 
@@ -97,8 +107,8 @@ def get_segment_masks(
                         )
                         idx_segment += 1
                         if n_segments_in_chunk == chunk_size:
-                            df_feature_values = pd.concat(
-                                feature_values_list, ignore_index=True
+                            df_feature_values = _concat_feature_values(
+                                feature_values_list
                             )
                             yield chunk.copy(), n_segments_in_chunk, df_feature_values
                             chunk[:] = 0
@@ -107,7 +117,7 @@ def get_segment_masks(
 
         # Yield remaining segments if any
         if n_segments_in_chunk > 0:
-            df_feature_values = pd.concat(feature_values_list, ignore_index=True)
+            df_feature_values = _concat_feature_values(feature_values_list)
             yield chunk.copy(), n_segments_in_chunk, df_feature_values
 
 
