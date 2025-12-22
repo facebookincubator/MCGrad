@@ -113,7 +113,8 @@ const Reference = () => (
   <div
     className="padding--lg"
     id="reference">
-    <h2 className='text--center'>References</h2>
+    <h2 className='text--center'>Citing MCGrad</h2>
+    <p className='text--center'>If you use MCGrad in academic work, please cite:</p>
     <div>
       <a href={`https://arxiv.org/pdf/2509.19884`}>{papertitle}</a>
       <CodeBlock className='margin-vert--md'>{paper_bibtex}</CodeBlock>
