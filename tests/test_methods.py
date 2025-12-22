@@ -456,7 +456,7 @@ def test_segmentwise_calibrator_equivalent_to_calibrator_per_segment(
 def test_segmentwise_calibrator_with_additive_adjustment_gives_expected_results(rng):
     df = pd.DataFrame(index=range(1000))
     df["label"] = rng.choice(range(1000), size=len(df))
-    df["uncalibrated_score"] = rng.choice(range(1000), size=len(df))
+    df["uncalibrated_score"] = rng.choice(range(1000), size=len(df)).astype(float)
     df["segment_1"] = rng.choice(["A", "B"], size=len(df))
     df["segment_2"] = rng.choice(["C", "D"], size=len(df))
 
