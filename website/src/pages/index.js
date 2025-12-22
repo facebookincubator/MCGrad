@@ -101,11 +101,11 @@ const QuickStart = () => (
 
 const papertitle = `MCGrad: Multicalibration at Web Scale`;
 const paper_bibtex = `
-@article{perini2025mcgrad,
+@article{perini2026mcgrad,
   title = {{MCGrad: Multicalibration at Web Scale}},
   author = {Perini, Lorenzo and Haimovich, Daniel and Linder, Fridolin and Tax, Niek and Karamshuk, Dima and Vojnovic, Milan and Okati, Nastaran and Apostolopoulos, Pavlos Athanasios},
   journal = {arXiv preprint arXiv:2509.19884},
-  year = {2025},
+  year = {2026},
   note = {To appear in KDD 2026}
 }`;
 
@@ -113,7 +113,8 @@ const Reference = () => (
   <div
     className="padding--lg"
     id="reference">
-    <h2 className='text--center'>References</h2>
+    <h2 className='text--center'>Citing MCGrad</h2>
+    <p className='text--center'>If you use MCGrad in academic work, please cite:</p>
     <div>
       <a href={`https://arxiv.org/pdf/2509.19884`}>{papertitle}</a>
       <CodeBlock className='margin-vert--md'>{paper_bibtex}</CodeBlock>

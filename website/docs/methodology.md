@@ -4,7 +4,7 @@ sidebar_position: 5
 
 # Methodology
 
-This page provides an overview of how MCGrad works under the hood.
+This page provides an overview of how MCGrad works under the hood. For full theoretical details, see the [research paper](https://arxiv.org/abs/2509.19884).
 
 ## The Multicalibration Problem
 
@@ -13,47 +13,68 @@ Traditional calibration ensures that predictions match outcomes globally:
 E[Y | f(X) = p] = p
 ```
 
-Multicalibration extends this to segments:
+Multicalibration extends this to all segments defined by group membership functions:
 ```
-E[Y | f(X) = p, g(X) = v] = p  for all functions g
+E[Y | f(X) ∈ I, h(X) = 1] = E[f(X) | f(X) ∈ I, h(X) = 1]
 ```
 
-Where `g(X)` represents any segment defined by the features.
+Where `I` is any score interval and `h(X)` is any group membership function (e.g., "user is in country X and content type is Y").
 
-## MCGrad Algorithm
+## The Key Insight
 
-MCGrad uses gradient boosting (LightGBM) to iteratively improve calibration across segments:
+MCGrad's core insight is that **gradient boosted decision trees (GBDT) naturally achieve multicalibration** when the feature space is augmented with the base model's predictions.
 
-1. **Initialize** - Start with the base model predictions
-2. **Iterate** over boosting rounds:
-   - Identify segments with the largest calibration errors
-   - Train a weak learner to correct those errors
-   - Update predictions by adding the corrections
-3. **Regularize** - Apply regularization techniques to prevent overfitting
+When we train a GBDT with features `(X, f₀(X))` — the original features plus the base model's predictions — the decision trees can split on both:
+- **Feature values** (e.g., `country = US`)
+- **Score intervals** (e.g., `f₀(X) ∈ [0.7, 0.8]`)
 
-## Why Gradient Boosting?
+This means the GBDT automatically identifies regions defined by the intersection of groups and score intervals — exactly what multicalibration requires.
 
-LightGBM provides several advantages for multicalibration:
+## The Algorithm
 
-- **Automatic feature selection** - finds relevant segments
-- **Efficient** - handles large datasets and many features
-- **Regularization** - built-in controls against overfitting
-- **Interpretable** - tree-based models show which segments matter
+MCGrad runs multiple rounds to achieve convergence:
 
-## Theoretical Guarantees
+```
+1. Start with base predictor f₀
+2. For each round t:
+   a. Train GBDT on features (X, f_{t-1}(X)) to predict Y
+   b. Rescale logits to compensate for shrinkage
+   c. Update: f_t = σ(θ_t · (F_{t-1} + h_t))
+3. Stop when validation loss stops improving
+4. Retrain final model on full data with optimal T rounds
+```
 
-MCGrad is a likelihood-improving procedure:
-- **On training data**: guaranteed to improve or maintain likelihood
-- **On test data**: improved with high probability given proper regularization
-- **Multicalibration**: achieves near-optimal calibration across exponentially many segments
+**Why multiple rounds?** Correcting predictions in some regions may introduce miscalibration in others. Each round refines the previous round's output until convergence.
 
-## Implementation Details
+## Design Choices for Scale and Safety
 
-The implementation uses:
-- **LightGBM** as the core gradient boosting framework
-- **Custom loss functions** designed for calibration
-- **Cross-validation** for hyperparameter tuning
-- **Early stopping** to prevent overfitting
+### 1. Efficient Gradient Boosting
+
+MCGrad delegates compute-intensive operations to LightGBM, a highly optimized GBDT implementation. This makes it orders of magnitude faster than alternatives that iterate over groups explicitly.
+
+### 2. Logit Rescaling
+
+GBDTs use shrinkage (step size < 1) for regularization, which can require many trees to achieve the optimal scale. MCGrad applies a simple rescaling after each round:
+
+```
+θ_t = argmin_θ E[L(θ · (F_{t-1} + h_t), Y)]
+```
+
+This reduces the number of trees needed while preserving regularization benefits.
+
+### 3. Early Stopping on Rounds
+
+While multiple rounds are needed for convergence, they also increase model capacity. MCGrad uses early stopping on the number of rounds to prevent overfitting:
+
+```
+T = last round before validation loss increases
+```
+
+**Safe by design**: If the first round hurts performance, MCGrad returns T=0 (the original predictions unchanged).
+
+### 4. Min-Hessian Regularization
+
+Augmenting features with predictions creates regions prone to overfitting (e.g., the tail where `f(x) < 0.01` contains only negative labels). MCGrad uses LightGBM's min-sum-Hessian constraint to prevent splits in these regions.
 
 ## Comparison with Alternatives
 

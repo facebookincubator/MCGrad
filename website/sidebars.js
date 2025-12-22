@@ -22,8 +22,10 @@
 const sidebars = {
   tutorialSidebar: [
     'intro',
+    'why-mcgrad',
     'installation',
     'quickstart',
+    'methodology',
     {
       type: 'category',
       label: 'API Reference',
