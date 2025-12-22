@@ -5,6 +5,7 @@
 # pyre-unsafe
 
 
+import warnings
 from collections.abc import Callable
 from functools import partial
 
@@ -533,7 +534,11 @@ def test_fpr():
     labels = np.array([0, 0, 0, 0, 0, 0, 0, 0])
     predicted_labels = np.array([0, 0, 0, 0, 0, 0, 0, 0])
 
-    assert fpr(labels, predicted_labels) == 0.0
+    # Single-class data may trigger sklearn warning about confusion matrix shape
+    # (depends on sklearn version)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="A single label was found")
+        assert fpr(labels, predicted_labels) == 0.0
 
     labels = np.array([0, 1, 0, 1, 0, 1, 0, 1])
     predicted_labels = np.array([0, 1, 0, 1, 0, 1, 0, 1])
@@ -1724,9 +1729,13 @@ def test_rank_calibration_error_zero_for_perfect_ranking():
     labels = np.array([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
     perfect_predictions = labels * 2.0
 
-    result = metrics._rank_calibration_error(
-        labels=labels, predicted_labels=perfect_predictions
-    )
+    # Mean of empty slice warning may be emitted by numpy when computing bin statistics
+    # (depends on whether np.errstate() is active in the implementation)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
+        result = metrics._rank_calibration_error(
+            labels=labels, predicted_labels=perfect_predictions
+        )
 
     assert isinstance(result[0], (float, np.floating))
     assert result[0] == pytest.approx(0, abs=1e-10)
@@ -1736,12 +1745,16 @@ def test_rank_calibration_error_higher_for_reversed_ranking():
     labels = np.array([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
     reversed_predictions = 1.0 - labels
 
-    result_reversed = metrics._rank_calibration_error(
-        labels=labels, predicted_labels=reversed_predictions
-    )
-    result_perfect = metrics._rank_calibration_error(
-        labels=labels, predicted_labels=labels
-    )
+    # Mean of empty slice warning may be emitted by numpy when computing bin statistics
+    # (depends on whether np.errstate() is active in the implementation)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
+        result_reversed = metrics._rank_calibration_error(
+            labels=labels, predicted_labels=reversed_predictions
+        )
+        result_perfect = metrics._rank_calibration_error(
+            labels=labels, predicted_labels=labels
+        )
 
     assert result_reversed[0] > result_perfect[0]
 
@@ -1813,7 +1826,11 @@ def test_fpr_edge_case_when_fp_plus_tn_equals_zero():
     labels = np.array([1, 1, 1, 1])
     predicted_labels = np.array([1, 1, 1, 1])
 
-    result = metrics.fpr(labels=labels, predicted_labels=predicted_labels)
+    # Single-class data may trigger sklearn warning about confusion matrix shape
+    # (depends on sklearn version)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="A single label was found")
+        result = metrics.fpr(labels=labels, predicted_labels=predicted_labels)
 
     # When there are no negatives in labels, fpr should return 0.0
     assert result == 0.0

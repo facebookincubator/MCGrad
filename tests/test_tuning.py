@@ -4,6 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 # pyre-unsafe
 
+import warnings
 from unittest.mock import Mock, patch
 
 import numpy as np
@@ -322,17 +323,22 @@ def test_warm_starting_trials_produces_the_right_number_of_sobol_and_bayesian_tr
     n_warmup_random_trials = 1
     total_trials = 3
 
-    _, trial_results = tune_mcboost_params(
-        model=methods.MCBoost(num_rounds=0, early_stopping=False),
-        df_train=df_train,
-        prediction_column_name="prediction",
-        label_column_name="label",
-        weight_column_name="weight",
-        categorical_feature_column_names=["feature1"],
-        numerical_feature_column_names=[],
-        n_trials=total_trials,
-        n_warmup_random_trials=n_warmup_random_trials,
-    )
+    # Suppress botorch/ax warnings about constant/non-standardized input data
+    # These are expected with minimal synthetic test data
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="Data.*is not standardized")
+        warnings.filterwarnings("ignore", message="An input array is constant")
+        _, trial_results = tune_mcboost_params(
+            model=methods.MCBoost(num_rounds=0, early_stopping=False),
+            df_train=df_train,
+            prediction_column_name="prediction",
+            label_column_name="label",
+            weight_column_name="weight",
+            categorical_feature_column_names=["feature1"],
+            numerical_feature_column_names=[],
+            n_trials=total_trials,
+            n_warmup_random_trials=n_warmup_random_trials,
+        )
 
     value_counter = trial_results["generation_node"].value_counts().to_dict()
     sobol_count = value_counter["GenerationStep_0"]
