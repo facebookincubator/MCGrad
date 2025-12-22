@@ -41,3 +41,18 @@ The result: predictions calibrated globally AND for any segment defined by your 
 - [Why MCGrad?](why-mcgrad.md) — Understand the challenges MCGrad solves and see results
 - [Installation](installation.md) — Get started
 - [Quick Start](quickstart.md) — Detailed usage examples
+
+## Citing MCGrad
+
+If you use MCGrad in academic work, please cite:
+
+```bibtex
+@inproceedings{perini2025mcgrad,
+  title={MCGrad: Multicalibration at Web Scale},
+  author={Perini, Lorenzo and Haimovich, Daniel and Linder, Fridolin and Tax, Niek and Karamshuk, Dima and Vojnovic, Milan and Okati, Nastaran and Apostolopoulos, Pavlos Athanasios},
+  booktitle={Proceedings of the 31st ACM SIGKDD Conference on Knowledge Discovery and Data Mining},
+  year={2025}
+}
+```
+
+**Paper:** [MCGrad: Multicalibration at Web Scale](https://arxiv.org/abs/2509.19884) (KDD 2025)
