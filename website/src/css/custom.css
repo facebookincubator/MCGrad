@@ -224,64 +224,6 @@
   background-clip: text;
 }
 
-/* Success Stories Cards */
-.success-story-card {
-  background: var(--ifm-card-background-color);
-  border-radius: 16px;
-  padding: 2.5rem;
-  height: 100%;
-  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.1);
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid rgba(102, 126, 234, 0.1);
-  position: relative;
-  overflow: hidden;
-}
-
-.success-story-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, var(--accent-gradient-start), var(--accent-gradient-end));
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.4s ease;
-}
-
-.success-story-card:hover {
-  box-shadow: 0 12px 35px rgba(102, 126, 234, 0.2);
-  transform: translateY(-8px);
-  border-color: rgba(102, 126, 234, 0.3);
-}
-
-.success-story-card:hover::before {
-  transform: scaleX(1);
-}
-
-.success-story-card h3 {
-  background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  font-weight: 800;
-  font-size: 1.5rem;
-  margin-bottom: 1.25rem;
-}
-
-.success-story-card p {
-  line-height: 1.8;
-  color: var(--ifm-color-content);
-  font-size: 1.05rem;
-}
-
-.success-story-card strong {
-  color: var(--accent-gradient-end);
-  font-weight: 800;
-  font-size: 1.1em;
-}
-
 /* Get Started Section */
 .get-started-section {
   background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);

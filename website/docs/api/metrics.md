@@ -15,7 +15,7 @@ help(metrics)
 ```
 :::
 
-## Multi-Calibration Metrics
+## Multicalibration Metrics
 
 ### Multicalibration Error (MCE)
 

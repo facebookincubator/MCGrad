@@ -17,6 +17,6 @@ help(segmentation)
 
 ## Overview
 
-The segmentation module provides utilities for defining and analyzing segments in your data for multi-calibration.
+The segmentation module provides utilities for defining and analyzing segments in your data for multicalibration.
 
 See the [source code](https://github.com/facebookincubator/MCGrad/blob/main/src/multicalibration/segmentation.py) for implementation details.

@@ -4,11 +4,11 @@ sidebar_position: 4
 
 # Quick Start
 
-This guide will help you get started with MCBoost for multi-calibration.
+This guide will help you get started with MCGrad for multicalibration.
 
 ## Basic Workflow
 
-Here's a simple example of using MCBoost:
+Here's a simple example of using MCGrad:
 
 ```python
 from multicalibration import methods
@@ -24,7 +24,7 @@ df = pd.DataFrame({
     'surface': ['feed', 'feed', 'stories', 'stories', 'feed', 'stories'],
 })
 
-# Apply MCBoost
+# Apply MCGrad
 mcboost = methods.MCBoost()
 mcboost.fit(
     df_train=df,
@@ -106,6 +106,6 @@ See the [plotting API](api/plotting.md) for more visualization options.
 
 ## Next Steps
 
-- [Methodology](methodology.md) - Understand how MCBoost works
+- [Methodology](methodology.md) - Understand how MCGrad works
 - [API Reference](api/methods.md) - Explore all available methods
 - [Contributing](contributing.md) - Contribute to the project

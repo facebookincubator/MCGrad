@@ -37,7 +37,7 @@ plotting.plot_calibration_curve(
 plt.show()
 ```
 
-## Multi-Calibration Analysis
+## Multicalibration Analysis
 
 Visualize calibration across segments:
 

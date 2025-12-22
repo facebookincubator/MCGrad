@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # Methods
 
-Multi-calibration methods for improving model calibration.
+Multicalibration methods for improving model calibration.
 
 :::info Python API Documentation
 For detailed Python API documentation with docstrings, please refer to the source code in `src/multicalibration/methods.py` or use Python's built-in help:
@@ -15,13 +15,13 @@ help(methods.MCBoost)
 ```
 :::
 
-## MCBoost
+## MCGrad
 
-The main multi-calibration method using gradient boosting.
+The main multicalibration method using gradient boosting.
 
 ### Overview
 
-MCBoost takes base model predictions and features, then builds a lightweight calibration layer using LightGBM. The resulting model is calibrated both globally and across virtually any segment defined by the features.
+MCGrad takes base model predictions and features, then builds a lightweight calibration layer using LightGBM. The resulting model is calibrated both globally and across virtually any segment defined by the features.
 
 ### Basic Usage
 
@@ -30,7 +30,7 @@ from multicalibration.methods import MCBoost
 import pandas as pd
 import numpy as np
 
-# Initialize MCBoost
+# Initialize MCGrad
 mcboost = MCBoost(
     num_rounds=100,
     learning_rate=0.1,
@@ -74,7 +74,7 @@ calibrated_preds = mcboost.predict(
 ### Methods
 
 #### `fit(predictions, features, labels)`
-Train the MCBoost calibration model.
+Train the MCGrad calibration model.
 
 **Parameters:**
 - `predictions`: Array of base model predictions

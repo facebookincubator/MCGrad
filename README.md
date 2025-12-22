@@ -2,11 +2,11 @@
 
 Production-ready multicalibration for machine learning.
 
-**MCBoost** is a scalable and easy-to-use tool for multi-calibration. It ensures your ML model predictions are well-calibrated not just globally (across all data), but also across virtually any segment defined by your features (e.g., by country, content type, or any combination).
+**MCGrad** is a scalable and easy-to-use tool for multicalibration. It ensures your ML model predictions are well-calibrated not just globally (across all data), but also across virtually any segment defined by your features (e.g., by country, content type, or any combination).
 
 ## 🌟 Key Features
 
-- **Powerful Multi-Calibration** - Calibrates across unlimited segments without pre-specification
+- **Powerful Multicalibration** - Calibrates across unlimited segments without pre-specification
 - **Data Efficient** - Borrows information like modern ML models
 - **Lightweight & Fast** - Orders of magnitude faster than NN-based calibration
 - **Improved Performance** - Likelihood-improving with significant PRAUC gains
@@ -15,7 +15,7 @@ Production-ready multicalibration for machine learning.
 
 Full documentation is available at: https://facebookincubator.github.io/MCGrad/
 
-- [Why MCBoost?](https://facebookincubator.github.io/MCGrad/docs/why-mcboost) - Learn about the benefits
+- [Why MCGrad?](https://facebookincubator.github.io/MCGrad/docs/why-mcgrad) - Learn about the benefits
 - [Quick Start](https://facebookincubator.github.io/MCGrad/docs/quickstart) - Get started quickly
 - [API Reference](https://mcgrad.readthedocs.io/) - Auto-generated API documentation from Python docstrings
 
@@ -47,7 +47,7 @@ df = pd.DataFrame({
     'content_type': ['photo', 'video', 'photo', 'video', 'photo', 'video'],  # defining segments
 })
 
-# Apply MCBoost
+# Apply MCGrad
 mcboost = methods.MCBoost()
 mcboost.fit(
     df_train=df,
@@ -77,12 +77,6 @@ git clone https://github.com/facebookincubator/MCGrad.git
 cd MCGrad
 pip install -e ".[dev]"
 ```
-
-## 🎯 Success Stories
-
-- **Integrity ReviewBot**: 6x reduction in multi-calibration error, +12pp PRAUC, +10pp automation rate
-- **Instagram Age Prediction**: 1.84% reduction in false negative rate while holding precision constant
-- **Confidence Aware NSMIEs**: Unblocked label-free precision readouts for integrity experiments
 
 ## 🔧 Development
 
