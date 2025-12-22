@@ -661,7 +661,9 @@ def _calculate_cumulative_differences(
     differences[:, 0] = 0
     weighted_diff = np.multiply((segments * sample_weight), (labels - predicted_scores))
     normalization = (segments * sample_weight).sum(axis=1)[:, np.newaxis]
-    normalized_diff = np.divide(weighted_diff, normalization)
+    # Division by zero only happens for empty segments, which are handled below
+    with np.errstate(divide="ignore", invalid="ignore"):
+        normalized_diff = np.divide(weighted_diff, normalization)
     np.cumsum(
         normalized_diff,
         axis=1,
@@ -703,7 +705,8 @@ def kuiper_upper_bound_standard_deviation_per_segment(
         sample_weight = np.ones_like(predicted_scores)
     if segments is None:
         segments = np.ones(shape=(1, len(predicted_scores)), dtype=np.bool_)
-    kuiper_ub = np.divide(1, (2 * np.sqrt((segments * sample_weight).sum(axis=1))))
+    with np.errstate(divide="ignore"):
+        kuiper_ub = np.divide(1, (2 * np.sqrt((segments * sample_weight).sum(axis=1))))
     kuiper_ub[np.isinf(kuiper_ub)] = 0
     return kuiper_ub
 
@@ -746,13 +749,14 @@ def kuiper_standard_deviation_per_segment(
         axis=1
     )
     normalization_variance = np.square((segments * sample_weight).sum(axis=1))
-    np.sqrt(
-        np.divide(
-            variance_weighted_segments,
-            normalization_variance,
-        ),
-        out=kuip_std_dev,
-    )
+    with np.errstate(divide="ignore", invalid="ignore"):
+        np.sqrt(
+            np.divide(
+                variance_weighted_segments,
+                normalization_variance,
+            ),
+            out=kuip_std_dev,
+        )
     kuip_std_dev[np.isnan(kuip_std_dev)] = 0
     return kuip_std_dev
 
@@ -873,11 +877,12 @@ def kuiper_calibration_per_segment(
         differences = differences.reshape(1, -1)
 
     c_range = np.ptp(differences, axis=1)
-    return np.where(
-        (denominator == 0) & (c_range != 0),
-        np.inf,
-        np.where(denominator == 0, 0, c_range / denominator),
-    )
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return np.where(
+            (denominator == 0) & (c_range != 0),
+            np.inf,
+            np.where(denominator == 0, 0, c_range / denominator),
+        )
 
 
 def kuiper_calibration(
@@ -1627,15 +1632,16 @@ class MulticalibrationError:
     def segment_ecces_sigma_scale(
         self,
     ) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
-        statistics = np.where(
-            (self.segment_ecces_absolute != 0) & (self.segment_sigmas == 0),
-            np.inf,
-            np.where(
-                self.segment_sigmas == 0,
-                0,
-                self.segment_ecces_absolute / self.segment_sigmas,
-            ),
-        )
+        with np.errstate(divide="ignore", invalid="ignore"):
+            statistics = np.where(
+                (self.segment_ecces_absolute != 0) & (self.segment_sigmas == 0),
+                np.inf,
+                np.where(
+                    self.segment_sigmas == 0,
+                    0,
+                    self.segment_ecces_absolute / self.segment_sigmas,
+                ),
+            )
         return statistics
 
     @functools.cached_property

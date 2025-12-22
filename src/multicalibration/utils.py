@@ -101,7 +101,8 @@ logistic_vectorized = np.vectorize(logistic)
 
 
 def logit(probs: np.ndarray, epsilon=1e-304) -> np.ndarray:
-    return np.log((probs + epsilon) / (1 - probs + epsilon))
+    with np.errstate(invalid="ignore"):
+        return np.log((probs + epsilon) / (1 - probs + epsilon))
 
 
 def absolute_error(estimate: np.ndarray, reference: np.ndarray) -> np.ndarray:
@@ -272,7 +273,8 @@ def geometric_mean(x: np.ndarray) -> float:
     :param x: array of numbers
     :return: geometric mean of the array
     """
-    return np.exp(np.log(x).mean())
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return np.exp(np.log(x).mean())
 
 
 def make_unjoined(x: np.ndarray, y: np.ndarray) -> tuple[Any, Any]:
