@@ -1619,7 +1619,9 @@ def test_precision_dtype_is_extended_for_large_weights(rng):
     )
 
     assert mce_float16.df["weights"].dtype == np.float64
-    mce_float16.df["weights"].replace([np.inf, -np.inf], np.nan, inplace=True)
+    mce_float16.df["weights"] = mce_float16.df["weights"].replace(
+        [np.inf, -np.inf], np.nan
+    )
     assert len(mce_float16.df.dropna(subset=["weights"], how="all")) == len(df)
 
 
