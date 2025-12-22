@@ -383,3 +383,44 @@ def test_extract_masks_returns_empty_mask_when_key_not_found():
     # Result should be an all-False mask when key is not found
     expected = np.zeros(df_length, dtype=np.bool_)
     assert np.array_equal(result, expected)
+
+
+def test_concat_feature_values_with_non_empty_dataframes():
+    df1 = pd.DataFrame({"segment_column": ["A"], "value": [1], "idx_segment": [0]})
+    df2 = pd.DataFrame({"segment_column": ["B"], "value": [2], "idx_segment": [1]})
+
+    result = segmentation._concat_feature_values([df1, df2])
+
+    assert len(result) == 2
+    assert list(result.columns) == ["segment_column", "value", "idx_segment"]
+    assert result["segment_column"].tolist() == ["A", "B"]
+    assert result["idx_segment"].tolist() == [0, 1]
+
+
+def test_concat_feature_values_with_empty_list():
+    result = segmentation._concat_feature_values([])
+
+    assert result.empty
+    assert list(result.columns) == ["segment_column", "value", "idx_segment"]
+
+
+def test_concat_feature_values_with_all_empty_dataframes():
+    df1 = pd.DataFrame(columns=["segment_column", "value", "idx_segment"])
+    df2 = pd.DataFrame(columns=["segment_column", "value", "idx_segment"])
+
+    result = segmentation._concat_feature_values([df1, df2])
+
+    assert result.empty
+    assert list(result.columns) == ["segment_column", "value", "idx_segment"]
+
+
+def test_concat_feature_values_with_mixed_empty_and_non_empty():
+    empty_df = pd.DataFrame(columns=["segment_column", "value", "idx_segment"])
+    non_empty_df = pd.DataFrame(
+        {"segment_column": ["A", "B"], "value": [1, 2], "idx_segment": [0, 0]}
+    )
+
+    result = segmentation._concat_feature_values([empty_df, non_empty_df, empty_df])
+
+    assert len(result) == 2
+    assert result["segment_column"].tolist() == ["A", "B"]
