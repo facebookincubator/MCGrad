@@ -101,11 +101,11 @@ const QuickStart = () => (
 
 const papertitle = `MCGrad: Multicalibration at Web Scale`;
 const paper_bibtex = `
-@article{perini2025mcgrad,
+@article{perini2026mcgrad,
   title = {{MCGrad: Multicalibration at Web Scale}},
   author = {Perini, Lorenzo and Haimovich, Daniel and Linder, Fridolin and Tax, Niek and Karamshuk, Dima and Vojnovic, Milan and Okati, Nastaran and Apostolopoulos, Pavlos Athanasios},
   journal = {arXiv preprint arXiv:2509.19884},
-  year = {2025},
+  year = {2026},
   note = {To appear in KDD 2026}
 }`;
 
