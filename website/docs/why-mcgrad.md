@@ -4,38 +4,91 @@ sidebar_position: 2
 
 # Why MCGrad?
 
-MCGrad offers significant advantages over traditional calibration methods like Isotonic Regression.
+**Multicalibration** — calibration across subgroups of your data — is essential for ML systems that make decisions based on predicted probabilities. Content ranking, recommender systems, digital advertising, and content moderation all benefit from predictions that are calibrated not just globally, but across user segments, content types, and other dimensions.
 
-## The Problem with Traditional Calibration
+Yet existing multicalibration methods have seen limited industry adoption due to three fundamental limitations.
 
-While methods like Isotonic Regression work well globally, they fail to maintain calibration when looking at specific segments of the data.
+## The Three Challenges
 
-For example, when examining different segments (e.g., reactively reported Videos vs. proactively reported Posts), Isotonic Regression results in major calibration deviations, while MCGrad maintains excellent calibration across all segments.
+### 1. Manual Group Specification
 
-## Key Benefits
+Existing multicalibration methods require *protected groups* to be **manually defined**. Users must not only specify covariates (e.g., `user_age`, `user_country`), but also define concrete group membership indicators like "is an adult in the US?"
 
-### 1. Powerful Multicalibration
+This is problematic because practitioners:
+- May not know the precise set of protected groups in advance
+- Face ongoing changes to group definitions (legal, policy, ethical)
+- Often just want overall performance improvement without specifying groups
 
-MCGrad can take a virtually unlimited number of features and optimize for multicalibration with respect to all of them, ensuring good calibration across segments.
+### 2. Lack of Scalability
 
-**Unlike traditional methods**, MCGrad improves calibration not just for a handful of segments, but for a huge number of segments that don't need to be pre-specified.
+Existing methods don't scale to large datasets or many protected groups. For example, some algorithms scale at least linearly in time and memory with the number of groups—making them impractical at web scale.
 
-### 2. Data Efficiency
+### 3. Risk of Harming Performance
 
-MCGrad borrows information from similar samples just like any other modern ML model. As a result, it can calibrate far more small segments than alternatives which calibrate each segment separately.
+Existing methods lack guardrails for safe deployment. The risk that multicalibration might **harm** model performance (e.g., through overfitting) prevents adoption.
 
-### 3. Lightweight Training and Inference
+---
 
-The method is implemented using LightGBM, a highly optimized gradient boosting framework. It is typically **orders of magnitude faster** than training heavier NN-based models.
+## How MCGrad Solves These
 
-### 4. Improved Predictive Performance
+| Challenge | MCGrad Solution |
+|-----------|-----------------|
+| Manual group specification | Only requires **features**, not predefined groups. MCGrad automatically identifies miscalibrated regions. |
+| Scalability | Uses LightGBM, a highly optimized GBDT implementation that scales to billions of samples. |
+| Risk of harm | Employs **early stopping** and regularization to ensure performance is not degraded. |
 
-MCGrad is a **likelihood-improving procedure**, meaning it can only improve model performance on training data (the same isn't true for e.g. Isotonic Regression).
+### Features, Not Groups
 
-In many cases, we observe:
-- Significant likelihood/PRAUC improvements
-- Better model performance metrics
-- Improved business outcomes
+MCGrad only requires specification of a set of **protected features** (rather than protected groups). It then automatically identifies miscalibrated regions within this feature space, calibrating predictions across all groups that can be defined from these features.
+
+### Built for Scale
+
+By reducing multicalibration to gradient boosting, MCGrad inherits the scalability of optimized GBDT libraries like LightGBM. This enables deployment at web scale with minimal computational overhead at training or inference time.
+
+### Safe by Design
+
+MCGrad is a **likelihood-improving procedure**—it can only improve model performance on training data. Combined with early stopping, this ensures that model performance is not harmed.
+
+---
+
+## When to Use Multicalibration Over Traditional Calibration
+
+Traditional calibration methods like **Isotonic Regression**, **Platt Scaling**, or **Temperature Scaling** work well for global calibration—but they fail to maintain calibration across specific segments of your data.
+
+### The Problem
+
+A model calibrated with Isotonic Regression might be well-calibrated overall, but when you look at specific segments (e.g., different countries, content types, or user cohorts), you'll often find significant calibration errors. These local miscalibrations harm decision quality for those subpopulations.
+
+### When Multicalibration Matters
+
+Use multicalibration when:
+- Your system makes **segment-specific decisions** (e.g., different thresholds per market)
+- You need **fair predictions** across demographic or interest groups
+- You observe **poor calibration in subgroups** despite good global calibration
+- You want to **improve overall performance**—multicalibration often improves log loss and PRAUC
+
+### MCGrad Advantages Over Alternatives
+
+| Benefit | Description |
+|---------|-------------|
+| **Data Efficiency** | MCGrad borrows information from similar samples, calibrating far more small segments than methods that calibrate each segment separately. |
+| **Lightweight** | Built on LightGBM—typically orders of magnitude faster than NN-based approaches. |
+| **No Pre-specification** | Unlike calibrating each segment independently, MCGrad doesn't require you to enumerate all segments upfront. |
+| **Likelihood-Improving** | MCGrad can only improve model performance on training data (unlike Isotonic Regression, which can harm it). |
+
+---
+
+## Results
+
+MCGrad has been deployed at **Meta** on hundreds of production models, generating over a million multicalibrated predictions per second:
+
+- **A/B tests**: 24 of 27 models significantly outperformed Platt scaling
+- **Offline evaluation** (120+ models): Improved log loss for 88.7%, ECE for 86.0%, PRAUC for 76.7% of models
+- **Inference**: Constant ~20μs latency vs 1,000+ μs for alternatives at scale
+
+On public benchmarks, MCGrad achieves 56% average MCE reduction while never harming base model performance. See the [research paper](https://arxiv.org/abs/2509.19884) for full experimental details.
+
+---
 
 ## Learn More
 
