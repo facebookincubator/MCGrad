@@ -250,7 +250,7 @@ def test_deserialized_mcboost_has_at_most_max_num_rounds(
         label_column_name="Label",
         categorical_feature_column_names=["City", "Gender"],
     )
-    assert model.NUM_ROUNDS <= max_num_rounds
+    assert model.num_rounds <= max_num_rounds
     serialized = model.serialize()
     deserialized = calibrator_class.deserialize(serialized)
     assert len(deserialized.mr) == len(model.mr)
@@ -1361,7 +1361,7 @@ def test_performance_metrics_dictionary_size_matches_number_of_rounds(
         numerical_feature_column_names=["feature2"],
     )
     extra_evaluation_due_to_early_stopping = (
-        1 if len(mcboost.mr) < mcboost.NUM_ROUNDS else 0
+        1 if len(mcboost.mr) < mcboost.num_rounds else 0
     )
 
     # +1 because we also have the initial performance
@@ -1516,7 +1516,7 @@ def test_patience_in_mcboost(patience: int, calibrator_class, rng):
     effective_num_rounds = len(mcboost.mr)
     extra_evaluation_due_to_early_stopping = (
         1
-        if (mcboost.early_stopping and effective_num_rounds < mcboost.NUM_ROUNDS)
+        if (mcboost.early_stopping and effective_num_rounds < mcboost.num_rounds)
         else 0
     )
 

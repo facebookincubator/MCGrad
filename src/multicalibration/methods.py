@@ -274,9 +274,9 @@ class BaseMCBoost(
             else:
                 num_rounds = self.NUM_ROUNDS_DEFAULT_NO_EARLY_STOPPING
 
-        self.NUM_ROUNDS: int = num_rounds
+        self.num_rounds: int = num_rounds
 
-        self.PATIENCE: int = (
+        self.patience: int = (
             self.DEFAULT_HYPERPARAMS["patience"] if patience is None else patience
         )
 
@@ -580,7 +580,7 @@ class BaseMCBoost(
 
         preprocessed_val_data = None
 
-        num_rounds = self.NUM_ROUNDS
+        num_rounds = self.num_rounds
         if self.early_stopping:
             timeout_msg = (
                 f" (timeout: {self.early_stopping_timeout}s)"
@@ -588,7 +588,7 @@ class BaseMCBoost(
                 else ""
             )
             logger.info(
-                f"Early stopping activated, max_num_rounds={self.NUM_ROUNDS}{timeout_msg}"
+                f"Early stopping activated, max_num_rounds={self.num_rounds}{timeout_msg}"
             )
 
             if df_val is not None:
@@ -618,7 +618,7 @@ class BaseMCBoost(
             if num_rounds > 0:
                 logger.info(f"Fitting final MCBoost model with {num_rounds} rounds")
         else:
-            logger.info(f"Early stopping deactivated, fitting {self.NUM_ROUNDS} rounds")
+            logger.info(f"Early stopping deactivated, fitting {self.num_rounds} rounds")
 
         predictions = preprocessed_data.predictions
         for round_idx in range(num_rounds):
@@ -919,7 +919,7 @@ class BaseMCBoost(
 
         start_time = time.time()
 
-        while num_rounds <= self.NUM_ROUNDS and patience_counter <= self.PATIENCE:
+        while num_rounds <= self.num_rounds and patience_counter <= self.patience:
             log_add = ""
             if num_rounds == 0:
                 log_add = " (input prediction for early stopping baseline)"
@@ -1056,7 +1056,7 @@ class BaseMCBoost(
                 else best_score
             )
             logger.info(
-                f"Round {num_rounds}: validation loss = {early_stopping_metric_value:.4f} (best: {best_early_stopping_metric_value:.4f}, patience: {patience_counter}/{self.PATIENCE})"
+                f"Round {num_rounds}: validation loss = {early_stopping_metric_value:.4f} (best: {best_early_stopping_metric_value:.4f}, patience: {patience_counter}/{self.patience})"
             )
 
             num_rounds += 1
@@ -1065,9 +1065,9 @@ class BaseMCBoost(
             logger.warning(
                 "Selected 0 to be the best number of rounds for MCBoost for this dataset, meaning that uncalibrated predictions will be returned. This is because the optimization metric did not improve during the first round of boosting."
             )
-        elif best_num_rounds == self.NUM_ROUNDS:
+        elif best_num_rounds == self.num_rounds:
             logger.warning(
-                f"max_num_rounds might be too low: best performance was at the maximum number of rounds ({self.NUM_ROUNDS})"
+                f"max_num_rounds might be too low: best performance was at the maximum number of rounds ({self.num_rounds})"
             )
 
         logger.info(f"Determined {best_num_rounds} to be best number of rounds")
@@ -1178,7 +1178,7 @@ class BaseMCBoost(
             model.mr.append(booster)
             model.unshrink_factors.append(model_info["unshrink_factor"])
 
-        model.NUM_ROUNDS = len(model.mr)
+        model.num_rounds = len(model.mr)
 
         model.encode_categorical_variables = json_obj["has_encoder"]
         if json_obj["has_encoder"] and "encoder" in json_obj:
