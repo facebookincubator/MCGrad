@@ -1055,7 +1055,7 @@ def test_early_stopping_stops_at_max_num_rounds(num_rounds: int, calibrator_clas
         early_stopping_score_func=wrap_sklearn_metric_func(dummy_score_func),
         early_stopping_minimize_score=False,
         save_training_performance=True,
-        lightgbm_params={"num_iterations": 1},
+        lightgbm_params={"n_estimators": 1},
     )
     mcboost.fit(
         df_train=df_train,
@@ -1116,7 +1116,7 @@ def test_fit_with_provided_df_val_runs_without_errors(calibrator_class, rng):
         early_stopping_minimize_score=False,
         early_stopping_use_crossvalidation=False,
         save_training_performance=True,
-        lightgbm_params={"num_iterations": 1},
+        lightgbm_params={"n_estimators": 1},
     )
 
     mcboost.fit(
