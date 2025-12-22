@@ -6,6 +6,7 @@
 
 
 import math
+import warnings
 
 import numpy as np
 
@@ -342,7 +343,11 @@ def test_geometric_mean_gives_correct_result(test_input, expected):
     ],  # Empty array  # Negative numbers
 )
 def test_geometric_mean_gives_nan_when_geometric_mean_is_undefined(test_input):
-    result = utils.geometric_mean(test_input)
+    # These edge cases may trigger numpy warnings for log of negative/zero or mean of empty slice
+    # (depends on whether np.errstate() is active in the implementation)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
+        result = utils.geometric_mean(test_input)
     assert np.isnan(result), f"Test failed for undefined input: {test_input}"
 
 
