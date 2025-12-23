@@ -26,6 +26,7 @@ const sidebars = {
     'installation',
     'quickstart',
     'methodology',
+    'measuring-multicalibration',
     {
       type: 'category',
       label: 'API Reference',
