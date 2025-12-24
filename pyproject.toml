@@ -27,20 +27,12 @@ dependencies = [
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.0.0",
-    "black>=22.0.0",
-    "isort>=5.0.0",
-    "toml>=0.10.2",  # Required for isort to read pyproject.toml
+    "flake8==7.3.0",
+    "flake8-bugbear>=24.0.0",
 ]
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.black]
-line-length = 88
-target-version = ['py39']
-
-[tool.isort]
-profile = "black"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
