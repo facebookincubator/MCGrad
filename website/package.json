@@ -2,6 +2,10 @@
   "name": "mcgrad-website",
   "version": "0.1.0",
   "private": true,
+  "overrides": {
+    "node-forge": ">=1.3.2",
+    "mdast-util-to-hast": ">=13.2.1"
+  },
   "scripts": {
     "docusaurus": "docusaurus",
     "start": "docusaurus start",
