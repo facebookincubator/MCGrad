@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+message: If you use this software, please cite it as below.
+title: MCGrad
+authors:
+  - name: MCGrad Team
+url: https://github.com/facebookincubator/MCGrad
+repository-code: https://github.com/facebookincubator/MCGrad
+license: MIT
+version: 0.1.0
+preferred-citation:
+  type: article
+  title: "MCGrad: Multicalibration at Web Scale"
+  authors:
+    - family-names: Perini
+      given-names: Lorenzo
+    - family-names: Haimovich
+      given-names: Daniel
+    - family-names: Linder
+      given-names: Fridolin
+    - family-names: Tax
+      given-names: Niek
+    - family-names: Karamshuk
+      given-names: Dima
+    - family-names: Vojnovic
+      given-names: Milan
+    - family-names: Okati
+      given-names: Nastaran
+    - family-names: Apostolopoulos
+      given-names: Pavlos Athanasios
+  journal: "arXiv preprint arXiv:2509.19884"
+  year: 2026
+  url: "https://arxiv.org/abs/2509.19884"
+  notes: "To appear in KDD 2026"
