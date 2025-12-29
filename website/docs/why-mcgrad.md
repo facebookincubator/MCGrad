@@ -66,6 +66,8 @@ Use multicalibration when:
 - You need **fair predictions** across demographic or interest groups
 - You observe **poor calibration in subgroups** despite good global calibration
 - You want to **improve overall performance**—multicalibration often improves log loss and PRAUC
+- Predictions feed into **downstream optimization** (e.g., matching, ranking, auctions)—even unbiased predictors can lead to [poor decisions without multicalibration](https://arxiv.org/abs/2511.11413)
+- You need **robustness to distribution shifts**—multicalibrated models generalize better across different weightings of examples ([Kim et al., 2022](https://www.pnas.org/doi/10.1073/pnas.2108097119); [Wu et al., 2024](https://proceedings.neurips.cc/paper_files/paper/2024/hash/859b6564b04959833fdf52ae6f726f84-Abstract-Conference.html))
 
 ### MCGrad Advantages Over Alternatives
 
