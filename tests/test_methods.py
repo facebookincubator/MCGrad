@@ -4,7 +4,6 @@
 # LICENSE file in the root directory of this source tree.
 # pyre-unsafe
 
-
 from unittest.mock import Mock
 
 import numpy as np
