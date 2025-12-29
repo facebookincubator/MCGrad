@@ -988,6 +988,20 @@ def test_that_lightgbm_params_are_applied_correctly_after_resetting_them(
         methods.RegressionMCBoost,
     ],
 )
+def test_mcboost_with_random_generator_as_random_state(calibrator_class):
+    rng = np.random.default_rng(42)
+    model = calibrator_class(random_state=rng)
+
+    assert model._rng is rng
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
 def test_mcboost_reproducibility_with_same_random_state(calibrator_class):
     model1 = calibrator_class(random_state=42)
     model2 = calibrator_class(random_state=42)
@@ -1012,7 +1026,6 @@ def test_mcboost_reproducibility_with_same_random_state(calibrator_class):
     ],
 )
 def test_mcboost_different_random_states_produce_different_seeds(calibrator_class):
-    """Test that different random_state values produce different seeds"""
     model1 = calibrator_class(random_state=42)
     model2 = calibrator_class(random_state=123)
 
@@ -1020,6 +1033,299 @@ def test_mcboost_different_random_states_produce_different_seeds(calibrator_clas
     seed2 = model2.lightgbm_params["seed"]
 
     assert seed1 != seed2, "Different random_state should produce different seeds"
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_mcboost_raises_when_custom_score_func_without_minimize_score(calibrator_class):
+    custom_score_func = wrap_sklearn_metric_func(skmetrics.roc_auc_score)
+    with pytest.raises(
+        ValueError,
+        match="`early_stopping_minimize_score` has to be set",
+    ):
+        calibrator_class(
+            early_stopping=True,
+            early_stopping_score_func=custom_score_func,
+            early_stopping_minimize_score=None,
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_mcboost_raises_when_patience_set_without_early_stopping(calibrator_class):
+    with pytest.raises(
+        ValueError,
+        match="`patience` must be None when argument `early_stopping` is disabled",
+    ):
+        calibrator_class(
+            early_stopping=False,
+            patience=5,
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_mcboost_raises_when_crossvalidation_set_without_early_stopping(
+    calibrator_class,
+):
+    with pytest.raises(
+        ValueError,
+        match="`early_stopping_use_crossvalidation` must be None when `early_stopping` is disabled",
+    ):
+        calibrator_class(
+            early_stopping=False,
+            early_stopping_use_crossvalidation=True,
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_mcboost_raises_when_score_func_set_without_early_stopping(calibrator_class):
+    custom_score_func = wrap_sklearn_metric_func(skmetrics.roc_auc_score)
+    with pytest.raises(
+        ValueError,
+        match="`score_func` must be None when `early_stopping` is disabled",
+    ):
+        calibrator_class(
+            early_stopping=False,
+            early_stopping_score_func=custom_score_func,
+            early_stopping_minimize_score=False,
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_mcboost_raises_when_minimize_score_without_custom_score_func_early_stopping_enabled(
+    calibrator_class,
+):
+    with pytest.raises(
+        ValueError,
+        match="`early_stopping_minimize_score` is only relevant when using a custom score function",
+    ):
+        calibrator_class(
+            early_stopping=True,
+            early_stopping_score_func=None,
+            early_stopping_minimize_score=True,
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_mcboost_raises_when_n_folds_set_with_holdout(calibrator_class):
+    with pytest.raises(
+        ValueError,
+        match="`n_folds` must be None when `early_stopping_use_crossvalidation` is disabled",
+    ):
+        calibrator_class(
+            early_stopping=True,
+            early_stopping_use_crossvalidation=False,
+            n_folds=5,
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_mcboost_default_num_rounds_when_early_stopping_disabled(calibrator_class):
+    model = calibrator_class(early_stopping=False, num_rounds=None)
+    assert model.num_rounds == calibrator_class.NUM_ROUNDS_DEFAULT_NO_EARLY_STOPPING
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_mcboost_raises_when_num_rounds_in_lightgbm_params(calibrator_class):
+    with pytest.raises(
+        ValueError,
+        match="Avoid using `num_rounds` in `lightgbm_params`",
+    ):
+        calibrator_class(
+            lightgbm_params={"num_rounds": 10},
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_mcboost_feature_importance_raises_when_not_fit(calibrator_class):
+    model = calibrator_class()
+    with pytest.raises(ValueError, match="Model has not been fit yet"):
+        model.feature_importance()
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_mcboost_performance_metrics_raises_when_not_fit_with_early_stopping(
+    calibrator_class,
+):
+    model = calibrator_class(early_stopping=False)
+    with pytest.raises(
+        ValueError,
+        match="Performance metrics are only available after the model has been fit with `early_stopping=True`",
+    ):
+        _ = model.performance_metrics
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_mcboost_monotone_t_constraint_applied_correctly(calibrator_class, rng):
+    df_train = pd.DataFrame(
+        {
+            "cat_feature": rng.choice(["A", "B", "C"], 50),
+            "num_feature": rng.rand(50),
+            "prediction": rng.rand(50),
+            "label": rng.randint(0, 2, 50),
+        }
+    )
+
+    model = calibrator_class(
+        monotone_t=True,
+        early_stopping=False,
+        num_rounds=1,
+        lightgbm_params={"max_depth": 2, "n_estimators": 2},
+    )
+    model.fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=["num_feature"],
+    )
+
+    assert model.monotone_t is True
+    assert len(model.mr) == 1
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_mcboost_get_lgbm_params_with_monotone_t(calibrator_class):
+    model = calibrator_class(monotone_t=True)
+
+    x = np.array([[1, 2, 3], [4, 5, 6]])
+
+    lgbm_params = model._get_lgbm_params(x)
+
+    assert "monotone_constraints" in lgbm_params
+    expected_constraints = [0, 0, 1]
+    assert lgbm_params["monotone_constraints"] == expected_constraints
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_mcboost_extract_features_raises_when_encoder_not_fit(calibrator_class):
+    model = calibrator_class(encode_categorical_variables=True)
+
+    df = pd.DataFrame({"cat_feature": ["A", "B", "C"]})
+
+    with pytest.raises(ValueError, match="Fit has to be called before encoder"):
+        model._extract_features(
+            df=df,
+            categorical_feature_column_names=["cat_feature"],
+            numerical_feature_column_names=None,
+            is_fit_phase=False,
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCBoost,
+        methods.RegressionMCBoost,
+    ],
+)
+def test_mcboost_feature_importance_returns_correct_dataframe(calibrator_class, rng):
+    df_train = pd.DataFrame(
+        {
+            "cat_feature": rng.choice(["A", "B", "C"], 50),
+            "num_feature": rng.rand(50),
+            "prediction": rng.rand(50),
+            "label": rng.randint(0, 2, 50),
+        }
+    )
+
+    model = calibrator_class(
+        early_stopping=False,
+        num_rounds=2,
+        lightgbm_params={"max_depth": 2, "n_estimators": 2},
+    )
+    model.fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=["num_feature"],
+    )
+
+    importance_df = model.feature_importance()
+
+    assert isinstance(importance_df, pd.DataFrame)
+    assert "feature" in importance_df.columns
+    assert "importance" in importance_df.columns
+    expected_features = {"cat_feature", "num_feature", "prediction"}
+    assert set(importance_df["feature"].values) == expected_features
+    assert importance_df["importance"].iloc[0] >= importance_df["importance"].iloc[-1]
 
 
 @pytest.mark.parametrize(
@@ -2559,6 +2865,97 @@ def test_prepare_mcboost_processed_data_presence_mask_with_missing_segment_featu
     assert internal_data.output_presence_mask[[0, 1, 3, 4]].all()
 
 
+def test_platt_scaling_with_features_categorical_features(rng):
+    df = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.2, 0.8, 100),
+            "label": rng.randint(0, 2, 100),
+            "cat_feature": rng.choice(["A", "B", "C"], 100),
+        }
+    )
+
+    calibrator = methods.PlattScalingWithFeatures()
+    calibrator.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["cat_feature"],
+    )
+
+    predictions = calibrator.predict(
+        df=df,
+        prediction_column_name="prediction",
+        categorical_feature_column_names=["cat_feature"],
+    )
+
+    assert len(predictions) == len(df)
+    assert calibrator.ohe is not None
+    assert calibrator.ohe_columns is not None
+    assert len(calibrator.ohe_columns) > 0
+
+
+def test_platt_scaling_with_features_numerical_features(rng):
+    df = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.2, 0.8, 100),
+            "label": rng.randint(0, 2, 100),
+            "num_feature": rng.uniform(0, 100, 100),
+        }
+    )
+
+    calibrator = methods.PlattScalingWithFeatures()
+    calibrator.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        numerical_feature_column_names=["num_feature"],
+    )
+
+    predictions = calibrator.predict(
+        df=df,
+        prediction_column_name="prediction",
+        numerical_feature_column_names=["num_feature"],
+    )
+
+    assert len(predictions) == len(df)
+    assert calibrator.kbd is not None
+    assert calibrator.kbd_columns is not None
+    assert len(calibrator.kbd_columns) > 0
+
+
+def test_platt_scaling_with_features_both_categorical_and_numerical(rng):
+    df = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.2, 0.8, 100),
+            "label": rng.randint(0, 2, 100),
+            "cat_feature": rng.choice(["X", "Y", "Z"], 100),
+            "num_feature": rng.uniform(0, 50, 100),
+        }
+    )
+
+    calibrator = methods.PlattScalingWithFeatures()
+    calibrator.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=["num_feature"],
+    )
+
+    predictions = calibrator.predict(
+        df=df,
+        prediction_column_name="prediction",
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=["num_feature"],
+    )
+
+    assert len(predictions) == len(df)
+    assert calibrator.ohe is not None
+    assert calibrator.kbd is not None
+    assert calibrator.ohe_columns is not None
+    assert calibrator.kbd_columns is not None
+
+
 @pytest.mark.parametrize(
     "calibrator_class",
     [
@@ -2749,3 +3146,114 @@ def test_multiple_predict_calls_produce_consistent_results(calibrator_class, rng
 
     np.testing.assert_array_equal(predictions_first, predictions_second)
     np.testing.assert_array_equal(predictions_second, predictions_third)
+
+
+def test_segmentwise_calibrator_with_no_categorical_features_equivalent_to_underlying_calibrator(
+    rng,
+):
+    df = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.2, 0.8, 100),
+            "label": rng.randint(0, 2, 100),
+        }
+    )
+
+    segmentwise_calibrator = methods.SegmentwiseCalibrator(methods.PlattScaling)
+    segmentwise_calibrator.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=None,
+    )
+
+    direct_calibrator = methods.PlattScaling()
+    direct_calibrator.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+    )
+
+    segmentwise_predictions = segmentwise_calibrator.predict(
+        df=df,
+        prediction_column_name="prediction",
+        categorical_feature_column_names=None,
+    )
+
+    direct_predictions = direct_calibrator.predict(
+        df=df,
+        prediction_column_name="prediction",
+    )
+
+    assert len(segmentwise_predictions) == len(df)
+    assert isinstance(
+        segmentwise_calibrator.calibrator_per_segment[""], methods.PlattScaling
+    )
+    np.testing.assert_allclose(segmentwise_predictions, direct_predictions)
+
+
+def test_segmentwise_calibrator_falls_back_to_identity_mapping_for_single_class_segment(
+    rng,
+):
+    df = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.2, 0.8, 100),
+            # Segment A: all 0s (single class), Segment B: mix of 0s and 1s (two classes)
+            "label": [0] * 50 + [0] * 25 + [1] * 25,
+            "segment": ["A"] * 50 + ["B"] * 50,
+        }
+    )
+
+    calibrator = methods.SegmentwiseCalibrator(methods.PlattScaling)
+    calibrator.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["segment"],
+    )
+
+    assert "A" in calibrator.calibrator_per_segment
+    assert "B" in calibrator.calibrator_per_segment
+    # Segment A has only one class (all 0s), so it falls back to IdentityCalibrator
+    assert isinstance(
+        calibrator.calibrator_per_segment["A"], methods.IdentityCalibrator
+    )
+    # Segment B has both classes, so PlattScaling can be fit
+    assert isinstance(calibrator.calibrator_per_segment["B"], methods.PlattScaling)
+
+
+def test_segmentwise_calibrator_falls_back_to_identity_mapping_for_unseen_segment(rng):
+    df_train = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.2, 0.8, 100),
+            "label": rng.randint(0, 2, 100),
+            "segment": rng.choice(["A", "B"], 100),
+        }
+    )
+
+    df_test = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.2, 0.8, 20),
+            "segment": ["C"] * 20,
+        }
+    )
+
+    calibrator = methods.SegmentwiseCalibrator(methods.PlattScaling)
+    calibrator.fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["segment"],
+    )
+
+    predictions = calibrator.predict(
+        df=df_test,
+        prediction_column_name="prediction",
+        categorical_feature_column_names=["segment"],
+    )
+
+    assert len(predictions) == len(df_test)
+    assert "C" in calibrator.calibrator_per_segment
+    assert isinstance(
+        calibrator.calibrator_per_segment["C"], methods.IdentityCalibrator
+    )
+    np.testing.assert_array_equal(predictions, df_test["prediction"].values)
