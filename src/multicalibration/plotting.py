@@ -4,7 +4,6 @@
 # LICENSE file in the root directory of this source tree.
 # pyre-strict
 
-
 import math
 from typing import Any, Protocol, Tuple
 
