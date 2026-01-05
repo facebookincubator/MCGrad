@@ -730,3 +730,63 @@ def test_tune_mcboost_params_df_val_passing_defaults_to_false(
     final_fit_call = fit_calls[-1]
     expected_final_df_val = sample_val_data if pass_df_val_into_final_fit else None
     assert final_fit_call[1]["df_val"] is expected_final_df_val
+
+
+@pytest.mark.arm64_incompatible
+@patch("multicalibration.tuning.normalized_entropy")
+def test_tune_mcboost_params_does_not_modify_input_dataframes(
+    mock_normalized_entropy,
+    sample_data,
+    sample_val_data,
+    mock_mcboost_model,
+):
+    mock_normalized_entropy.return_value = 0.5
+
+    df_train_original = sample_data.copy()
+    df_val_original = sample_val_data.copy()
+
+    tune_mcboost_params(
+        model=mock_mcboost_model,
+        df_train=sample_data,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        df_val=sample_val_data,
+        weight_column_name="weight",
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=["num_feature"],
+        n_trials=2,
+    )
+
+    pd.testing.assert_frame_equal(sample_data, df_train_original)
+    pd.testing.assert_frame_equal(sample_val_data, df_val_original)
+
+
+@pytest.mark.arm64_incompatible
+@patch("multicalibration.tuning.normalized_entropy")
+@patch("multicalibration.tuning.train_test_split")
+def test_tune_mcboost_params_does_not_modify_input_dataframe_when_no_df_val(
+    mock_train_test_split,
+    mock_normalized_entropy,
+    sample_data,
+    mock_mcboost_model,
+):
+    train_data = sample_data.iloc[:40].copy()
+    val_data = sample_data.iloc[40:].copy()
+    mock_train_test_split.return_value = (train_data, val_data)
+    mock_normalized_entropy.return_value = 0.5
+
+    df_train_original = sample_data.copy()
+
+    tune_mcboost_params(
+        model=mock_mcboost_model,
+        df_train=sample_data,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        df_val=None,
+        weight_column_name="weight",
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=["num_feature"],
+        n_trials=2,
+    )
+
+    pd.testing.assert_frame_equal(sample_data, df_train_original)
