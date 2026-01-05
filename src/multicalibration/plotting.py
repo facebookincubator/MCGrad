@@ -850,7 +850,7 @@ def plot_learning_curve(
                 >= mcboost_model.MCE_STRONG_EVIDENCE_THRESHOLD
             ):
                 fig.add_annotation(
-                    text="<b>WARNING: MCBoost run failed to remove strong evidence of multicalibration!</b><br><b>Reach out to us and share your notebook in the MCBoost Users workplace group.</b>",
+                    text="<b>WARNING: MCBoost run failed to remove strong evidence of multicalibration!</b>",
                     xref="paper",
                     yref="paper",
                     x=tot_num_rounds - 1,
