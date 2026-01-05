@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from multicalibration import metrics, plotting
+from multicalibration import methods, metrics, plotting
 
 
 @pytest.fixture
@@ -432,6 +432,101 @@ def test_plot_calibration_curve_by_segment_empty_data():
         label_col="label",
         num_bins=5,
     )
+
+    assert fig is not None
+
+
+def test_plot_learning_curve_with_early_stopping(rng):
+    n_samples = 200
+    predictions = rng.rand(n_samples)
+    labels = rng.randint(0, 2, n_samples)
+
+    df = pd.DataFrame(
+        {
+            "prediction": predictions,
+            "label": labels,
+            "feature": rng.choice(["a", "b", "c"], n_samples),
+        }
+    )
+
+    model = methods.MCBoost(
+        num_rounds=3,
+        early_stopping=True,
+        patience=1,
+        lightgbm_params={"max_depth": 2, "n_estimators": 2},
+    )
+    model.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["feature"],
+    )
+
+    fig = plotting.plot_learning_curve(model)
+
+    assert fig is not None
+
+
+def test_plot_learning_curve_raises_without_early_stopping(rng):
+    n_samples = 100
+    predictions = rng.rand(n_samples)
+    labels = rng.randint(0, 2, n_samples)
+
+    df = pd.DataFrame(
+        {
+            "prediction": predictions,
+            "label": labels,
+            "feature": rng.choice(["a", "b"], n_samples),
+        }
+    )
+
+    model = methods.MCBoost(
+        num_rounds=2,
+        early_stopping=False,
+        lightgbm_params={"max_depth": 2, "n_estimators": 2},
+    )
+    model.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["feature"],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Learning curve can only be plotted for models that have been trained with early_stopping=True",
+    ):
+        plotting.plot_learning_curve(model)
+
+
+def test_plot_learning_curve_with_show_all(rng):
+    n_samples = 200
+    predictions = rng.rand(n_samples)
+    labels = rng.randint(0, 2, n_samples)
+
+    df = pd.DataFrame(
+        {
+            "prediction": predictions,
+            "label": labels,
+            "feature": rng.choice(["a", "b", "c"], n_samples),
+        }
+    )
+
+    model = methods.MCBoost(
+        num_rounds=3,
+        early_stopping=True,
+        patience=1,
+        save_training_performance=True,
+        lightgbm_params={"max_depth": 2, "n_estimators": 2},
+    )
+    model.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["feature"],
+    )
+
+    fig = plotting.plot_learning_curve(model, show_all=True)
 
     assert fig is not None
 
