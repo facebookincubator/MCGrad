@@ -423,3 +423,94 @@ def test_concat_feature_values_with_mixed_empty_and_non_empty():
 
     assert len(result) == 2
     assert result["segment_column"].tolist() == ["A", "B"]
+
+
+def test_get_segment_masks_does_not_modify_input_dataframe():
+    df = pd.DataFrame(
+        {
+            "segment_A": ["a", "a", "b", "b", "c", "d"],
+            "segment_B": [0.1, 0.2, 0.3, 0.7, 0.8, 0.9],
+        }
+    )
+    df_original = df.copy()
+
+    generator = segmentation.get_segment_masks(
+        df,
+        categorical_segment_columns=["segment_A"],
+        numerical_segment_columns=["segment_B"],
+        max_values_per_segment_feature=3,
+        min_samples_per_segment=1,
+        chunk_size=10,
+    )
+    # Consume the generator to ensure all processing is done
+    _ = list(generator)
+
+    pd.testing.assert_frame_equal(df, df_original)
+
+
+def test_get_segment_masks_does_not_modify_input_dataframe_with_missing_values():
+    df = pd.DataFrame(
+        {
+            "segment_A": ["a", "a", None, None, "c", "d"],
+            "segment_B": [0.1, None, 0.3, None, 0.8, 0.9],
+        }
+    )
+    df_original = df.copy()
+
+    generator = segmentation.get_segment_masks(
+        df,
+        categorical_segment_columns=["segment_A"],
+        numerical_segment_columns=["segment_B"],
+        max_values_per_segment_feature=3,
+        min_samples_per_segment=1,
+        chunk_size=10,
+    )
+    # Consume the generator to ensure all processing is done
+    _ = list(generator)
+
+    pd.testing.assert_frame_equal(df, df_original)
+
+
+def test_collapse_infrequent_values_does_not_modify_input_series():
+    values = pd.Series(["a", "a", "b", "c", "d", "e"])
+    values_original = values.copy()
+
+    _ = segmentation.collapse_infrequent_values(values, max_unique_values=2)
+
+    pd.testing.assert_series_equal(values, values_original)
+
+
+def test_collapse_numeric_values_does_not_modify_input_series():
+    values = pd.Series([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
+    values_original = values.copy()
+
+    _ = segmentation.collapse_numeric_values(values, max_unique_values=3)
+
+    pd.testing.assert_series_equal(values, values_original)
+
+
+def test_collapse_numeric_values_does_not_modify_input_series_with_missing_values():
+    values = pd.Series([0.1, None, 0.3, None, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
+    values_original = values.copy()
+
+    _ = segmentation.collapse_numeric_values(values, max_unique_values=3)
+
+    pd.testing.assert_series_equal(values, values_original)
+
+
+def test_replace_missing_values_does_not_modify_input_dataframe():
+    df = pd.DataFrame(
+        {
+            "cat_col": ["a", None, "b", None],
+            "num_col": [0.1, None, 0.3, None],
+        }
+    )
+    df_original = df.copy()
+
+    _ = segmentation.replace_missing_values(
+        df,
+        categorical_segment_columns=["cat_col"],
+        numerical_segment_columns=["num_col"],
+    )
+
+    pd.testing.assert_frame_equal(df, df_original)
