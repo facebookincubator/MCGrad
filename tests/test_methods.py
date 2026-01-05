@@ -3257,3 +3257,427 @@ def test_segmentwise_calibrator_falls_back_to_identity_mapping_for_unseen_segmen
         calibrator.calibrator_per_segment["C"], methods.IdentityCalibrator
     )
     np.testing.assert_array_equal(predictions, df_test["prediction"].values)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class,calibrator_kwargs",
+    [
+        (
+            methods.MCBoost,
+            {
+                "num_rounds": 2,
+                "early_stopping": False,
+                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+            },
+        ),
+        (
+            methods.RegressionMCBoost,
+            {
+                "num_rounds": 2,
+                "early_stopping": False,
+                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+            },
+        ),
+    ],
+)
+def test_mcboost_fit_does_not_modify_input_dataframe(
+    calibrator_class, calibrator_kwargs
+):
+    df_train = pd.DataFrame(
+        {
+            "prediction": [0.1, 0.2, 0.3, 0.4, 0.5],
+            "label": [0, 1, 0, 1, 0],
+            "cat_feature": ["A", "B", "A", "B", "A"],
+            "num_feature": [1.0, 2.0, 3.0, 4.0, 5.0],
+            "weight": [1.0, 1.0, 2.0, 2.0, 1.0],
+        }
+    )
+
+    df_train_original = df_train.copy()
+
+    calibrator = calibrator_class(**calibrator_kwargs)
+    calibrator.fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        weight_column_name="weight",
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=["num_feature"],
+    )
+
+    pd.testing.assert_frame_equal(df_train, df_train_original)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class,calibrator_kwargs",
+    [
+        (
+            methods.MCBoost,
+            {
+                "num_rounds": 2,
+                "early_stopping": False,
+                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+            },
+        ),
+        (
+            methods.RegressionMCBoost,
+            {
+                "num_rounds": 2,
+                "early_stopping": False,
+                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+            },
+        ),
+    ],
+)
+def test_mcboost_predict_does_not_modify_input_dataframe(
+    calibrator_class, calibrator_kwargs
+):
+    df_train = pd.DataFrame(
+        {
+            "prediction": [0.1, 0.2, 0.3, 0.4, 0.5],
+            "label": [0, 1, 0, 1, 0],
+            "cat_feature": ["A", "B", "A", "B", "A"],
+            "num_feature": [1.0, 2.0, 3.0, 4.0, 5.0],
+        }
+    )
+
+    df_test = pd.DataFrame(
+        {
+            "prediction": [0.15, 0.25, 0.35],
+            "cat_feature": ["A", "B", "A"],
+            "num_feature": [1.5, 2.5, 3.5],
+        }
+    )
+
+    df_test_original = df_test.copy()
+
+    calibrator = calibrator_class(**calibrator_kwargs)
+    calibrator.fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=["num_feature"],
+    )
+
+    _ = calibrator.predict(
+        df=df_test,
+        prediction_column_name="prediction",
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=["num_feature"],
+    )
+
+    pd.testing.assert_frame_equal(df_test, df_test_original)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class,calibrator_kwargs",
+    [
+        (methods.PlattScaling, {}),
+        (methods.IsotonicRegression, {}),
+        (methods.MultiplicativeAdjustment, {}),
+        (methods.AdditiveAdjustment, {}),
+        (methods.IdentityCalibrator, {}),
+    ],
+)
+def test_simple_calibrator_fit_does_not_modify_input_dataframe(
+    calibrator_class, calibrator_kwargs, rng
+):
+    df_train = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.1, 0.9, 50),
+            "label": rng.randint(0, 2, 50),
+            "weight": rng.uniform(0.5, 2.0, 50),
+        }
+    )
+
+    df_train_original = df_train.copy()
+
+    calibrator = calibrator_class(**calibrator_kwargs)
+    calibrator.fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        weight_column_name="weight",
+    )
+
+    pd.testing.assert_frame_equal(df_train, df_train_original)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class,calibrator_kwargs",
+    [
+        (methods.PlattScaling, {}),
+        (methods.IsotonicRegression, {}),
+        (methods.MultiplicativeAdjustment, {}),
+        (methods.AdditiveAdjustment, {}),
+        (methods.IdentityCalibrator, {}),
+    ],
+)
+def test_simple_calibrator_predict_does_not_modify_input_dataframe(
+    calibrator_class, calibrator_kwargs, rng
+):
+    df_train = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.1, 0.9, 50),
+            "label": rng.randint(0, 2, 50),
+        }
+    )
+
+    df_test = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.1, 0.9, 20),
+        }
+    )
+
+    df_test_original = df_test.copy()
+
+    calibrator = calibrator_class(**calibrator_kwargs)
+    calibrator.fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+    )
+
+    _ = calibrator.predict(
+        df=df_test,
+        prediction_column_name="prediction",
+    )
+
+    pd.testing.assert_frame_equal(df_test, df_test_original)
+
+
+def test_platt_scaling_with_features_fit_does_not_modify_input_dataframe(rng):
+    df_train = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.1, 0.9, 100),
+            "label": rng.randint(0, 2, 100),
+            "cat_feature": rng.choice(["A", "B", "C"], 100),
+            "num_feature": rng.uniform(0, 100, 100),
+            "weight": rng.uniform(0.5, 2.0, 100),
+        }
+    )
+
+    df_train_original = df_train.copy()
+
+    calibrator = methods.PlattScalingWithFeatures()
+    calibrator.fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        weight_column_name="weight",
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=["num_feature"],
+    )
+
+    pd.testing.assert_frame_equal(df_train, df_train_original)
+
+
+def test_platt_scaling_with_features_predict_does_not_modify_input_dataframe(rng):
+    df_train = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.1, 0.9, 100),
+            "label": rng.randint(0, 2, 100),
+            "cat_feature": rng.choice(["A", "B", "C"], 100),
+            "num_feature": rng.uniform(0, 100, 100),
+        }
+    )
+
+    df_test = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.1, 0.9, 20),
+            "cat_feature": rng.choice(["A", "B", "C"], 20),
+            "num_feature": rng.uniform(0, 100, 20),
+        }
+    )
+
+    df_test_original = df_test.copy()
+
+    calibrator = methods.PlattScalingWithFeatures()
+    calibrator.fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=["num_feature"],
+    )
+
+    _ = calibrator.predict(
+        df=df_test,
+        prediction_column_name="prediction",
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=["num_feature"],
+    )
+
+    pd.testing.assert_frame_equal(df_test, df_test_original)
+
+
+def test_segmentwise_calibrator_fit_does_not_modify_input_dataframe(rng):
+    df_train = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.1, 0.9, 100),
+            "label": rng.randint(0, 2, 100),
+            "segment": rng.choice(["A", "B"], 100),
+            "weight": rng.uniform(0.5, 2.0, 100),
+        }
+    )
+
+    df_train_original = df_train.copy()
+
+    calibrator = methods.SegmentwiseCalibrator(methods.PlattScaling)
+    calibrator.fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        weight_column_name="weight",
+        categorical_feature_column_names=["segment"],
+    )
+
+    pd.testing.assert_frame_equal(df_train, df_train_original)
+
+
+def test_segmentwise_calibrator_predict_does_not_modify_input_dataframe(rng):
+    df_train = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.1, 0.9, 100),
+            "label": rng.randint(0, 2, 100),
+            "segment": rng.choice(["A", "B"], 100),
+        }
+    )
+
+    df_test = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.1, 0.9, 20),
+            "segment": rng.choice(["A", "B"], 20),
+        }
+    )
+
+    df_test_original = df_test.copy()
+
+    calibrator = methods.SegmentwiseCalibrator(methods.PlattScaling)
+    calibrator.fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["segment"],
+    )
+
+    _ = calibrator.predict(
+        df=df_test,
+        prediction_column_name="prediction",
+        categorical_feature_column_names=["segment"],
+    )
+
+    pd.testing.assert_frame_equal(df_test, df_test_original)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class,calibrator_kwargs",
+    [
+        (
+            methods.MCBoost,
+            {
+                "num_rounds": 2,
+                "early_stopping": True,
+                "early_stopping_use_crossvalidation": True,
+                "n_folds": 2,
+                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+            },
+        ),
+        (
+            methods.RegressionMCBoost,
+            {
+                "num_rounds": 2,
+                "early_stopping": True,
+                "early_stopping_use_crossvalidation": True,
+                "n_folds": 2,
+                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+            },
+        ),
+    ],
+)
+def test_mcboost_fit_with_early_stopping_does_not_modify_input_dataframe(
+    calibrator_class, calibrator_kwargs
+):
+    df_train = pd.DataFrame(
+        {
+            "prediction": [0.1, 0.2, 0.3, 0.4, 0.5],
+            "label": [0, 1, 0, 1, 0],
+            "cat_feature": ["A", "B", "A", "B", "A"],
+            "num_feature": [1.0, 2.0, 3.0, 4.0, 5.0],
+        }
+    )
+
+    df_train_original = df_train.copy()
+
+    calibrator = calibrator_class(**calibrator_kwargs)
+    calibrator.fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=["num_feature"],
+    )
+
+    pd.testing.assert_frame_equal(df_train, df_train_original)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class,calibrator_kwargs",
+    [
+        (
+            methods.MCBoost,
+            {
+                "num_rounds": 2,
+                "early_stopping": True,
+                "early_stopping_use_crossvalidation": False,
+                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+            },
+        ),
+        (
+            methods.RegressionMCBoost,
+            {
+                "num_rounds": 2,
+                "early_stopping": True,
+                "early_stopping_use_crossvalidation": False,
+                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
+            },
+        ),
+    ],
+)
+def test_mcboost_fit_with_df_val_does_not_modify_input_dataframes(
+    calibrator_class, calibrator_kwargs, rng
+):
+    df_train = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.1, 0.9, 50),
+            "label": rng.randint(0, 2, 50),
+            "cat_feature": rng.choice(["A", "B"], 50),
+            "num_feature": rng.uniform(0, 10, 50),
+        }
+    )
+
+    df_val = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.1, 0.9, 30),
+            "label": rng.randint(0, 2, 30),
+            "cat_feature": rng.choice(["A", "B"], 30),
+            "num_feature": rng.uniform(0, 10, 30),
+        }
+    )
+
+    df_train_original = df_train.copy()
+    df_val_original = df_val.copy()
+
+    calibrator = calibrator_class(**calibrator_kwargs)
+    calibrator.fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=["num_feature"],
+        df_val=df_val,
+    )
+
+    pd.testing.assert_frame_equal(df_train, df_train_original)
+    pd.testing.assert_frame_equal(df_val, df_val_original)
