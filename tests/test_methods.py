@@ -41,8 +41,8 @@ def generate_test_data(n):
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
 @pytest.mark.parametrize(
@@ -60,7 +60,7 @@ def generate_test_data(n):
         },
     ],
 )
-def test_deserialized_mcboost_fits_correct_num_rounds_when_no_early_stopping(
+def test_deserialized_mcgrad_fits_correct_num_rounds_when_no_early_stopping(
     num_rounds, calibrator_class, calibrator_kwargs
 ):
     df_train = generate_test_data(5)
@@ -89,14 +89,14 @@ def test_deserialized_mcboost_fits_correct_num_rounds_when_no_early_stopping(
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
 @pytest.mark.parametrize(
     "calibrator_kwargs",
     [
-        # Pass MCBoost params that minimize test runtime
+        # Pass MCGrad params that minimize test runtime
         {
             "num_rounds": 2,
             "early_stopping": False,
@@ -107,12 +107,12 @@ def test_deserialized_mcboost_fits_correct_num_rounds_when_no_early_stopping(
             "early_stopping": True,
             "early_stopping_use_crossvalidation": True,
             "n_folds": 2,  # More than 2 folds would require more input data
-            # Pass MCBoost params that minimize test runtime
+            # Pass MCGrad params that minimize test runtime
             "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
         },
     ],
 )
-def test_mcboost_serialize_deserialize_encode_categorical(
+def test_mcgrad_serialize_deserialize_encode_categorical(
     calibrator_class, calibrator_kwargs
 ):
     df_train = generate_test_data(5)
@@ -149,14 +149,14 @@ def test_mcboost_serialize_deserialize_encode_categorical(
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
 @pytest.mark.parametrize(
     "calibrator_kwargs",
     [
-        # Pass MCBoost params that minimize test runtime
+        # Pass MCGrad params that minimize test runtime
         {
             "num_rounds": 2,
             "early_stopping": False,
@@ -167,12 +167,12 @@ def test_mcboost_serialize_deserialize_encode_categorical(
             "early_stopping": True,
             "early_stopping_use_crossvalidation": True,
             "n_folds": 2,  # More than 2 folds would require more input data
-            # Pass MCBoost params that minimize test runtime
+            # Pass MCGrad params that minimize test runtime
             "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
         },
     ],
 )
-def test_mcboost_serialize_deserialize_no_encode_categorical(
+def test_mcgrad_serialize_deserialize_no_encode_categorical(
     calibrator_class, calibrator_kwargs
 ):
     df_train = generate_test_data(5)
@@ -220,12 +220,12 @@ def test_mcboost_serialize_deserialize_no_encode_categorical(
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
 @pytest.mark.parametrize("max_num_rounds", [(1), (2), (6), (10), (16)])
-def test_deserialized_mcboost_has_at_most_max_num_rounds(
+def test_deserialized_mcgrad_has_at_most_max_num_rounds(
     max_num_rounds, calibrator_class
 ):
     df_train = pd.DataFrame(
@@ -260,13 +260,13 @@ def test_deserialized_mcboost_has_at_most_max_num_rounds(
     [
         (methods.PlattScaling, {}),
         (methods.IsotonicRegression, {}),
-        # Pass MCBoost params that minimize test runtime
+        # Pass MCGrad params that minimize test runtime
         (
-            methods.MCBoost,
+            methods.MCGrad,
             {"num_rounds": 2, "lightgbm_params": {"max_depth": 2, "n_estimators": 2}},
         ),
         (
-            methods.MCBoost,
+            methods.MCGrad,
             {
                 "num_rounds": 2,
                 "early_stopping": True,
@@ -274,7 +274,7 @@ def test_deserialized_mcboost_has_at_most_max_num_rounds(
             },
         ),
         (
-            methods.MCBoost,
+            methods.MCGrad,
             {
                 "num_rounds": 2,
                 "early_stopping": False,
@@ -285,7 +285,7 @@ def test_deserialized_mcboost_has_at_most_max_num_rounds(
         (methods.MultiplicativeAdjustment, {}),
         (methods.AdditiveAdjustment, {}),
         (
-            methods.RegressionMCBoost,
+            methods.RegressionMCGrad,
             {
                 "num_rounds": 2,
                 "early_stopping": True,
@@ -293,7 +293,7 @@ def test_deserialized_mcboost_has_at_most_max_num_rounds(
             },
         ),
         (
-            methods.RegressionMCBoost,
+            methods.RegressionMCGrad,
             {
                 "num_rounds": 2,
                 "early_stopping": False,
@@ -333,13 +333,13 @@ def test_fit_transform_with_train_col_identical_to_fit_then_predict(
     [
         (methods.PlattScaling, {}),
         (methods.IsotonicRegression, {}),
-        # Pass MCBoost params that minimize test runtime
+        # Pass MCGrad params that minimize test runtime
         (
-            methods.MCBoost,
+            methods.MCGrad,
             {"num_rounds": 2, "lightgbm_params": {"max_depth": 2, "n_estimators": 2}},
         ),
         (
-            methods.MCBoost,
+            methods.MCGrad,
             {
                 "num_rounds": 2,
                 "early_stopping": True,
@@ -347,7 +347,7 @@ def test_fit_transform_with_train_col_identical_to_fit_then_predict(
             },
         ),
         (
-            methods.MCBoost,
+            methods.MCGrad,
             {
                 "num_rounds": 2,
                 "early_stopping": False,
@@ -358,7 +358,7 @@ def test_fit_transform_with_train_col_identical_to_fit_then_predict(
         (methods.MultiplicativeAdjustment, {}),
         (methods.AdditiveAdjustment, {}),
         (
-            methods.RegressionMCBoost,
+            methods.RegressionMCGrad,
             {
                 "num_rounds": 2,
                 "early_stopping": True,
@@ -366,7 +366,7 @@ def test_fit_transform_with_train_col_identical_to_fit_then_predict(
             },
         ),
         (
-            methods.RegressionMCBoost,
+            methods.RegressionMCGrad,
             {
                 "num_rounds": 2,
                 "early_stopping": False,
@@ -582,7 +582,7 @@ def test_additive_adjustment_calibrator_with_clip_gives_expected_result(
     "calibrator_class, calibrator_kwargs",
     [
         (
-            methods.MCBoost,
+            methods.MCGrad,
             {
                 "num_rounds": 2,
                 "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
@@ -590,7 +590,7 @@ def test_additive_adjustment_calibrator_with_clip_gives_expected_result(
             },
         ),
         (
-            methods.RegressionMCBoost,
+            methods.RegressionMCGrad,
             {
                 "num_rounds": 2,
                 "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
@@ -631,7 +631,7 @@ def test_calibration_methods_use_weight_column_correctly(
     # Adding this assertion because there were test cases earlier where a model passed
     # just because in both cases it was fit with 0 rounds
     # TODO: understand why early stopping is not equivalent with/without weights
-    if isinstance(model_unweighted, methods.BaseMCBoost):
+    if isinstance(model_unweighted, methods.BaseMCGrad):
         assert len(model_weighted.mr) > 0
         assert len(model_unweighted.mr) > 0
 
@@ -644,19 +644,19 @@ def test_calibration_methods_use_weight_column_correctly(
 @pytest.mark.parametrize(
     "calibrator_class, predictions",
     [
-        (methods.MCBoost, np.array([-0.001, 0.1])),
-        (methods.MCBoost, np.array([0.1, 1.0001])),
-        (methods.MCBoost, np.array([-0.001, 1.0001])),
-        (methods.RegressionMCBoost, np.array([-0.001, float("inf")])),
-        (methods.RegressionMCBoost, np.array([0.1, -1 * float("inf")])),
-        (methods.RegressionMCBoost, np.array([-0.001, None])),
+        (methods.MCGrad, np.array([-0.001, 0.1])),
+        (methods.MCGrad, np.array([0.1, 1.0001])),
+        (methods.MCGrad, np.array([-0.001, 1.0001])),
+        (methods.RegressionMCGrad, np.array([-0.001, float("inf")])),
+        (methods.RegressionMCGrad, np.array([0.1, -1 * float("inf")])),
+        (methods.RegressionMCGrad, np.array([-0.001, None])),
     ],
 )
-def test_mcboost_raises_when_predictions_invalid(calibrator_class, predictions):
+def test_mcgrad_raises_when_predictions_invalid(calibrator_class, predictions):
     df = pd.DataFrame({"prediction": predictions, "label": np.array([0, 1])})
-    mcboost = calibrator_class()
+    mcgrad = calibrator_class()
     with pytest.raises(ValueError):
-        mcboost.fit(
+        mcgrad.fit(
             df_train=df, prediction_column_name="prediction", label_column_name="label"
         )
 
@@ -665,8 +665,8 @@ def test_mcboost_raises_when_predictions_invalid(calibrator_class, predictions):
     "calibrator_class, calibrator_kwargs",
     [
         (
-            methods.MCBoost,
-            # Pass MCBoost params that minimize test runtime
+            methods.MCGrad,
+            # Pass MCGrad params that minimize test runtime
             {
                 "num_rounds": 2,
                 "early_stopping": False,
@@ -674,19 +674,19 @@ def test_mcboost_raises_when_predictions_invalid(calibrator_class, predictions):
             },
         ),
         (
-            methods.MCBoost,
+            methods.MCGrad,
             {
                 "num_rounds": 2,
                 "early_stopping": True,
                 "early_stopping_use_crossvalidation": True,
                 "n_folds": 2,  # More than 2 folds would require more input data
-                # Pass MCBoost params that minimize test runtime
+                # Pass MCGrad params that minimize test runtime
                 "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
             },
         ),
     ],
 )
-def test_mcboost_runs_without_errors_when_scores_in_zero_one(
+def test_mcgrad_runs_without_errors_when_scores_in_zero_one(
     calibrator_class, calibrator_kwargs
 ):
     df = pd.DataFrame(
@@ -695,8 +695,8 @@ def test_mcboost_runs_without_errors_when_scores_in_zero_one(
             "label": np.array([0, 1, 0, 1]),
         }
     )
-    mcboost = calibrator_class(**calibrator_kwargs)
-    mcboost.fit(
+    mcgrad = calibrator_class(**calibrator_kwargs)
+    mcgrad.fit(
         df_train=df, prediction_column_name="prediction", label_column_name="label"
     )
 
@@ -705,8 +705,8 @@ def test_mcboost_runs_without_errors_when_scores_in_zero_one(
     "calibrator_class, calibrator_kwargs",
     [
         (
-            methods.MCBoost,
-            # Pass MCBoost params that minimize test runtime
+            methods.MCGrad,
+            # Pass MCGrad params that minimize test runtime
             {
                 "num_rounds": 2,
                 "early_stopping": False,
@@ -714,35 +714,33 @@ def test_mcboost_runs_without_errors_when_scores_in_zero_one(
             },
         ),
         (
-            methods.MCBoost,
+            methods.MCGrad,
             {
                 "num_rounds": 2,
                 "early_stopping": True,
                 "early_stopping_use_crossvalidation": True,
                 "n_folds": 2,  # More than 2 folds would require more input data
-                # Pass MCBoost params that minimize test runtime
+                # Pass MCGrad params that minimize test runtime
                 "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
             },
         ),
     ],
 )
-def test_mcboost_runs_without_errors_when_scores_are_exactly_zero_or_one(
+def test_mcgrad_runs_without_errors_when_scores_are_exactly_zero_or_one(
     calibrator_class, calibrator_kwargs
 ):
     df = pd.DataFrame(
         {"prediction": np.array([0, 1, 0, 1]), "label": np.array([0, 1, 0, 1])}
     )
-    mcboost = calibrator_class(**calibrator_kwargs)
-    mcboost.fit(
+    mcgrad = calibrator_class(**calibrator_kwargs)
+    mcgrad.fit(
         df_train=df, prediction_column_name="prediction", label_column_name="label"
     )
 
 
-@pytest.mark.parametrize(
-    "calibrator_class", [methods.MCBoost, methods.RegressionMCBoost]
-)
+@pytest.mark.parametrize("calibrator_class", [methods.MCGrad, methods.RegressionMCGrad])
 @pytest.mark.parametrize("num_rounds", [(1), (2), (4)])
-def test_mcboost_predict_returns_correct_number_of_rounds_and_consistent_final_prediction_when_no_early_stopping(
+def test_mcgrad_predict_returns_correct_number_of_rounds_and_consistent_final_prediction_when_no_early_stopping(
     num_rounds, calibrator_class, rng
 ):
     n = 10
@@ -765,11 +763,9 @@ def test_mcboost_predict_returns_correct_number_of_rounds_and_consistent_final_p
     assert np.array_equal(rounds_predictions[-1], final_predictions)
 
 
-@pytest.mark.parametrize(
-    "calibrator_class", [methods.MCBoost, methods.RegressionMCBoost]
-)
+@pytest.mark.parametrize("calibrator_class", [methods.MCGrad, methods.RegressionMCGrad])
 @pytest.mark.parametrize("num_rounds", [(1), (2), (4)])
-def test_mcboost_predict_returns_correct_number_of_rounds_and_consistent_final_prediction_when_early_stopping_is_used(
+def test_mcgrad_predict_returns_correct_number_of_rounds_and_consistent_final_prediction_when_early_stopping_is_used(
     num_rounds, calibrator_class, rng
 ):
     n = 10
@@ -794,10 +790,8 @@ def test_mcboost_predict_returns_correct_number_of_rounds_and_consistent_final_p
     assert np.array_equal(rounds_predictions[-1], final_predictions)
 
 
-@pytest.mark.parametrize(
-    "calibrator_class", [methods.MCBoost, methods.RegressionMCBoost]
-)
-def test_mcboost_predict_returns_correct_number_of_rounds_and_consistent_final_prediction(
+@pytest.mark.parametrize("calibrator_class", [methods.MCGrad, methods.RegressionMCGrad])
+def test_mcgrad_predict_returns_correct_number_of_rounds_and_consistent_final_prediction(
     calibrator_class,
     rng,
 ):
@@ -831,18 +825,18 @@ def test_mcboost_predict_returns_correct_number_of_rounds_and_consistent_final_p
     [
         # if nothing is passed we take all defaults
         (
-            methods.MCBoost,
+            methods.MCGrad,
             None,
-            methods.MCBoost.DEFAULT_HYPERPARAMS["lightgbm_params"],
+            methods.MCGrad.DEFAULT_HYPERPARAMS["lightgbm_params"],
             "binary",
         ),
         # if only one is passed we take the default for the others
         (
-            methods.MCBoost,
+            methods.MCGrad,
             {"max_depth": -1},
             {
                 k: v if k != "max_depth" else -1
-                for k, v in methods.MCBoost.DEFAULT_HYPERPARAMS[
+                for k, v in methods.MCGrad.DEFAULT_HYPERPARAMS[
                     "lightgbm_params"
                 ].items()
             },
@@ -850,25 +844,25 @@ def test_mcboost_predict_returns_correct_number_of_rounds_and_consistent_final_p
         ),
         # if a parameter is passed that is not present in the default we take the default + the passed parameter
         (
-            methods.MCBoost,
+            methods.MCGrad,
             {"_OTHER": -1},
-            methods.MCBoost.DEFAULT_HYPERPARAMS["lightgbm_params"] | {"_OTHER": -1},
+            methods.MCGrad.DEFAULT_HYPERPARAMS["lightgbm_params"] | {"_OTHER": -1},
             "binary",
         ),
         # if nothing is passed we take all defaults
         (
-            methods.RegressionMCBoost,
+            methods.RegressionMCGrad,
             None,
-            methods.RegressionMCBoost.DEFAULT_HYPERPARAMS["lightgbm_params"],
+            methods.RegressionMCGrad.DEFAULT_HYPERPARAMS["lightgbm_params"],
             "regression",
         ),
         # if only one is passed we take the default for the others
         (
-            methods.RegressionMCBoost,
+            methods.RegressionMCGrad,
             {"max_depth": -1},
             {
                 k: v if k != "max_depth" else -1
-                for k, v in methods.RegressionMCBoost.DEFAULT_HYPERPARAMS[
+                for k, v in methods.RegressionMCGrad.DEFAULT_HYPERPARAMS[
                     "lightgbm_params"
                 ].items()
             },
@@ -876,20 +870,20 @@ def test_mcboost_predict_returns_correct_number_of_rounds_and_consistent_final_p
         ),
         # if a parameter is passed that is not present in the default we take the default + the passed parameter
         (
-            methods.RegressionMCBoost,
+            methods.RegressionMCGrad,
             {"_OTHER": -1},
-            methods.RegressionMCBoost.DEFAULT_HYPERPARAMS["lightgbm_params"]
+            methods.RegressionMCGrad.DEFAULT_HYPERPARAMS["lightgbm_params"]
             | {"_OTHER": -1},
             "regression",
         ),
     ],
 )
-def test_that_default_lightgbm_params_are_applied_correctly_for_mcboost(
+def test_that_default_lightgbm_params_are_applied_correctly_for_mcgrad(
     calibrator_class, input_params, expected_params, objective
 ):
     model = calibrator_class(lightgbm_params=input_params)
 
-    # These are always added in the MCBoost init
+    # These are always added in the MCGrad init
     expected_params |= {
         "objective": objective,
         "deterministic": True,
@@ -908,18 +902,18 @@ def test_that_default_lightgbm_params_are_applied_correctly_for_mcboost(
     [
         # if nothing is passed we take all defaults
         (
-            methods.MCBoost,
+            methods.MCGrad,
             None,
-            methods.MCBoost.DEFAULT_HYPERPARAMS["lightgbm_params"],
+            methods.MCGrad.DEFAULT_HYPERPARAMS["lightgbm_params"],
             "binary",
         ),
         # if only one is passed we take the default for the others
         (
-            methods.MCBoost,
+            methods.MCGrad,
             {"max_depth": -1},
             {
                 k: v if k != "max_depth" else -1
-                for k, v in methods.MCBoost.DEFAULT_HYPERPARAMS[
+                for k, v in methods.MCGrad.DEFAULT_HYPERPARAMS[
                     "lightgbm_params"
                 ].items()
             },
@@ -927,25 +921,25 @@ def test_that_default_lightgbm_params_are_applied_correctly_for_mcboost(
         ),
         # if a parameter is passed that is not present in the default we take the default + the passed parameter
         (
-            methods.MCBoost,
+            methods.MCGrad,
             {"_OTHER": -1},
-            methods.MCBoost.DEFAULT_HYPERPARAMS["lightgbm_params"] | {"_OTHER": -1},
+            methods.MCGrad.DEFAULT_HYPERPARAMS["lightgbm_params"] | {"_OTHER": -1},
             "binary",
         ),
         # if nothing is passed we take all defaults
         (
-            methods.RegressionMCBoost,
+            methods.RegressionMCGrad,
             None,
-            methods.RegressionMCBoost.DEFAULT_HYPERPARAMS["lightgbm_params"],
+            methods.RegressionMCGrad.DEFAULT_HYPERPARAMS["lightgbm_params"],
             "regression",
         ),
         # if only one is passed we take the default for the others
         (
-            methods.RegressionMCBoost,
+            methods.RegressionMCGrad,
             {"max_depth": -1},
             {
                 k: v if k != "max_depth" else -1
-                for k, v in methods.RegressionMCBoost.DEFAULT_HYPERPARAMS[
+                for k, v in methods.RegressionMCGrad.DEFAULT_HYPERPARAMS[
                     "lightgbm_params"
                 ].items()
             },
@@ -953,9 +947,9 @@ def test_that_default_lightgbm_params_are_applied_correctly_for_mcboost(
         ),
         # if a parameter is passed that is not present in the default we take the default + the passed parameter
         (
-            methods.RegressionMCBoost,
+            methods.RegressionMCGrad,
             {"_OTHER": -1},
-            methods.RegressionMCBoost.DEFAULT_HYPERPARAMS["lightgbm_params"]
+            methods.RegressionMCGrad.DEFAULT_HYPERPARAMS["lightgbm_params"]
             | {"_OTHER": -1},
             "regression",
         ),
@@ -967,7 +961,7 @@ def test_that_lightgbm_params_are_applied_correctly_after_resetting_them(
     model = calibrator_class()
     model._set_lightgbm_params(lightgbm_params=input_params)
 
-    # These are always added in the MCBoost init
+    # These are always added in the MCGrad init
     expected_params |= {
         "objective": objective,
         "deterministic": True,
@@ -984,11 +978,11 @@ def test_that_lightgbm_params_are_applied_correctly_after_resetting_them(
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mcboost_with_random_generator_as_random_state(calibrator_class):
+def test_mcgrad_with_random_generator_as_random_state(calibrator_class):
     rng = np.random.default_rng(42)
     model = calibrator_class(random_state=rng)
 
@@ -998,11 +992,11 @@ def test_mcboost_with_random_generator_as_random_state(calibrator_class):
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mcboost_reproducibility_with_same_random_state(calibrator_class):
+def test_mcgrad_reproducibility_with_same_random_state(calibrator_class):
     model1 = calibrator_class(random_state=42)
     model2 = calibrator_class(random_state=42)
 
@@ -1021,11 +1015,11 @@ def test_mcboost_reproducibility_with_same_random_state(calibrator_class):
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mcboost_different_random_states_produce_different_seeds(calibrator_class):
+def test_mcgrad_different_random_states_produce_different_seeds(calibrator_class):
     model1 = calibrator_class(random_state=42)
     model2 = calibrator_class(random_state=123)
 
@@ -1038,11 +1032,11 @@ def test_mcboost_different_random_states_produce_different_seeds(calibrator_clas
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mcboost_raises_when_custom_score_func_without_minimize_score(calibrator_class):
+def test_mcgrad_raises_when_custom_score_func_without_minimize_score(calibrator_class):
     custom_score_func = wrap_sklearn_metric_func(skmetrics.roc_auc_score)
     with pytest.raises(
         ValueError,
@@ -1058,11 +1052,11 @@ def test_mcboost_raises_when_custom_score_func_without_minimize_score(calibrator
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mcboost_raises_when_patience_set_without_early_stopping(calibrator_class):
+def test_mcgrad_raises_when_patience_set_without_early_stopping(calibrator_class):
     with pytest.raises(
         ValueError,
         match="`patience` must be None when argument `early_stopping` is disabled",
@@ -1076,11 +1070,11 @@ def test_mcboost_raises_when_patience_set_without_early_stopping(calibrator_clas
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mcboost_raises_when_crossvalidation_set_without_early_stopping(
+def test_mcgrad_raises_when_crossvalidation_set_without_early_stopping(
     calibrator_class,
 ):
     with pytest.raises(
@@ -1096,11 +1090,11 @@ def test_mcboost_raises_when_crossvalidation_set_without_early_stopping(
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mcboost_raises_when_score_func_set_without_early_stopping(calibrator_class):
+def test_mcgrad_raises_when_score_func_set_without_early_stopping(calibrator_class):
     custom_score_func = wrap_sklearn_metric_func(skmetrics.roc_auc_score)
     with pytest.raises(
         ValueError,
@@ -1116,11 +1110,11 @@ def test_mcboost_raises_when_score_func_set_without_early_stopping(calibrator_cl
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mcboost_raises_when_minimize_score_without_custom_score_func_early_stopping_enabled(
+def test_mcgrad_raises_when_minimize_score_without_custom_score_func_early_stopping_enabled(
     calibrator_class,
 ):
     with pytest.raises(
@@ -1137,11 +1131,11 @@ def test_mcboost_raises_when_minimize_score_without_custom_score_func_early_stop
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mcboost_raises_when_n_folds_set_with_holdout(calibrator_class):
+def test_mcgrad_raises_when_n_folds_set_with_holdout(calibrator_class):
     with pytest.raises(
         ValueError,
         match="`n_folds` must be None when `early_stopping_use_crossvalidation` is disabled",
@@ -1156,11 +1150,11 @@ def test_mcboost_raises_when_n_folds_set_with_holdout(calibrator_class):
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mcboost_default_num_rounds_when_early_stopping_disabled(calibrator_class):
+def test_mcgrad_default_num_rounds_when_early_stopping_disabled(calibrator_class):
     model = calibrator_class(early_stopping=False, num_rounds=None)
     assert model.num_rounds == calibrator_class.NUM_ROUNDS_DEFAULT_NO_EARLY_STOPPING
 
@@ -1168,11 +1162,11 @@ def test_mcboost_default_num_rounds_when_early_stopping_disabled(calibrator_clas
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mcboost_raises_when_num_rounds_in_lightgbm_params(calibrator_class):
+def test_mcgrad_raises_when_num_rounds_in_lightgbm_params(calibrator_class):
     with pytest.raises(
         ValueError,
         match="Avoid using `num_rounds` in `lightgbm_params`",
@@ -1185,11 +1179,11 @@ def test_mcboost_raises_when_num_rounds_in_lightgbm_params(calibrator_class):
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mcboost_feature_importance_raises_when_not_fit(calibrator_class):
+def test_mcgrad_feature_importance_raises_when_not_fit(calibrator_class):
     model = calibrator_class()
     with pytest.raises(ValueError, match="Model has not been fit yet"):
         model.feature_importance()
@@ -1198,11 +1192,11 @@ def test_mcboost_feature_importance_raises_when_not_fit(calibrator_class):
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mcboost_performance_metrics_raises_when_not_fit_with_early_stopping(
+def test_mcgrad_performance_metrics_raises_when_not_fit_with_early_stopping(
     calibrator_class,
 ):
     model = calibrator_class(early_stopping=False)
@@ -1216,11 +1210,11 @@ def test_mcboost_performance_metrics_raises_when_not_fit_with_early_stopping(
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mcboost_monotone_t_constraint_applied_correctly(calibrator_class, rng):
+def test_mcgrad_monotone_t_constraint_applied_correctly(calibrator_class, rng):
     df_train = pd.DataFrame(
         {
             "cat_feature": rng.choice(["A", "B", "C"], 50),
@@ -1251,11 +1245,11 @@ def test_mcboost_monotone_t_constraint_applied_correctly(calibrator_class, rng):
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mcboost_get_lgbm_params_with_monotone_t(calibrator_class):
+def test_mcgrad_get_lgbm_params_with_monotone_t(calibrator_class):
     model = calibrator_class(monotone_t=True)
 
     x = np.array([[1, 2, 3], [4, 5, 6]])
@@ -1270,11 +1264,11 @@ def test_mcboost_get_lgbm_params_with_monotone_t(calibrator_class):
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mcboost_extract_features_raises_when_encoder_not_fit(calibrator_class):
+def test_mcgrad_extract_features_raises_when_encoder_not_fit(calibrator_class):
     model = calibrator_class(encode_categorical_variables=True)
 
     df = pd.DataFrame({"cat_feature": ["A", "B", "C"]})
@@ -1291,11 +1285,11 @@ def test_mcboost_extract_features_raises_when_encoder_not_fit(calibrator_class):
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mcboost_feature_importance_returns_correct_dataframe(calibrator_class, rng):
+def test_mcgrad_feature_importance_returns_correct_dataframe(calibrator_class, rng):
     df_train = pd.DataFrame(
         {
             "cat_feature": rng.choice(["A", "B", "C"], 50),
@@ -1328,9 +1322,7 @@ def test_mcboost_feature_importance_returns_correct_dataframe(calibrator_class, 
     assert importance_df["importance"].iloc[0] >= importance_df["importance"].iloc[-1]
 
 
-@pytest.mark.parametrize(
-    "calibrator_class", [methods.MCBoost, methods.RegressionMCBoost]
-)
+@pytest.mark.parametrize("calibrator_class", [methods.MCGrad, methods.RegressionMCGrad])
 @pytest.mark.parametrize("num_rounds", [(2), (6)])
 def test_early_stopping_stops_at_max_num_rounds(num_rounds: int, calibrator_class, rng):
     df_train = pd.DataFrame(
@@ -1354,7 +1346,7 @@ def test_early_stopping_stops_at_max_num_rounds(num_rounds: int, calibrator_clas
 
     # Early stopping should now not kick in, because the score is always increasing
     # It should still stop at the maximum number of rounds, which is specified by num_rounds
-    mcboost = calibrator_class(
+    mcgrad = calibrator_class(
         num_rounds=num_rounds,
         early_stopping=True,
         early_stopping_score_func=wrap_sklearn_metric_func(dummy_score_func),
@@ -1362,7 +1354,7 @@ def test_early_stopping_stops_at_max_num_rounds(num_rounds: int, calibrator_clas
         save_training_performance=True,
         lightgbm_params={"n_estimators": 1},
     )
-    mcboost.fit(
+    mcgrad.fit(
         df_train=df_train,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -1371,17 +1363,15 @@ def test_early_stopping_stops_at_max_num_rounds(num_rounds: int, calibrator_clas
     )
     assert (
         num_rounds
-        == len(mcboost.mr)
-        == len(mcboost._performance_metrics["avg_valid_performance_dummy_score_func"])
+        == len(mcgrad.mr)
+        == len(mcgrad._performance_metrics["avg_valid_performance_dummy_score_func"])
         - 1
-        == len(mcboost._performance_metrics["avg_train_performance_dummy_score_func"])
+        == len(mcgrad._performance_metrics["avg_train_performance_dummy_score_func"])
         - 1
     ), "Early stopping exceeded the maximum number of rounds."
 
 
-@pytest.mark.parametrize(
-    "calibrator_class", [methods.MCBoost, methods.RegressionMCBoost]
-)
+@pytest.mark.parametrize("calibrator_class", [methods.MCGrad, methods.RegressionMCGrad])
 def test_fit_with_provided_df_val_runs_without_errors(calibrator_class, rng):
     # Setup: create training and validation datasets
 
@@ -1414,7 +1404,7 @@ def test_fit_with_provided_df_val_runs_without_errors(calibrator_class, rng):
         return score
 
     # Execute: fit model with early stopping using provided validation set
-    mcboost = calibrator_class(
+    mcgrad = calibrator_class(
         num_rounds=num_rounds,
         early_stopping=True,
         early_stopping_score_func=wrap_sklearn_metric_func(dummy_score_func),
@@ -1424,7 +1414,7 @@ def test_fit_with_provided_df_val_runs_without_errors(calibrator_class, rng):
         lightgbm_params={"n_estimators": 1},
     )
 
-    mcboost.fit(
+    mcgrad.fit(
         df_train=df_train,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -1435,15 +1425,15 @@ def test_fit_with_provided_df_val_runs_without_errors(calibrator_class, rng):
 
     assert (
         num_rounds
-        == len(mcboost.mr)
-        == len(mcboost._performance_metrics["avg_valid_performance_dummy_score_func"])
+        == len(mcgrad.mr)
+        == len(mcgrad._performance_metrics["avg_valid_performance_dummy_score_func"])
         - 1
-        == len(mcboost._performance_metrics["avg_train_performance_dummy_score_func"])
+        == len(mcgrad._performance_metrics["avg_train_performance_dummy_score_func"])
         - 1
     ), "Early stopping exceeded the maximum number of rounds."
 
     # Assert: model can make predictions
-    predictions_val = mcboost.predict(
+    predictions_val = mcgrad.predict(
         df_val,
         prediction_column_name="prediction",
         categorical_feature_column_names=[],
@@ -1458,11 +1448,11 @@ def test_fit_with_provided_df_val_runs_without_errors(calibrator_class, rng):
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mce_correctly_setup_in_mcboost(calibrator_class, rng):
+def test_mce_correctly_setup_in_mcgrad(calibrator_class, rng):
     # Check if the MCE is the right metric by looking at the name of the score function
 
     df_train = pd.DataFrame(
@@ -1474,8 +1464,8 @@ def test_mce_correctly_setup_in_mcboost(calibrator_class, rng):
         }
     )
 
-    # Create an MCBoost object using MCE with the expected parameters and fit MCBoost
-    mcboost = calibrator_class(
+    # Create an MCGrad object using MCE with the expected parameters and fit MCGrad
+    mcgrad = calibrator_class(
         early_stopping_score_func=wrap_multicalibration_error_metric(
             categorical_segment_columns=["feature1"],
             numerical_segment_columns=["feature2"],
@@ -1491,19 +1481,19 @@ def test_mce_correctly_setup_in_mcboost(calibrator_class, rng):
     )
 
     assert (
-        "Multicalibration Error" in mcboost.early_stopping_score_func.name
+        "Multicalibration Error" in mcgrad.early_stopping_score_func.name
     ), "Name of the MCE metric does not contain Multicalibration Error or is not properly set up."
 
 
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mce_parameters_correctly_setup_in_mcboost(calibrator_class, rng):
-    # Check if the MCE's parameters are correctly set in the MCBoost object
+def test_mce_parameters_correctly_setup_in_mcgrad(calibrator_class, rng):
+    # Check if the MCE's parameters are correctly set in the MCGrad object
 
     df_train = pd.DataFrame(
         {
@@ -1523,8 +1513,8 @@ def test_mce_parameters_correctly_setup_in_mcboost(calibrator_class, rng):
         "sigma_estimation_method": "kuiper_upper_bound_standard_deviation",
     }
 
-    # Create an MCBoost object using MCE with the expected parameters and fit MCBoost
-    mcboost = calibrator_class(
+    # Create an MCGrad object using MCE with the expected parameters and fit MCGrad
+    mcgrad = calibrator_class(
         early_stopping_score_func=wrap_multicalibration_error_metric(
             categorical_segment_columns=["feature1"],
             numerical_segment_columns=["feature2"],
@@ -1541,21 +1531,21 @@ def test_mce_parameters_correctly_setup_in_mcboost(calibrator_class, rng):
         numerical_feature_column_names=["feature2"],
     )
 
-    # Check if the MCE's parameters are correctly set in the MCBoost object
+    # Check if the MCE's parameters are correctly set in the MCGrad object
     for param, expected_value in expected_params.items():
         assert (
-            getattr(mcboost.early_stopping_score_func, param) == expected_value
+            getattr(mcgrad.early_stopping_score_func, param) == expected_value
         ), f"Parameter {param} not set correctly"
 
 
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mcboost_calls_score_func_during_early_stopping(calibrator_class, rng):
+def test_mcgrad_calls_score_func_during_early_stopping(calibrator_class, rng):
     # Check if the score function is called during early stopping
 
     mock_roc_auc_score = Mock(spec="skmetrics.roc_auc_score")
@@ -1569,12 +1559,12 @@ def test_mcboost_calls_score_func_during_early_stopping(calibrator_class, rng):
             "label": rng.randint(0, 2, 50),
         }
     )
-    mcboost = calibrator_class(
+    mcgrad = calibrator_class(
         early_stopping_score_func=mock_roc_auc_score,
         early_stopping_minimize_score=False,
         num_rounds=1,
     )
-    mcboost.fit(
+    mcgrad.fit(
         df_train=df_train,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -1587,8 +1577,8 @@ def test_mcboost_calls_score_func_during_early_stopping(calibrator_class, rng):
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
 def test_early_stopping_with_multicalibration_error_metric(calibrator_class, rng):
@@ -1601,7 +1591,7 @@ def test_early_stopping_with_multicalibration_error_metric(calibrator_class, rng
         }
     )
 
-    mcboost = calibrator_class(
+    mcgrad = calibrator_class(
         num_rounds=5,
         early_stopping=True,
         early_stopping_score_func=wrap_multicalibration_error_metric(
@@ -1611,7 +1601,7 @@ def test_early_stopping_with_multicalibration_error_metric(calibrator_class, rng
         early_stopping_minimize_score=True,
         lightgbm_params={"max_depth": 2, "n_estimators": 2},
     )
-    mcboost.fit(
+    mcgrad.fit(
         df_train=df_train,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -1619,15 +1609,15 @@ def test_early_stopping_with_multicalibration_error_metric(calibrator_class, rng
         numerical_feature_column_names=["feature2"],
     )
 
-    assert len(mcboost.mr) <= 5
-    assert "Multicalibration Error" in mcboost.early_stopping_score_func.name
+    assert len(mcgrad.mr) <= 5
+    assert "Multicalibration Error" in mcgrad.early_stopping_score_func.name
 
 
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
 def test_performance_metrics_dictionary_size_matches_number_of_rounds(
@@ -1644,7 +1634,7 @@ def test_performance_metrics_dictionary_size_matches_number_of_rounds(
         }
     )
 
-    mcboost = calibrator_class(
+    mcgrad = calibrator_class(
         early_stopping_score_func=wrap_sklearn_metric_func(
             skmetrics.average_precision_score
         ),
@@ -1666,30 +1656,30 @@ def test_performance_metrics_dictionary_size_matches_number_of_rounds(
         numerical_feature_column_names=["feature2"],
     )
     extra_evaluation_due_to_early_stopping = (
-        1 if len(mcboost.mr) < mcboost.num_rounds else 0
+        1 if len(mcgrad.mr) < mcgrad.num_rounds else 0
     )
 
     # +1 because we also have the initial performance
     # + extra_evaluation_due_to_early_stopping because we also have the performance after the last round
     assert (
         len(
-            mcboost._performance_metrics[
-                f"avg_valid_performance_{mcboost.early_stopping_score_func.name}"
+            mcgrad._performance_metrics[
+                f"avg_valid_performance_{mcgrad.early_stopping_score_func.name}"
             ]
         )
-        == 1 + len(mcboost.mr) + extra_evaluation_due_to_early_stopping
-    ), f"The (validation) performance metrics dictionary should have {1 + len(mcboost.mr)+extra_evaluation_due_to_early_stopping} elements"
+        == 1 + len(mcgrad.mr) + extra_evaluation_due_to_early_stopping
+    ), f"The (validation) performance metrics dictionary should have {1 + len(mcgrad.mr)+extra_evaluation_due_to_early_stopping} elements"
     assert (
         len(
-            mcboost._performance_metrics[
-                f"avg_train_performance_{mcboost.early_stopping_score_func.name}"
+            mcgrad._performance_metrics[
+                f"avg_train_performance_{mcgrad.early_stopping_score_func.name}"
             ]
         )
-        == 1 + len(mcboost.mr) + extra_evaluation_due_to_early_stopping
-    ), f"The (training) performance metrics dictionary should have {1 + len(mcboost.mr)+extra_evaluation_due_to_early_stopping} elements"
+        == 1 + len(mcgrad.mr) + extra_evaluation_due_to_early_stopping
+    ), f"The (training) performance metrics dictionary should have {1 + len(mcgrad.mr)+extra_evaluation_due_to_early_stopping} elements"
 
 
-def test_categorical_features_used_correctly_in_mcboost_regressor():
+def test_categorical_features_used_correctly_in_mcgrad_regressor():
     # Create a dataset that can be perfectly fit only when categorical features are used appropriately, rather than ordinally
 
     uncalibrated_col = "uncalibrated"
@@ -1712,7 +1702,7 @@ def test_categorical_features_used_correctly_in_mcboost_regressor():
         columns=[categorical_segment_cols[0], truth_col, uncalibrated_col],
     )
 
-    h = methods.RegressionMCBoost(
+    h = methods.RegressionMCGrad(
         num_rounds=1,
         lightgbm_params={
             "min_child_samples": 1,
@@ -1771,13 +1761,13 @@ def test_categorical_features_used_correctly_in_mcboost_regressor():
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
 @pytest.mark.parametrize("patience", [(4), (9)])
-def test_patience_in_mcboost(patience: int, calibrator_class, rng):
-    # Check if the patience is correctly set in the MCBoost object: we use the dummy function that always increases the score
+def test_patience_in_mcgrad(patience: int, calibrator_class, rng):
+    # Check if the patience is correctly set in the MCGrad object: we use the dummy function that always increases the score
     # and check if the early stopping with a given patience stops at the correct round.
 
     num_rounds = 20  # This needs to be > than 1 + patience
@@ -1799,7 +1789,7 @@ def test_patience_in_mcboost(patience: int, calibrator_class, rng):
         score_index[0] += 1
         return score
 
-    mcboost = calibrator_class(
+    mcgrad = calibrator_class(
         num_rounds=num_rounds,
         early_stopping=True,
         early_stopping_score_func=wrap_sklearn_metric_func(dummy_score_func),
@@ -1811,38 +1801,36 @@ def test_patience_in_mcboost(patience: int, calibrator_class, rng):
             "max_depth": 2,
         },
     )
-    mcboost.fit(
+    mcgrad.fit(
         df_train=df_train,
         prediction_column_name="prediction",
         label_column_name="label",
         categorical_feature_column_names=[],
         numerical_feature_column_names=["feature1"],
     )
-    effective_num_rounds = len(mcboost.mr)
+    effective_num_rounds = len(mcgrad.mr)
     extra_evaluation_due_to_early_stopping = (
-        1
-        if (mcboost.early_stopping and effective_num_rounds < mcboost.num_rounds)
-        else 0
+        1 if (mcgrad.early_stopping and effective_num_rounds < mcgrad.num_rounds) else 0
     )
 
     assert (
         len(
-            mcboost._performance_metrics[
-                f"avg_valid_performance_{mcboost.early_stopping_score_func.name}"
+            mcgrad._performance_metrics[
+                f"avg_valid_performance_{mcgrad.early_stopping_score_func.name}"
             ]
         )
-        == 1 + patience + len(mcboost.mr) + extra_evaluation_due_to_early_stopping
+        == 1 + patience + len(mcgrad.mr) + extra_evaluation_due_to_early_stopping
     ), "Patience not used correctly."
 
 
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mcboost_predict_with_num_rounds_0(calibrator_class, rng):
+def test_mcgrad_predict_with_num_rounds_0(calibrator_class, rng):
     # Check if the predictions are the same as the original prediction column when num_rounds=0
     df_train = pd.DataFrame(
         {
@@ -1852,7 +1840,7 @@ def test_mcboost_predict_with_num_rounds_0(calibrator_class, rng):
             "label": rng.randint(0, 2, 50),
         }
     )
-    mcboost = calibrator_class(
+    mcgrad = calibrator_class(
         num_rounds=0,  # this has to be 0
         early_stopping=True,
         save_training_performance=True,
@@ -1868,10 +1856,10 @@ def test_mcboost_predict_with_num_rounds_0(calibrator_class, rng):
         categorical_feature_column_names=["feature1"],
         numerical_feature_column_names=["feature2"],
     )
-    predictions_all_rounds = mcboost.predict(
+    predictions_all_rounds = mcgrad.predict(
         df_train, "prediction", return_all_rounds=True
     )
-    predictions_final_round = mcboost.predict(
+    predictions_final_round = mcgrad.predict(
         df_train, "prediction", return_all_rounds=False
     )
 
@@ -1887,11 +1875,11 @@ def test_mcboost_predict_with_num_rounds_0(calibrator_class, rng):
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mcboost_number_rounds_after_fitting_with_0_rounds(calibrator_class, rng):
+def test_mcgrad_number_rounds_after_fitting_with_0_rounds(calibrator_class, rng):
     # Check if the number of rounds is 0 after fitting with 0 rounds by checking the length of the mr attribute
     df_train = pd.DataFrame(
         {
@@ -1902,7 +1890,7 @@ def test_mcboost_number_rounds_after_fitting_with_0_rounds(calibrator_class, rng
         }
     )
 
-    mcboost = calibrator_class(
+    mcgrad = calibrator_class(
         num_rounds=0,
         early_stopping=True,
         save_training_performance=True,
@@ -1920,13 +1908,11 @@ def test_mcboost_number_rounds_after_fitting_with_0_rounds(calibrator_class, rng
     )
 
     assert (
-        len(mcboost.mr) == 0
-    ), "MCBoost's number of rounds should be 0 after setting num_rounds to 0."
+        len(mcgrad.mr) == 0
+    ), "MCGrad's number of rounds should be 0 after setting num_rounds to 0."
 
 
-@pytest.mark.parametrize(
-    "calibrator_class", [methods.MCBoost, methods.RegressionMCBoost]
-)
+@pytest.mark.parametrize("calibrator_class", [methods.MCGrad, methods.RegressionMCGrad])
 def test_that_default_early_stopping_score_func_minimization_adheres_to_scikitlearn_convention(
     calibrator_class,
 ):
@@ -1966,11 +1952,11 @@ def test_mce_below_initial_and_mce_below_strong_evidence_threshold_are_false_whe
                 score_column: str,
                 weight_column: str | None,
             ) -> float:
-                return methods.MCBoost().MCE_STRONG_EVIDENCE_THRESHOLD + 0.1
+                return methods.MCGrad().MCE_STRONG_EVIDENCE_THRESHOLD + 0.1
 
         return WrappedFuncMockMCE()
 
-    mcboost = methods.MCBoost(
+    mcgrad = methods.MCGrad(
         num_rounds=5,
         early_stopping=True,
         early_stopping_score_func=mce_sigma_scale_mock(),
@@ -1989,29 +1975,29 @@ def test_mce_below_initial_and_mce_below_strong_evidence_threshold_are_false_whe
         numerical_feature_column_names=["feature2"],
     )
     assert (
-        not mcboost.mce_below_initial and mcboost.mce_below_initial is not None
+        not mcgrad.mce_below_initial and mcgrad.mce_below_initial is not None
     ), "MCE is equal to the initial value. Thus, mce_below_initial must be False."
     assert (
-        not mcboost.mce_below_strong_evidence_threshold
-        and mcboost.mce_below_strong_evidence_threshold is not None
-    ), f"MCE is greater than {mcboost.MCE_STRONG_EVIDENCE_THRESHOLD}. Thus, mce_below_strong_evidence_threshold must be False."
+        not mcgrad.mce_below_strong_evidence_threshold
+        and mcgrad.mce_below_strong_evidence_threshold is not None
+    ), f"MCE is greater than {mcgrad.MCE_STRONG_EVIDENCE_THRESHOLD}. Thus, mce_below_strong_evidence_threshold must be False."
     assert (
-        not mcboost._mce_is_satisfactory and mcboost._mce_is_satisfactory is not None
+        not mcgrad._mce_is_satisfactory and mcgrad._mce_is_satisfactory is not None
     ), "MCE is neither below the initial value nor below strong evidence threshold. Thus, mce_is_satisfactory must be False."
 
 
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
 def test_extract_features_categorical_features_overflow(calibrator_class):
-    mcboost = calibrator_class(encode_categorical_variables=False)
+    mcgrad = calibrator_class(encode_categorical_variables=False)
     x_cat = np.array([np.iinfo(np.int32).max + 1, np.nan, 0])
     with pytest.raises(ValueError) as exc_info:
-        mcboost._extract_features(
+        mcgrad._extract_features(
             df=pd.DataFrame({"cat_feature": x_cat}),
             categorical_feature_column_names=["cat_feature"],
             numerical_feature_column_names=None,
@@ -2023,15 +2009,15 @@ def test_extract_features_categorical_features_overflow(calibrator_class):
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
 def test_extract_features_categorical_features_negative(calibrator_class):
-    mcboost = calibrator_class(encode_categorical_variables=False)
+    mcgrad = calibrator_class(encode_categorical_variables=False)
     x_cat = np.array([-1, np.nan, 0])
     with pytest.raises(ValueError) as exc_info:
-        mcboost._extract_features(
+        mcgrad._extract_features(
             df=pd.DataFrame({"cat_feature": x_cat}),
             categorical_feature_column_names=["cat_feature"],
             numerical_feature_column_names=None,
@@ -2043,14 +2029,14 @@ def test_extract_features_categorical_features_negative(calibrator_class):
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
 def test_extract_features_categorical_features_valid(calibrator_class):
-    mcboost = calibrator_class(encode_categorical_variables=False)
+    mcgrad = calibrator_class(encode_categorical_variables=False)
     x_cat = np.array([1, np.nan, 0])
-    mcboost._extract_features(
+    mcgrad._extract_features(
         df=pd.DataFrame({"cat_feature": x_cat}),
         categorical_feature_column_names=["cat_feature"],
         numerical_feature_column_names=None,
@@ -2060,14 +2046,14 @@ def test_extract_features_categorical_features_valid(calibrator_class):
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
 def test_extract_features_numerical_features_valid(calibrator_class):
-    mcboost = calibrator_class(encode_categorical_variables=False)
+    mcgrad = calibrator_class(encode_categorical_variables=False)
     x_num = np.array([1.0, np.nan, 0])
-    mcboost._extract_features(
+    mcgrad._extract_features(
         df=pd.DataFrame({"num_feature": x_num}),
         categorical_feature_column_names=None,
         numerical_feature_column_names=["num_feature"],
@@ -2077,12 +2063,12 @@ def test_extract_features_numerical_features_valid(calibrator_class):
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
 @pytest.mark.parametrize("best_num_rounds", [(0), (1), (2), (3)])
-def test_mcboost_early_stopping_returns_correct_number_of_rounds(
+def test_mcgrad_early_stopping_returns_correct_number_of_rounds(
     calibrator_class, best_num_rounds: int
 ):
     data_len = 10
@@ -2124,7 +2110,7 @@ def test_mcboost_early_stopping_returns_correct_number_of_rounds(
         score_index[0] += 1
         return score
 
-    mcboost = calibrator_class(
+    mcgrad = calibrator_class(
         num_rounds=num_rounds,
         n_folds=n_folds,
         early_stopping=True,
@@ -2137,7 +2123,7 @@ def test_mcboost_early_stopping_returns_correct_number_of_rounds(
             "max_depth": 2,
         },
     )
-    mcboost.fit(
+    mcgrad.fit(
         df_train=df_train,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -2145,18 +2131,18 @@ def test_mcboost_early_stopping_returns_correct_number_of_rounds(
         numerical_feature_column_names=["feature1"],
     )
 
-    assert len(mcboost.mr) == best_num_rounds
+    assert len(mcgrad.mr) == best_num_rounds
 
 
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_cross_val_timeout_in_mcboost(calibrator_class, rng):
-    # Check if the cross validation timeout is correctly set in the MCBoost object: we use the dummy function that always increases the score
+def test_cross_val_timeout_in_mcgrad(calibrator_class, rng):
+    # Check if the cross validation timeout is correctly set in the MCGrad object: we use the dummy function that always increases the score
 
     data_len = 10
 
@@ -2184,7 +2170,7 @@ def test_cross_val_timeout_in_mcboost(calibrator_class, rng):
     num_rounds = 10
     early_stopping_timeout = 20
 
-    mcboost = calibrator_class(
+    mcgrad = calibrator_class(
         num_rounds=num_rounds,
         early_stopping=True,
         early_stopping_use_crossvalidation=True,
@@ -2209,23 +2195,23 @@ def test_cross_val_timeout_in_mcboost(calibrator_class, rng):
     ]
 
     # Mock the elapsed time check
-    mcboost._get_elapsed_time = Mock(side_effect=returned_times)
+    mcgrad._get_elapsed_time = Mock(side_effect=returned_times)
 
-    mcboost.fit(
+    mcgrad.fit(
         df_train=df_train,
         prediction_column_name="prediction",
         label_column_name="label",
         categorical_feature_column_names=[],
         numerical_feature_column_names=["feature1"],
     )
-    assert len(mcboost.mr) == 2
+    assert len(mcgrad.mr) == 2
 
-    del mcboost
+    del mcgrad
 
     # No timeout (timeout not reached or set to None)
     num_rounds = 3
     for early_stopping_timeout in [max(returned_times) + 1, None]:
-        mcboost = calibrator_class(
+        mcgrad = calibrator_class(
             num_rounds=num_rounds,
             early_stopping=True,
             early_stopping_use_crossvalidation=True,
@@ -2239,104 +2225,106 @@ def test_cross_val_timeout_in_mcboost(calibrator_class, rng):
                 "max_depth": 2,
             },
         )
-        mcboost._get_elapsed_time = Mock(side_effect=returned_times)
-        mcboost.fit(
+        mcgrad._get_elapsed_time = Mock(side_effect=returned_times)
+        mcgrad.fit(
             df_train=df_train,
             prediction_column_name="prediction",
             label_column_name="label",
             categorical_feature_column_names=[],
             numerical_feature_column_names=["feature1"],
         )
-        assert len(mcboost.mr) == num_rounds
+        assert len(mcgrad.mr) == num_rounds
 
 
 @pytest.mark.parametrize(
     "calibrator_class, labels,is_valid",
     [
-        # MCBoost
+        # MCGrad
         ## Valid cases
-        (methods.MCBoost, [0, 1], True),
-        (methods.MCBoost, [True, False], True),
+        (methods.MCGrad, [0, 1], True),
+        (methods.MCGrad, [True, False], True),
         ## Invalid cases
         ### Only one unique label
-        (methods.MCBoost, [0, 0], False),
-        (methods.MCBoost, [1, 1], False),
-        (methods.MCBoost, [True, True], False),
-        (methods.MCBoost, [False, False], False),
+        (methods.MCGrad, [0, 0], False),
+        (methods.MCGrad, [1, 1], False),
+        (methods.MCGrad, [True, True], False),
+        (methods.MCGrad, [False, False], False),
         ### Value > 1
-        (methods.MCBoost, [0, 1.1], False),
+        (methods.MCGrad, [0, 1.1], False),
         ### Invalid type
-        (methods.MCBoost, ["a", "b"], False),
+        (methods.MCGrad, ["a", "b"], False),
         ### Missing values in label
-        (methods.MCBoost, [0, None], False),
-        (methods.MCBoost, [0, np.nan], False),
-        (methods.MCBoost, [0, np.inf], False),
-        # RegressionMCBoost
+        (methods.MCGrad, [0, None], False),
+        (methods.MCGrad, [0, np.nan], False),
+        (methods.MCGrad, [0, np.inf], False),
+        # RegressionMCGrad
         ## Valid cases
-        (methods.RegressionMCBoost, [1.0, 101.0], True),
+        (methods.RegressionMCGrad, [1.0, 101.0], True),
         ## Invalid cases
         ### Missing values
-        (methods.RegressionMCBoost, [np.nan, 101.0], False),
+        (methods.RegressionMCGrad, [np.nan, 101.0], False),
         ### Infinite values
-        (methods.RegressionMCBoost, [float("inf"), 101.0], False),
+        (methods.RegressionMCGrad, [float("inf"), 101.0], False),
         ### String
-        (methods.RegressionMCBoost, ["a", "b"], False),
+        (methods.RegressionMCGrad, ["a", "b"], False),
         ### No variance
-        (methods.RegressionMCBoost, [1.0, 1.0], False),
+        (methods.RegressionMCGrad, [1.0, 1.0], False),
     ],
 )
-def test_mcboost__check_labels_fails_when_expected(calibrator_class, labels, is_valid):
+def test_mcgrad__check_labels_fails_when_expected(calibrator_class, labels, is_valid):
     df = pd.DataFrame({"label": labels})
+    calibrator = calibrator_class()
     if is_valid:
-        calibrator_class._check_labels(df, "label")
+        calibrator._check_labels(df, "label")
     else:
         with pytest.raises(ValueError):
-            calibrator_class._check_labels(df, "label")
+            calibrator._check_labels(df, "label")
 
 
 @pytest.mark.parametrize(
     "calibrator_class,scores,is_valid",
     [
-        # MCBoost
+        # MCGrad
         ## Valid cases
-        (methods.MCBoost, [0.1, 0.2], True),
+        (methods.MCGrad, [0.1, 0.2], True),
         ## Invalid cases
         ### Missing values
-        (methods.MCBoost, [0.1, None], False),
-        (methods.MCBoost, [0.1, np.nan], False),
+        (methods.MCGrad, [0.1, None], False),
+        (methods.MCGrad, [0.1, np.nan], False),
         ### Out of bounds
-        (methods.MCBoost, [0.1, 1.1], False),
-        (methods.MCBoost, [0.1, -0.1], False),
-        (methods.MCBoost, [-0.1, 0.1], False),
+        (methods.MCGrad, [0.1, 1.1], False),
+        (methods.MCGrad, [0.1, -0.1], False),
+        (methods.MCGrad, [-0.1, 0.1], False),
         ### Infinite values
-        (methods.MCBoost, [0.1, np.inf], False),
-        # RegressionMCBoost
+        (methods.MCGrad, [0.1, np.inf], False),
+        # RegressionMCGrad
         ## Valid cases
-        (methods.RegressionMCBoost, [1.0, 101.0], True),
-        (methods.RegressionMCBoost, [-50.0, 50.0], True),
+        (methods.RegressionMCGrad, [1.0, 101.0], True),
+        (methods.RegressionMCGrad, [-50.0, 50.0], True),
         ## Invalid cases
         ### Missing values
-        (methods.RegressionMCBoost, [1.0, None], False),
-        (methods.RegressionMCBoost, [1.0, np.nan], False),
+        (methods.RegressionMCGrad, [1.0, None], False),
+        (methods.RegressionMCGrad, [1.0, np.nan], False),
         ### Infinite values
-        (methods.RegressionMCBoost, [1.0, float("inf")], False),
-        (methods.RegressionMCBoost, [float("-inf"), 1.0], False),
+        (methods.RegressionMCGrad, [1.0, float("inf")], False),
+        (methods.RegressionMCGrad, [float("-inf"), 1.0], False),
     ],
 )
-def test_mcboost__check_predictions_fails_when_expected(
+def test_mcgrad__check_predictions_fails_when_expected(
     calibrator_class, scores, is_valid
 ):
     df = pd.DataFrame({"score": scores})
+    calibrator = calibrator_class()
     if is_valid:
-        calibrator_class._check_predictions(df, "score")
+        calibrator._check_predictions(df, "score")
     else:
         with pytest.raises(ValueError):
-            calibrator_class._check_predictions(df, "score")
+            calibrator._check_predictions(df, "score")
 
 
-def test_basemcboost_implementations_transform_inverse_transform_invariance():
-    # Find all subclasses of BaseMCBoost. This only works for classes that are imported in this file
-    # so we're operating on the assumption that there's at least on other relevant test for any MCBoost implementation.
+def test_basemcgrad_implementations_transform_inverse_transform_invariance():
+    # Find all subclasses of BaseMCGrad. This only works for classes that are imported in this file
+    # so we're operating on the assumption that there's at least on other relevant test for any MCGrad implementation.
     def get_all_subclasses(cls):
         all_subclasses = []
         for subclass in cls.__subclasses__():
@@ -2344,8 +2332,8 @@ def test_basemcboost_implementations_transform_inverse_transform_invariance():
             all_subclasses.extend(get_all_subclasses(subclass))
         return all_subclasses
 
-    subclasses = get_all_subclasses(methods.BaseMCBoost)
-    assert len(subclasses) > 0, "Expected at least one subclass of BaseMCBoost"
+    subclasses = get_all_subclasses(methods.BaseMCGrad)
+    assert len(subclasses) > 0, "Expected at least one subclass of BaseMCGrad"
 
     predictions = np.array([0.001, 0.1, 0.25, 0.5, 0.75, 0.9, 0.999])
 
@@ -2363,8 +2351,8 @@ def test_basemcboost_implementations_transform_inverse_transform_invariance():
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
 @pytest.mark.parametrize(
@@ -2379,7 +2367,7 @@ def test_basemcboost_implementations_transform_inverse_transform_invariance():
         ([[]], [[0.1, None]], False, True),
     ],
 )
-def test_mcboost__check_segment_features_fails_when_expected(
+def test_mcgrad__check_segment_features_fails_when_expected(
     calibrator_class, cat_data, num_data, allow_missing, should_raise
 ):
     df = pd.DataFrame(cat_data + num_data)
@@ -2421,14 +2409,14 @@ def test_mcboost__check_segment_features_fails_when_expected(
         ),
     ],
 )
-def test_mcboost__determine_estimation_method(
+def test_mcgrad__determine_estimation_method(
     early_stopping_use_crossvalidation,
     weights,
     scoring_function,
     expected_method,
 ):
-    # For regression MCBoost we don't have a ESS threshold so we just run it for binary for now
-    mcb = methods.MCBoost(
+    # For regression MCGrad we don't have a ESS threshold so we just run it for binary for now
+    mcb = methods.MCGrad(
         early_stopping=True,
         early_stopping_use_crossvalidation=early_stopping_use_crossvalidation,
         early_stopping_score_func=wrap_sklearn_metric_func(scoring_function)
@@ -2445,28 +2433,28 @@ def test_mcboost__determine_estimation_method(
 @pytest.mark.parametrize(
     "calibrator_class,scores,segment,expected_mask,allow_missing_segment_features",
     [
-        # MCBoost tests
-        (methods.MCBoost, [0.1, 0.2], [0, 1], [True, True], True),
-        (methods.MCBoost, [0.1, None], [0, 1], [True, False], True),
-        (methods.MCBoost, [0.1, 1.1], [0, 1], [True, False], True),
-        (methods.MCBoost, [0.1, -0.1], [0, 1], [True, False], True),
-        (methods.MCBoost, [0.1, np.nan], [0, 1], [True, False], True),
-        (methods.MCBoost, [0.1, np.inf], [0, 1], [True, False], True),
-        (methods.MCBoost, [-0.1, 0.1], [0, 1], [False, True], True),
-        (methods.MCBoost, [None, 0.1], [0, None], [False, True], True),
-        (methods.MCBoost, [None, 0.1], [0, None], [False, False], False),
-        # RegressionMCBoost tests - no out-of-bounds checking
-        (methods.RegressionMCBoost, [1.0, 101.0], [0, 1], [True, True], True),
-        (methods.RegressionMCBoost, [1.0, None], [0, 1], [True, False], True),
-        (methods.RegressionMCBoost, [-50.0, 50.0], [0, 1], [True, True], True),
-        (methods.RegressionMCBoost, [1.0, np.nan], [0, 1], [True, False], True),
-        (methods.RegressionMCBoost, [1.0, np.inf], [0, 1], [True, False], True),
-        (methods.RegressionMCBoost, [float("-inf"), 1.0], [0, 1], [False, True], True),
-        (methods.RegressionMCBoost, [None, 1.0], [0, None], [False, True], True),
-        (methods.RegressionMCBoost, [None, 1.0], [0, None], [False, False], False),
+        # MCGrad tests
+        (methods.MCGrad, [0.1, 0.2], [0, 1], [True, True], True),
+        (methods.MCGrad, [0.1, None], [0, 1], [True, False], True),
+        (methods.MCGrad, [0.1, 1.1], [0, 1], [True, False], True),
+        (methods.MCGrad, [0.1, -0.1], [0, 1], [True, False], True),
+        (methods.MCGrad, [0.1, np.nan], [0, 1], [True, False], True),
+        (methods.MCGrad, [0.1, np.inf], [0, 1], [True, False], True),
+        (methods.MCGrad, [-0.1, 0.1], [0, 1], [False, True], True),
+        (methods.MCGrad, [None, 0.1], [0, None], [False, True], True),
+        (methods.MCGrad, [None, 0.1], [0, None], [False, False], False),
+        # RegressionMCGrad tests - no out-of-bounds checking
+        (methods.RegressionMCGrad, [1.0, 101.0], [0, 1], [True, True], True),
+        (methods.RegressionMCGrad, [1.0, None], [0, 1], [True, False], True),
+        (methods.RegressionMCGrad, [-50.0, 50.0], [0, 1], [True, True], True),
+        (methods.RegressionMCGrad, [1.0, np.nan], [0, 1], [True, False], True),
+        (methods.RegressionMCGrad, [1.0, np.inf], [0, 1], [True, False], True),
+        (methods.RegressionMCGrad, [float("-inf"), 1.0], [0, 1], [False, True], True),
+        (methods.RegressionMCGrad, [None, 1.0], [0, None], [False, True], True),
+        (methods.RegressionMCGrad, [None, 1.0], [0, None], [False, False], False),
     ],
 )
-def test_mcboost__get_output_presence_mask_works_correctly(
+def test_mcgrad__get_output_presence_mask_works_correctly(
     calibrator_class,
     scores,
     segment,
@@ -2489,11 +2477,11 @@ def test_mcboost__get_output_presence_mask_works_correctly(
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_mcboost_internal_state_reset_when_fitting_again(calibrator_class, rng):
+def test_mcgrad_internal_state_reset_when_fitting_again(calibrator_class, rng):
     df_train = pd.DataFrame(
         {
             "feature1": rng.rand(50),
@@ -2512,7 +2500,7 @@ def test_mcboost_internal_state_reset_when_fitting_again(calibrator_class, rng):
         score_index[0] += 1
         return score
 
-    mcboost = calibrator_class(
+    mcgrad = calibrator_class(
         num_rounds=1,
         early_stopping=True,
         early_stopping_score_func=wrap_sklearn_metric_func(dummy_score_func),
@@ -2525,16 +2513,16 @@ def test_mcboost_internal_state_reset_when_fitting_again(calibrator_class, rng):
             "max_depth": 2,
         },
     )
-    # Fitting MCBoost for the first time
-    mcboost.fit(
+    # Fitting MCGrad for the first time
+    mcgrad.fit(
         df_train=df_train,
         prediction_column_name="prediction",
         label_column_name="label",
         categorical_feature_column_names=[],
         numerical_feature_column_names=["feature1"],
     )
-    # Fitting MCBoost again should reset the training parameters
-    mcboost.fit(
+    # Fitting MCGrad again should reset the training parameters
+    mcgrad.fit(
         df_train=df_train,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -2544,22 +2532,22 @@ def test_mcboost_internal_state_reset_when_fitting_again(calibrator_class, rng):
     # Number of rounds should be 1, not 2 as well as number of evaluations
     assert (
         1
-        == len(mcboost.mr)
-        == len(mcboost._performance_metrics["avg_valid_performance_dummy_score_func"])
+        == len(mcgrad.mr)
+        == len(mcgrad._performance_metrics["avg_valid_performance_dummy_score_func"])
         - 1
-        == len(mcboost._performance_metrics["avg_train_performance_dummy_score_func"])
+        == len(mcgrad._performance_metrics["avg_train_performance_dummy_score_func"])
         - 1
-    ), "The internal state - including number of Boosters & evaluations of MCBoost - should be reset when fitting MCBoost multiple times."
+    ), "The internal state - including number of Boosters & evaluations of MCGrad - should be reset when fitting MCGrad multiple times."
 
 
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_prepare_mcboost_processed_data_matches_individual_operations(calibrator_class):
+def test_prepare_mcgrad_processed_data_matches_individual_operations(calibrator_class):
     df = generate_test_data(5)
     model = calibrator_class(early_stopping=False, num_rounds=1)
 
@@ -2601,11 +2589,11 @@ def test_prepare_mcboost_processed_data_matches_individual_operations(calibrator
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_prepare_mcboost_processed_data_with_weights(calibrator_class):
+def test_prepare_mcgrad_processed_data_with_weights(calibrator_class):
     df = generate_test_data(5)
     df["Weight"] = np.array([1.0, 2.0, 1.0, 3.0, 1.0])
 
@@ -2628,11 +2616,11 @@ def test_prepare_mcboost_processed_data_with_weights(calibrator_class):
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
-def test_prepare_mcboost_processed_data_presence_mask_with_nan_predictions(
+def test_prepare_mcgrad_processed_data_presence_mask_with_nan_predictions(
     calibrator_class,
 ):
     df = generate_test_data(5)
@@ -2657,8 +2645,8 @@ def test_prepare_mcboost_processed_data_presence_mask_with_nan_predictions(
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
 @pytest.mark.parametrize(
@@ -2715,8 +2703,8 @@ def test_determine_train_test_splitter_returns_correct_splitter(
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
 def test_determine_train_test_splitter_raises_error_for_cv_with_custom_validation_set(
@@ -2742,8 +2730,8 @@ def test_determine_train_test_splitter_raises_error_for_cv_with_custom_validatio
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
 def test_determine_train_test_splitter_noop_splitter_returned(
@@ -2769,8 +2757,8 @@ def test_determine_train_test_splitter_noop_splitter_returned(
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
 @pytest.mark.parametrize(
@@ -2806,10 +2794,10 @@ def test_determine_n_folds_returns_correct_value(
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
+        methods.MCGrad,
     ],
 )
-def test_prepare_mcboost_processed_data_presence_mask_with_out_of_bounds_predictions(
+def test_prepare_mcgrad_processed_data_presence_mask_with_out_of_bounds_predictions(
     calibrator_class,
 ):
     df = generate_test_data(5)
@@ -2836,10 +2824,10 @@ def test_prepare_mcboost_processed_data_presence_mask_with_out_of_bounds_predict
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
+        methods.MCGrad,
     ],
 )
-def test_prepare_mcboost_processed_data_presence_mask_with_missing_segment_features(
+def test_prepare_mcgrad_processed_data_presence_mask_with_missing_segment_features(
     calibrator_class,
 ):
     df = generate_test_data(5)
@@ -2959,8 +2947,8 @@ def test_platt_scaling_with_features_both_categorical_and_numerical(rng):
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
 def test_predict_does_not_modify_input_predictions_array(calibrator_class, rng):
@@ -2979,9 +2967,9 @@ def test_predict_does_not_modify_input_predictions_array(calibrator_class, rng):
         }
     )
 
-    mcboost = calibrator_class(early_stopping=False, num_rounds=2)
+    mcgrad = calibrator_class(early_stopping=False, num_rounds=2)
 
-    mcboost.fit(
+    mcgrad.fit(
         df_train=df,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -2989,7 +2977,7 @@ def test_predict_does_not_modify_input_predictions_array(calibrator_class, rng):
     )
 
     test_df = df.head(10)
-    preprocessed_data = mcboost._preprocess_input_data(
+    preprocessed_data = mcgrad._preprocess_input_data(
         df=test_df,
         prediction_column_name="prediction",
         label_column_name=None,
@@ -3001,7 +2989,7 @@ def test_predict_does_not_modify_input_predictions_array(calibrator_class, rng):
 
     original_predictions = preprocessed_data.predictions.copy()
 
-    _ = mcboost._predict(
+    _ = mcgrad._predict(
         x=preprocessed_data.features,
         transformed_predictions=preprocessed_data.predictions,
         return_all_rounds=False,
@@ -3016,8 +3004,8 @@ def test_predict_does_not_modify_input_predictions_array(calibrator_class, rng):
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
 def test_early_stopping_produces_same_model_as_manual_num_rounds(calibrator_class, rng):
@@ -3040,14 +3028,14 @@ def test_early_stopping_produces_same_model_as_manual_num_rounds(calibrator_clas
         }
     )
 
-    mcboost_with_es = calibrator_class(
+    mcgrad_with_es = calibrator_class(
         early_stopping=True,
         num_rounds=10,
         save_training_performance=True,
         patience=0,
     )
 
-    mcboost_with_es.fit(
+    mcgrad_with_es.fit(
         df_train=df,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -3055,13 +3043,13 @@ def test_early_stopping_produces_same_model_as_manual_num_rounds(calibrator_clas
         numerical_feature_column_names=["feature2"],
     )
 
-    num_rounds_determined = len(mcboost_with_es.mr)
+    num_rounds_determined = len(mcgrad_with_es.mr)
 
-    mcboost_manual = calibrator_class(
+    mcgrad_manual = calibrator_class(
         early_stopping=False, num_rounds=num_rounds_determined, random_state=42
     )
 
-    mcboost_manual.fit(
+    mcgrad_manual.fit(
         df_train=df,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -3071,14 +3059,14 @@ def test_early_stopping_produces_same_model_as_manual_num_rounds(calibrator_clas
 
     test_df = df.sample(50, random_state=999)
 
-    predictions_with_es = mcboost_with_es.predict(
+    predictions_with_es = mcgrad_with_es.predict(
         df=test_df,
         prediction_column_name="prediction",
         categorical_feature_column_names=["feature1"],
         numerical_feature_column_names=["feature2"],
     )
 
-    predictions_manual = mcboost_manual.predict(
+    predictions_manual = mcgrad_manual.predict(
         df=test_df,
         prediction_column_name="prediction",
         categorical_feature_column_names=["feature1"],
@@ -3096,8 +3084,8 @@ def test_early_stopping_produces_same_model_as_manual_num_rounds(calibrator_clas
 @pytest.mark.parametrize(
     "calibrator_class",
     [
-        methods.MCBoost,
-        methods.RegressionMCBoost,
+        methods.MCGrad,
+        methods.RegressionMCGrad,
     ],
 )
 def test_multiple_predict_calls_produce_consistent_results(calibrator_class, rng):
@@ -3115,9 +3103,9 @@ def test_multiple_predict_calls_produce_consistent_results(calibrator_class, rng
         }
     )
 
-    mcboost = calibrator_class(early_stopping=False, num_rounds=2, random_state=42)
+    mcgrad = calibrator_class(early_stopping=False, num_rounds=2, random_state=42)
 
-    mcboost.fit(
+    mcgrad.fit(
         df_train=df,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -3126,19 +3114,19 @@ def test_multiple_predict_calls_produce_consistent_results(calibrator_class, rng
 
     test_df = df.sample(20, random_state=123)
 
-    predictions_first = mcboost.predict(
+    predictions_first = mcgrad.predict(
         df=test_df,
         prediction_column_name="prediction",
         categorical_feature_column_names=["feature1"],
     )
 
-    predictions_second = mcboost.predict(
+    predictions_second = mcgrad.predict(
         df=test_df,
         prediction_column_name="prediction",
         categorical_feature_column_names=["feature1"],
     )
 
-    predictions_third = mcboost.predict(
+    predictions_third = mcgrad.predict(
         df=test_df,
         prediction_column_name="prediction",
         categorical_feature_column_names=["feature1"],
@@ -3263,7 +3251,7 @@ def test_segmentwise_calibrator_falls_back_to_identity_mapping_for_unseen_segmen
     "calibrator_class,calibrator_kwargs",
     [
         (
-            methods.MCBoost,
+            methods.MCGrad,
             {
                 "num_rounds": 2,
                 "early_stopping": False,
@@ -3271,7 +3259,7 @@ def test_segmentwise_calibrator_falls_back_to_identity_mapping_for_unseen_segmen
             },
         ),
         (
-            methods.RegressionMCBoost,
+            methods.RegressionMCGrad,
             {
                 "num_rounds": 2,
                 "early_stopping": False,
@@ -3280,7 +3268,7 @@ def test_segmentwise_calibrator_falls_back_to_identity_mapping_for_unseen_segmen
         ),
     ],
 )
-def test_mcboost_fit_does_not_modify_input_dataframe(
+def test_mcgrad_fit_does_not_modify_input_dataframe(
     calibrator_class, calibrator_kwargs
 ):
     df_train = pd.DataFrame(
@@ -3312,7 +3300,7 @@ def test_mcboost_fit_does_not_modify_input_dataframe(
     "calibrator_class,calibrator_kwargs",
     [
         (
-            methods.MCBoost,
+            methods.MCGrad,
             {
                 "num_rounds": 2,
                 "early_stopping": False,
@@ -3320,7 +3308,7 @@ def test_mcboost_fit_does_not_modify_input_dataframe(
             },
         ),
         (
-            methods.RegressionMCBoost,
+            methods.RegressionMCGrad,
             {
                 "num_rounds": 2,
                 "early_stopping": False,
@@ -3329,7 +3317,7 @@ def test_mcboost_fit_does_not_modify_input_dataframe(
         ),
     ],
 )
-def test_mcboost_predict_does_not_modify_input_dataframe(
+def test_mcgrad_predict_does_not_modify_input_dataframe(
     calibrator_class, calibrator_kwargs
 ):
     df_train = pd.DataFrame(
@@ -3575,7 +3563,7 @@ def test_segmentwise_calibrator_predict_does_not_modify_input_dataframe(rng):
     "calibrator_class,calibrator_kwargs",
     [
         (
-            methods.MCBoost,
+            methods.MCGrad,
             {
                 "num_rounds": 2,
                 "early_stopping": True,
@@ -3585,7 +3573,7 @@ def test_segmentwise_calibrator_predict_does_not_modify_input_dataframe(rng):
             },
         ),
         (
-            methods.RegressionMCBoost,
+            methods.RegressionMCGrad,
             {
                 "num_rounds": 2,
                 "early_stopping": True,
@@ -3596,7 +3584,7 @@ def test_segmentwise_calibrator_predict_does_not_modify_input_dataframe(rng):
         ),
     ],
 )
-def test_mcboost_fit_with_early_stopping_does_not_modify_input_dataframe(
+def test_mcgrad_early_stopping_crossvalidation_does_not_modify_input_dataframe(
     calibrator_class, calibrator_kwargs
 ):
     df_train = pd.DataFrame(
@@ -3626,7 +3614,7 @@ def test_mcboost_fit_with_early_stopping_does_not_modify_input_dataframe(
     "calibrator_class,calibrator_kwargs",
     [
         (
-            methods.MCBoost,
+            methods.MCGrad,
             {
                 "num_rounds": 2,
                 "early_stopping": True,
@@ -3635,7 +3623,7 @@ def test_mcboost_fit_with_early_stopping_does_not_modify_input_dataframe(
             },
         ),
         (
-            methods.RegressionMCBoost,
+            methods.RegressionMCGrad,
             {
                 "num_rounds": 2,
                 "early_stopping": True,
@@ -3645,7 +3633,7 @@ def test_mcboost_fit_with_early_stopping_does_not_modify_input_dataframe(
         ),
     ],
 )
-def test_mcboost_fit_with_df_val_does_not_modify_input_dataframes(
+def test_mcgrad_early_stopping_holdout_does_not_modify_input_dataframe(
     calibrator_class, calibrator_kwargs, rng
 ):
     df_train = pd.DataFrame(

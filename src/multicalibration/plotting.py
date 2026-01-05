@@ -685,43 +685,43 @@ def plot_segment_calibration_errors(
 
 
 def plot_learning_curve(
-    mcboost_model: methods.MCBoost, show_all: bool = False
+    mcgrad_model: methods.MCGrad, show_all: bool = False
 ) -> go.Figure:
     """
-    Plots a learning curve for a MCBoost model.
+    Plots a learning curve for an MCGrad model.
 
-    :param mcboost_model: An MCBoost model object.
-    :param show_all: Whether to show all metrics in the learning curve. If False, only the metric specified in MCBoost's early_stopping_score_func is shown.
+    :param mcgrad_model: An MCGrad model object.
+    :param show_all: Whether to show all metrics in the learning curve. If False, only the metric specified in the model's early_stopping_score_func is shown.
     :returns: A Plotly Figure object representing the learning curve.
     """
-    if not mcboost_model.early_stopping:
+    if not mcgrad_model.early_stopping:
         raise ValueError(
             "Learning curve can only be plotted for models that have been trained with early_stopping=True."
         )
 
-    performance_metrics = mcboost_model._performance_metrics
+    performance_metrics = mcgrad_model._performance_metrics
     extra_evaluation_due_to_early_stopping = (
         1
         if (
-            mcboost_model.early_stopping
-            and len(mcboost_model.mr) < mcboost_model.num_rounds
+            mcgrad_model.early_stopping
+            and len(mcgrad_model.mr) < mcgrad_model.num_rounds
         )
         else 0
     )
     # Calculate the total number of rounds (including the initial round)
     tot_num_rounds = min(
         1
-        + len(mcboost_model.mr)
+        + len(mcgrad_model.mr)
         + extra_evaluation_due_to_early_stopping
-        + mcboost_model.patience,
-        1 + mcboost_model.num_rounds,
+        + mcgrad_model.patience,
+        1 + mcgrad_model.num_rounds,
     )
     x_vals = np.arange(0, tot_num_rounds)
-    metric_names = [mcboost_model.early_stopping_score_func.name]
+    metric_names = [mcgrad_model.early_stopping_score_func.name]
     for metric_name in performance_metrics.keys():
         if (
             "valid" in metric_name
-            and mcboost_model.early_stopping_score_func.name not in metric_name
+            and mcgrad_model.early_stopping_score_func.name not in metric_name
             and show_all
         ):
             metric_names.append(metric_name.split("performance_")[-1])
@@ -758,8 +758,8 @@ def plot_learning_curve(
             row=i + 1,
             col=1,
         )
-        if mcboost_model.save_training_performance:
-            train_performance = mcboost_model._performance_metrics[
+        if mcgrad_model.save_training_performance:
+            train_performance = mcgrad_model._performance_metrics[
                 f"avg_train_performance_{metric_name}"
             ]
             # Plot the training performance (training set)
@@ -787,7 +787,7 @@ def plot_learning_curve(
             )
         # Add vertical line for the selected iteration
         fig.add_vline(
-            x=len(mcboost_model.mr),
+            x=len(mcgrad_model.mr),
             line_dash="dash",
             line_color="black",
             opacity=0.5,
@@ -800,7 +800,7 @@ def plot_learning_curve(
                 text="Selected round by early stopping",
                 xref="x",
                 yref="y",
-                x=len(mcboost_model.mr) - 0.05,
+                x=len(mcgrad_model.mr) - 0.05,
                 y=max_perf_for_annotation * 1.075,
                 xanchor="center",
                 yanchor="middle",
@@ -815,9 +815,9 @@ def plot_learning_curve(
                 col=1,
             )
         if "mce_sigma_scale" in metric_name:
-            if max_perf_for_annotation >= mcboost_model.MCE_STRONG_EVIDENCE_THRESHOLD:
+            if max_perf_for_annotation >= mcgrad_model.MCE_STRONG_EVIDENCE_THRESHOLD:
                 fig.add_hline(
-                    y=mcboost_model.MCE_STRONG_EVIDENCE_THRESHOLD,
+                    y=mcgrad_model.MCE_STRONG_EVIDENCE_THRESHOLD,
                     line_dash="dash",
                     line_color="darkgreen",
                     opacity=1,
@@ -830,9 +830,9 @@ def plot_learning_curve(
                     annotation_textangle=90,
                 )
 
-            if max_perf_for_annotation >= mcboost_model.MCE_STAT_SIGN_THRESHOLD:
+            if max_perf_for_annotation >= mcgrad_model.MCE_STAT_SIGN_THRESHOLD:
                 fig.add_hline(
-                    y=mcboost_model.MCE_STAT_SIGN_THRESHOLD,
+                    y=mcgrad_model.MCE_STAT_SIGN_THRESHOLD,
                     line_dash="dash",
                     line_color="darkorange",
                     opacity=0.7,
@@ -846,11 +846,11 @@ def plot_learning_curve(
                 )
 
             if (
-                test_performance[len(mcboost_model.mr)]
-                >= mcboost_model.MCE_STRONG_EVIDENCE_THRESHOLD
+                test_performance[len(mcgrad_model.mr)]
+                >= mcgrad_model.MCE_STRONG_EVIDENCE_THRESHOLD
             ):
                 fig.add_annotation(
-                    text="<b>WARNING: MCBoost run failed to remove strong evidence of multicalibration!</b>",
+                    text=f"<b>WARNING: {mcgrad_model.__class__.__name__} run failed to remove strong evidence of multicalibration!</b>",
                     xref="paper",
                     yref="paper",
                     x=tot_num_rounds - 1,
@@ -889,23 +889,29 @@ def plot_learning_curve(
             row=i + 1,
             col=1,
         )
-        # Update x-axis labels including "without MCBoost" for the 0th iteration
+        # Update x-axis labels including "without MCGrad" for the 0th iteration
         if len(x_vals) <= 10:
             fig.update_xaxes(
-                title_text="MCBoost round" if i == len(metric_names) - 1 else "",
+                title_text=f"{mcgrad_model.__class__.__name__} round"
+                if i == len(metric_names) - 1
+                else "",
                 tickmode="array",
                 tickvals=x_vals,
-                ticktext=["without<br>MCBoost"] + [str(int(val)) for val in x_vals[1:]],
+                ticktext=[f"without<br>{mcgrad_model.__class__.__name__}"]
+                + [str(int(val)) for val in x_vals[1:]],
                 row=i + 1,
                 col=1,
             )
         else:
             x_vals = np.arange(0, len(x_vals), np.ceil(len(x_vals) / 5))
             fig.update_xaxes(
-                title_text="MCBoost round" if i == len(metric_names) - 1 else "",
+                title_text=f"{mcgrad_model.__class__.__name__} round"
+                if i == len(metric_names) - 1
+                else "",
                 tickmode="array",
                 tickvals=x_vals,
-                ticktext=["without<br>MCBoost"] + [str(int(val)) for val in x_vals[1:]],
+                ticktext=[f"without<br>{mcgrad_model.__class__.__name__}"]
+                + [str(int(val)) for val in x_vals[1:]],
                 row=i + 1,
                 col=1,
             )

@@ -38,7 +38,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
-class MCBoostProcessedData:
+class MCGradProcessedData:
     features: npt.NDArray
     predictions: npt.NDArray
     weights: npt.NDArray
@@ -47,8 +47,8 @@ class MCBoostProcessedData:
     numerical_feature_names: list[str]
     labels: npt.NDArray | None = None
 
-    def __getitem__(self, index: npt.NDArray) -> "MCBoostProcessedData":
-        return MCBoostProcessedData(
+    def __getitem__(self, index: npt.NDArray) -> "MCGradProcessedData":
+        return MCGradProcessedData(
             features=self.features[index],
             predictions=self.predictions[index],
             weights=self.weights[index],
@@ -59,20 +59,22 @@ class MCBoostProcessedData:
         )
 
 
+# @oss-disable[end= ]: MCBoostProcessedData = MCGradProcessedData
+
+
 class EstimationMethod(Enum):
     CROSS_VALIDATION = 1
     HOLDOUT = 2
     AUTO = 3
 
 
-class BaseMCBoost(
-    # @oss-disable[end= ]: DeprecatedAttributesMixin,
+class BaseMCGrad(
     BaseCalibrator,
     ABC,
 ):
     """
-    Abstract base class for MCBoost models. This class hosts the common functionality for all MCBoost models and defines
-    an abstract interface that all MCBoost models must implement.
+    Abstract base class for MCGrad models. This class hosts the common functionality for all MCGrad models and defines
+    an abstract interface that all MCGrad models must implement.
     """
 
     VALID_SIZE = 0.4
@@ -119,14 +121,14 @@ class BaseMCBoost(
     ) -> float:
         pass
 
-    @staticmethod
     @abstractmethod
-    def _check_predictions(df_train: pd.DataFrame, prediction_column_name: str) -> None:
+    def _check_predictions(
+        self, df_train: pd.DataFrame, prediction_column_name: str
+    ) -> None:
         pass
 
-    @staticmethod
     @abstractmethod
-    def _check_labels(df_train: pd.DataFrame, label_column_name: str) -> None:
+    def _check_labels(self, df_train: pd.DataFrame, label_column_name: str) -> None:
         pass
 
     @staticmethod
@@ -171,12 +173,12 @@ class BaseMCBoost(
     ) -> None:
         """
         :param encode_categorical_variables: whether to encode categorical variables using a modified label encoding (when True),
-            or whether to assume that categorical variables are already manipulated into the right format prior to calling MCBoost
+            or whether to assume that categorical variables are already manipulated into the right format prior to calling MCGrad
             (when False).
         :param monotone_t: whether to use a monotonicity constraint on the logit feature (i.e., t): value
             True implies that the decision tree is blocked from creating splits where a lower value of t
             results in a higher predicted probability.
-        :param num_rounds: number of rounds boosting that is used in MCBoost. When early stopping is used, then num_rounds specifies the maximum
+        :param num_rounds: number of rounds boosting that is used in MCGrad. When early stopping is used, then num_rounds specifies the maximum
             number of rounds. If set to None, default values are used.
         :param lightgbm_params: the training parameters of lightgbm model. See: https://lightgbm.readthedocs.io/en/stable/Parameters.html
             if None, we will use a set of default parameters.
@@ -328,11 +330,11 @@ class BaseMCBoost(
 
     def _set_lightgbm_params(self, lightgbm_params: dict[str, Any] | None) -> None:
         """
-        Sets or updates the LightGBM parameters for this MCBoost instance.
+        Sets or updates the LightGBM parameters for this MCGrad instance.
 
 
         The `lightgbm_params` argument and `self.lightgbm_params` attribute are not always identical.
-        When tuning hyperparameters (see tuning.py), we modify existing MCBoost objects rather than creating new objects.
+        When tuning hyperparameters (see tuning.py), we modify existing MCGrad objects rather than creating new objects.
         This design choice allows for parameter updates during hyperparameter tuning without
         recreating the entire object, but it means the instance's parameters may differ from
         what was originally passed during initialization.
@@ -361,7 +363,7 @@ class BaseMCBoost(
         if "num_rounds" in params_to_set:
             raise ValueError(
                 "Avoid using `num_rounds` in `lightgbm_params` due to a naming "
-                "conflict with `num_rounds` in MCBoost. Use any of the other aliases "
+                "conflict with `num_rounds` in MCGrad. Use any of the other aliases "
                 "instead (https://lightgbm.readthedocs.io/en/latest/Parameters.html)"
             )
 
@@ -374,9 +376,9 @@ class BaseMCBoost(
         }
 
     def feature_importance(self) -> pd.DataFrame:
-        """Returns the feature importance of the first MCBoost round.
+        """Returns the feature importance of the first MCGrad round.
 
-        Importance is defined as the total gain from splits on a feature from the first round of MCBoost.
+        Importance is defined as the total gain from splits on a feature from the first round of MCGrad.
 
         :return: A dataframe with columns 'feature' and 'importance', sorted by importance in descending order
         """
@@ -391,7 +393,7 @@ class BaseMCBoost(
 
         return pd.DataFrame(
             {
-                # Ordering of features here relies on two things 1) that MCBoost.extract_features returns first categoricals then
+                # Ordering of features here relies on two things 1) that MCGrad.extract_features returns first categoricals then
                 # numericals and 2) that .fit method concatenates logits to the end of the feature matrix
                 # pyre-ignore[58] if either feature_names attribute is None an error is raised above
                 "feature": self.categorical_feature_names
@@ -419,7 +421,7 @@ class BaseMCBoost(
     def performance_metrics(self) -> dict[str, list[float]]:
         """Returns the performance metrics collected during early stopping procedure.
 
-        Metrics are tracked for each round of MCBoost during the early stopping phase. The dictionary
+        Metrics are tracked for each round of MCGrad during the early stopping phase. The dictionary
         contains metric names as keys and lists of values (one per round) as values. Metrics include
         the early stopping metric and any additional monitored metrics specified during initialization.
 
@@ -443,11 +445,11 @@ class BaseMCBoost(
         if segment_df.isnull().any().any():
             if self.allow_missing_segment_feature_values:
                 logger.info(
-                    "Missing values found in segment feature data. MCBoost supports handling of missing data in segment features. If you want to disable native missing value support and predict None for examples with missing values in segment features, set `allow_missing_segment_feature_values=False` in the constructor of MCBoost. "
+                    f"Missing values found in segment feature data. {self.__class__.__name__} supports handling of missing data in segment features. If you want to disable native missing value support and predict None for examples with missing values in segment features, set `allow_missing_segment_feature_values=False` in the constructor of {self.__class__.__name__}. "
                 )
             else:
                 raise ValueError(
-                    "Missing values found in segment feature data and `allow_missing_segment_feature_values` is set to False. If you want to enable native missing value support, set `allow_missing_segment_feature_values=True` in the constructor of MCBoost."
+                    f"Missing values found in segment feature data and `allow_missing_segment_feature_values` is set to False. If you want to enable native missing value support, set `allow_missing_segment_feature_values=True` in the constructor of {self.__class__.__name__}."
                 )
 
     def _check_input_data(
@@ -475,7 +477,7 @@ class BaseMCBoost(
         categorical_feature_column_names: list[str],
         numerical_feature_column_names: list[str],
         is_fit_phase: bool = False,
-    ) -> MCBoostProcessedData:
+    ) -> MCGradProcessedData:
         """
         Prepares processed data representation by extracting features once and computing the presence mask.
 
@@ -489,7 +491,7 @@ class BaseMCBoost(
         :param categorical_feature_column_names: List of categorical feature column names
         :param numerical_feature_column_names: List of numerical feature column names
         :param is_fit_phase: Whether this is during fit phase (for encoder training)
-        :return: MCBoostProcessedData object with extracted features and metadata
+        :return: MCGradProcessedData object with extracted features and metadata
         """
         logger.info(
             f"Preprocessing input data with {len(df)} rows; in_fit_phase = {is_fit_phase}"
@@ -520,7 +522,7 @@ class BaseMCBoost(
             numerical_feature_column_names or [],
         )
 
-        return MCBoostProcessedData(
+        return MCGradProcessedData(
             features=x,
             predictions=predictions,
             weights=w,
@@ -541,7 +543,7 @@ class BaseMCBoost(
         df_val: pd.DataFrame | None = None,
         **kwargs: Any,
     ) -> Self:
-        """Fit the MCBoost calibration model on the provided training data.
+        """Fit the MCGrad calibration model on the provided training data.
 
         :param df_train: The dataframe containing the training data
         :param prediction_column_name: Name of the column in dataframe df that contains the uncalibrated predictions
@@ -619,7 +621,9 @@ class BaseMCBoost(
             )
 
             if num_rounds > 0:
-                logger.info(f"Fitting final MCBoost model with {num_rounds} rounds")
+                logger.info(
+                    f"Fitting final {self.__class__.__name__} model with {num_rounds} rounds"
+                )
         else:
             logger.info(f"Early stopping deactivated, fitting {self.num_rounds} rounds")
 
@@ -695,13 +699,13 @@ class BaseMCBoost(
         outofbounds_mask = self._predictions_out_of_bounds(predictions)
         if nan_mask.any():
             logger.warning(
-                f"MCBoost does not support missing values in the prediction column. Found {nan_mask.sum()} missing values. MCBoost.predict will return np.nan for these predictions."
+                f"{self.__class__.__name__} does not support missing values in the prediction column. Found {nan_mask.sum()} missing values. {self.__class__.__name__}.predict will return np.nan for these predictions."
             )
         if outofbounds_mask.any():
             min_score = np.min(df[prediction_column_name].values)
             max_score = np.max(df[prediction_column_name].values)
             logger.warning(
-                f"MCBoost calibrates probabilistic binary classifiers, hence predictions must be in (0,1). Found min {min_score} and max {max_score}. MCBoost.predict will return np.nan for these predictions."
+                f"{self.__class__.__name__} calibrates probabilistic binary classifiers, hence predictions must be in (0,1). Found min {min_score} and max {max_score}. {self.__class__.__name__}.predict will return np.nan for these predictions."
             )
         invalid_mask = nan_mask | outofbounds_mask
         if not self.allow_missing_segment_feature_values:
@@ -712,7 +716,7 @@ class BaseMCBoost(
             )
             if segment_feature_missing_mask.any():
                 logger.warning(
-                    f"Found {segment_feature_missing_mask.sum()} missing values in segment features. MCBoost.predict will return np.nan for these predictions. MCBoost supports handling of missing data in segment features. If you want to enable native missing value support set `allow_missing_segment_feature_values=True` in the constructor of MCBoost. "
+                    f"Found {segment_feature_missing_mask.sum()} missing values in segment features. {self.__class__.__name__}.predict will return np.nan for these predictions. {self.__class__.__name__} supports handling of missing data in segment features. If you want to enable native missing value support set `allow_missing_segment_feature_values=True` in the constructor of {self.__class__.__name__}. "
                 )
             invalid_mask = invalid_mask | segment_feature_missing_mask
         return np.logical_not(invalid_mask)
@@ -739,7 +743,7 @@ class BaseMCBoost(
         return_all_rounds: bool = False,
         **kwargs: Any,
     ) -> npt.NDArray:
-        """Apply the MCBoost calibration model to a DataFrame.
+        """Apply the MCGrad calibration model to a DataFrame.
 
         This requires the `fit` method to have been previously called on this calibrator object.
 
@@ -749,7 +753,7 @@ class BaseMCBoost(
             segmentation features
         :param numerical_feature_column_names: List of column names in the df that contain the numerical
             segmentation features
-        :param return_all_rounds: If True, returns predictions for all MCBoost rounds as a 2D array of shape
+        :param return_all_rounds: If True, returns predictions for all MCGrad rounds as a 2D array of shape
             (num_rounds, num_samples). If False, returns only the final round predictions as a 1D array
         :param kwargs: Additional keyword arguments
         :return: Array of calibrated predictions. Shape depends on return_all_rounds parameter
@@ -787,7 +791,7 @@ class BaseMCBoost(
         assert len(self.mr) == len(self.unshrink_factors)
         if len(self.mr) < 1:
             logger.warning(
-                "MCBoost has not been fit. Returning the uncalibrated predictions."
+                f"{self.__class__.__name__} has not been fit. Returning the uncalibrated predictions."
             )
             inverse_preds = self._inverse_transform_predictions(transformed_predictions)
             return inverse_preds.reshape(1, -1) if return_all_rounds else inverse_preds
@@ -896,8 +900,8 @@ class BaseMCBoost(
 
     def _determine_best_num_rounds(
         self,
-        data_train: MCBoostProcessedData,
-        data_val: MCBoostProcessedData | None = None,
+        data_train: MCGradProcessedData,
+        data_val: MCGradProcessedData | None = None,
     ) -> int:
         logger.info("Determining optimal number of rounds")
         if data_train.labels is None:
@@ -915,7 +919,7 @@ class BaseMCBoost(
         num_rounds = 0
         best_num_rounds = 0
 
-        mcboost_per_fold: Dict[int, BaseMCBoost] = {}
+        mcgrad_per_fold: Dict[int, BaseMCGrad] = {}
         predictions_per_fold: Dict[int, npt.NDArray] = {}
 
         best_score = -np.inf
@@ -933,7 +937,7 @@ class BaseMCBoost(
             ) > cast(int, self.early_stopping_timeout):
                 logger.warning(
                     f"Stopping early stopping upon exceeding the {self.early_stopping_timeout:,}-second timeout; "
-                    + "MCBoost results will likely improve by increasing `early_stopping_timeout` or setting it to None"
+                    + f"{self.__class__.__name__} results will likely improve by increasing `early_stopping_timeout` or setting it to None"
                 )
                 break
 
@@ -961,18 +965,18 @@ class BaseMCBoost(
                         data_valid_cv.predictions
                     )
                 else:
-                    if fold_num not in mcboost_per_fold:
-                        mcboost = self._create_instance_for_cv(
+                    if fold_num not in mcgrad_per_fold:
+                        mcgrad = self._create_instance_for_cv(
                             encode_categorical_variables=self.encode_categorical_variables,
                             monotone_t=self.monotone_t,
                             lightgbm_params=self.lightgbm_params,
                             early_stopping=False,
                             num_rounds=0,
                         )
-                        mcboost_per_fold[fold_num] = mcboost
+                        mcgrad_per_fold[fold_num] = mcgrad
                         predictions_per_fold[fold_num] = data_train_cv.predictions
 
-                    new_predictions = mcboost_per_fold[
+                    new_predictions = mcgrad_per_fold[
                         fold_num
                     ]._fit_single_round(
                         x=data_train_cv.features,
@@ -984,13 +988,13 @@ class BaseMCBoost(
                     )
                     predictions_per_fold[fold_num] = new_predictions
                     if self.save_training_performance:
-                        train_fold_preds = mcboost_per_fold[fold_num]._predict(
+                        train_fold_preds = mcgrad_per_fold[fold_num]._predict(
                             x=data_train_cv.features,
                             transformed_predictions=data_train_cv.predictions,
                             return_all_rounds=False,
                         )
 
-                    valid_fold_preds = mcboost_per_fold[fold_num]._predict(
+                    valid_fold_preds = mcgrad_per_fold[fold_num]._predict(
                         x=data_valid_cv.features,
                         transformed_predictions=data_valid_cv.predictions,
                         return_all_rounds=False,
@@ -1066,7 +1070,7 @@ class BaseMCBoost(
 
         if best_num_rounds == 0:
             logger.warning(
-                "Selected 0 to be the best number of rounds for MCBoost for this dataset, meaning that uncalibrated predictions will be returned. This is because the optimization metric did not improve during the first round of boosting."
+                f"Selected 0 to be the best number of rounds for {self.__class__.__name__} for this dataset, meaning that uncalibrated predictions will be returned. This is because the optimization metric did not improve during the first round of boosting."
             )
         elif best_num_rounds == self.num_rounds:
             logger.warning(
@@ -1091,11 +1095,11 @@ class BaseMCBoost(
 
                 if not self.mce_below_strong_evidence_threshold:
                     logger.warning(
-                        f"The final Multicalibration Error on the validation set after using MCBoost is {mce_at_best_num_rounds}. This is higher than 4.0, which still indicates strong evidence for miscalibration."
+                        f"The final Multicalibration Error on the validation set after using {self.__class__.__name__} is {mce_at_best_num_rounds}. This is higher than 4.0, which still indicates strong evidence for miscalibration."
                     )
                 if not self.mce_below_initial:
                     logger.warning(
-                        f"The final Multicalibration Error on the validation set after using MCBoost is {mce_at_best_num_rounds}, which is not lower than the initial Multicalibration Error of {mce_at_initial_round}. This indicates that MCBoost did not improve the multi-calibration of the model."
+                        f"The final Multicalibration Error on the validation set after using {self.__class__.__name__} is {mce_at_best_num_rounds}, which is not lower than the initial Multicalibration Error of {mce_at_initial_round}. This indicates that {self.__class__.__name__} did not improve the multi-calibration of the model."
                     )
 
         return best_num_rounds
@@ -1103,11 +1107,11 @@ class BaseMCBoost(
     def _compute_metric_on_internal_data(
         self,
         metric: ScoreFunctionInterface,
-        data: MCBoostProcessedData,
+        data: MCGradProcessedData,
         predictions: npt.NDArray,
     ) -> float:
         """
-        Compatibility wrapper for MCBoostProcessedData -> ScoreFunctionInterface.
+        Compatibility wrapper for MCGradProcessedData -> ScoreFunctionInterface.
         """
         feature_columns = data.categorical_feature_names + data.numerical_feature_names
         df = pd.DataFrame(
@@ -1131,7 +1135,7 @@ class BaseMCBoost(
         return int(time.time() - start_time)
 
     def serialize(self) -> str:
-        """Serializes the fitted MCBoost model to a JSON string.
+        """Serializes the fitted MCGrad model to a JSON string.
 
         The serialized model includes all boosters, unshrink factors, encoder state, and configuration parameters,
         allowing the model to be saved and restored later.
@@ -1164,12 +1168,12 @@ class BaseMCBoost(
 
     @classmethod
     def deserialize(cls, model_str: str) -> Self:
-        """Deserializes an MCBoost model from a JSON string.
+        """Deserializes an MCGrad model from a JSON string.
 
-        Reconstructs a fitted MCBoost model from a previously serialized representation.
+        Reconstructs a fitted MCGrad model from a previously serialized representation.
 
         :param model_str: JSON string containing the serialized model
-        :return: A fitted MCBoost instance with all state restored
+        :return: A fitted MCGrad instance with all state restored
         """
         json_obj = json.loads(model_str)
         model = cls()
@@ -1236,13 +1240,13 @@ class BaseMCBoost(
             return EstimationMethod.HOLDOUT
 
 
-class MCBoost(BaseMCBoost):
+class MCGrad(BaseMCGrad):
     """
-    Multicalibration boosting (MCBoost) as introduced in [1].
+    MCGrad (Multicalibration Gradient Boosting) as described in [1].
 
     References:
-    [1] Hébert-Johnson, U., Kim, M., Reingold, O., & Rothblum, G. (2018). Multicalibration: Calibration for the
-        (computationally-identifiable) masses. In International Conference on Machine Learning (pp. 1939-1948). PMLR.
+    [1] Perini, Haimovich, Linder, Tax, Karamshuk, Okati, Vojnovic, Apostolopoulos (2026). MCGrad: Multicalibration at Web Scale.
+    In Conference on Knowledge Discovery in Databases.
     """
 
     UNSHRINK_LOGIT_EPSILON = 10
@@ -1280,7 +1284,7 @@ class MCBoost(BaseMCBoost):
         y: npt.NDArray, predictions: npt.NDArray, w: npt.NDArray | None
     ) -> float:
         return utils.unshrink(
-            y, predictions, w, logit_epsilon=MCBoost.UNSHRINK_LOGIT_EPSILON
+            y, predictions, w, logit_epsilon=MCGrad.UNSHRINK_LOGIT_EPSILON
         )
 
     @property
@@ -1291,22 +1295,23 @@ class MCBoost(BaseMCBoost):
     def _default_early_stopping_metric(self) -> ScoreFunctionInterface:
         return wrap_sklearn_metric_func(skmetrics.log_loss)
 
-    @staticmethod
-    def _check_predictions(df_train: pd.DataFrame, prediction_column_name: str) -> None:
+    def _check_predictions(
+        self, df_train: pd.DataFrame, prediction_column_name: str
+    ) -> None:
         predictions = df_train[prediction_column_name].to_numpy()
-        if MCBoost._predictions_out_of_bounds(predictions).any():
+        if self._predictions_out_of_bounds(predictions).any():
             raise ValueError(
                 "Predictions must be probabilities in the (0, 1) interval. "
                 f"Found predictions outside this range: min={predictions.min()}, max={predictions.max()}"
             )
         if df_train[prediction_column_name].isnull().any():
             raise ValueError(
-                f"MCBoost does not support missing values in the prediction column, but {df_train[prediction_column_name].isnull().sum()}"
+                f"{self.__class__.__name__} does not support missing values in the prediction column, but {df_train[prediction_column_name].isnull().sum()}"
                 f" of {len(df_train[prediction_column_name])} are null."
             )
 
-        lower_prob_bound = utils.logistic(-MCBoost.UNSHRINK_LOGIT_EPSILON)
-        upper_prob_bound = utils.logistic(MCBoost.UNSHRINK_LOGIT_EPSILON)
+        lower_prob_bound = utils.logistic(-self.UNSHRINK_LOGIT_EPSILON)
+        upper_prob_bound = utils.logistic(self.UNSHRINK_LOGIT_EPSILON)
         num_out_of_bounds = np.sum(
             (predictions < lower_prob_bound) | (predictions > upper_prob_bound)
         )
@@ -1317,11 +1322,10 @@ class MCBoost(BaseMCBoost):
                 f"These samples will be clipped in the unshrink step. Consider reviewing input prediction quality."
             )
 
-    @staticmethod
-    def _check_labels(df_train: pd.DataFrame, label_column_name: str) -> None:
+    def _check_labels(self, df_train: pd.DataFrame, label_column_name: str) -> None:
         if df_train[label_column_name].isnull().any():
             raise ValueError(
-                f"MCBoost does not support missing values in the label column, but {df_train[label_column_name].isnull().sum()}"
+                f"{self.__class__.__name__} does not support missing values in the label column, but {df_train[label_column_name].isnull().sum()}"
                 f" of {len(df_train[label_column_name])} are null."
             )
         unique_labels = list(df_train[label_column_name].unique())
@@ -1360,9 +1364,9 @@ class MCBoost(BaseMCBoost):
         return utils.NoopSplitterWrapper()
 
 
-class RegressionMCBoost(BaseMCBoost):
+class RegressionMCGrad(BaseMCGrad):
     """
-    Regression variant of MCBoost for continuous label calibration.
+    Regression variant of MCGrad for continuous label calibration.
 
     Note that automatic determination of train/test split vs. cross validation is currently not supported for Regression.
     """
@@ -1416,40 +1420,40 @@ class RegressionMCBoost(BaseMCBoost):
     def _default_early_stopping_metric(self) -> ScoreFunctionInterface:
         return wrap_sklearn_metric_func(skmetrics.mean_squared_error)
 
-    @staticmethod
-    def _check_predictions(df_train: pd.DataFrame, prediction_column_name: str) -> None:
+    def _check_predictions(
+        self, df_train: pd.DataFrame, prediction_column_name: str
+    ) -> None:
         predictions = df_train[prediction_column_name]
         if predictions.isnull().any():
             raise ValueError(
-                f"RegressionMCBoost does not support missing values in the prediction column, but {predictions.isnull().sum()}"
+                f"{self.__class__.__name__} does not support missing values in the prediction column, but {predictions.isnull().sum()}"
                 f" of {len(predictions)} are null."
             )
         if np.isinf(predictions).any():
             raise ValueError(
-                f"RegressionMCBoost does not support infinite values in the prediction column, but {np.sum(np.isinf(predictions))}"
+                f"{self.__class__.__name__} does not support infinite values in the prediction column, but {np.sum(np.isinf(predictions))}"
                 f" of {len(predictions)} are null."
             )
 
-    @staticmethod
-    def _check_labels(df_train: pd.DataFrame, label_column_name: str) -> None:
+    def _check_labels(self, df_train: pd.DataFrame, label_column_name: str) -> None:
         labels = df_train[label_column_name]
         if not pd.api.types.is_numeric_dtype(labels):
             raise ValueError(
-                f"RegressionMCBoost only supports numeric labels, but {label_column_name} has type {labels.dtype}."
+                f"{self.__class__.__name__} only supports numeric labels, but {label_column_name} has type {labels.dtype}."
             )
         if labels.isnull().any() or labels.isna().any():
             raise ValueError(
-                f"RegressionMCBoost does not support missing values in the label column, but {labels.isnull().sum()}"
+                f"{self.__class__.__name__} does not support missing values in the label column, but {labels.isnull().sum()}"
                 f" of {len(labels)} are null."
             )
         if np.isinf(labels).any():
             raise ValueError(
-                f"RegressionMCBoost does not support infinite values in the prediction column, but {np.sum(np.isinf(labels))}"
+                f"{self.__class__.__name__} does not support infinite values in the prediction column, but {np.sum(np.isinf(labels))}"
                 f" of {len(labels)} are null."
             )
         if labels.nunique() < 2:
             raise ValueError(
-                f"RegressionMCBoost requires at least 2 unique values in the label column, but {label_column_name} has only {labels.nunique()}."
+                f"{self.__class__.__name__} requires at least 2 unique values in the label column, but {label_column_name} has only {labels.nunique()}."
             )
 
     @property
@@ -1474,6 +1478,20 @@ class RegressionMCBoost(BaseMCBoost):
         self,
     ) -> utils.NoopSplitterWrapper:
         return utils.NoopSplitterWrapper()
+
+
+# @oss-disable[end= ]: class MCBoost(
+    # @oss-disable[end= ]: MCGrad,
+    # @oss-disable[end= ]: DeprecatedAttributesMixin,
+# @oss-disable[end= ]: ):
+    # @oss-disable[end= ]: pass
+
+
+# @oss-disable[end= ]: class RegressionMCBoost(
+    # @oss-disable[end= ]: RegressionMCGrad,
+    # @oss-disable[end= ]: DeprecatedAttributesMixin,
+# @oss-disable[end= ]: ):
+    # @oss-disable[end= ]: pass
 
 
 class PlattScaling(BaseCalibrator):
