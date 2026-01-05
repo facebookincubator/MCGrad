@@ -423,3 +423,330 @@ def test_OrdinalEncoderWithUnknownSupport_transform_before_fit_raises_error():
         ValueError, match="fit method should be called before transform"
     ):
         encoder.transform(df.values)
+
+
+def test_positive_label_proportion_does_not_modify_input_arrays(rng):
+    labels = rng.randint(0, 2, 100).astype(float)
+    predictions = rng.uniform(0.1, 0.9, 100)
+    bins = np.array([0.0, 0.25, 0.5, 0.75, 1.0])
+    sample_weight = rng.uniform(0.5, 2.0, 100)
+
+    labels_original = labels.copy()
+    predictions_original = predictions.copy()
+    bins_original = bins.copy()
+    sample_weight_original = sample_weight.copy()
+
+    _ = utils.positive_label_proportion(
+        labels=labels,
+        predictions=predictions,
+        bins=bins,
+        sample_weight=sample_weight,
+    )
+
+    np.testing.assert_array_equal(labels, labels_original)
+    np.testing.assert_array_equal(predictions, predictions_original)
+    np.testing.assert_array_equal(bins, bins_original)
+    np.testing.assert_array_equal(sample_weight, sample_weight_original)
+
+
+def test_ordinal_encoder_fit_does_not_modify_input_array():
+    data = np.array([["Paris", "Male"], ["Tokyo", "Female"], ["Amsterdam", "Male"]])
+    data_original = data.copy()
+
+    encoder = utils.OrdinalEncoderWithUnknownSupport()
+    encoder.fit(data)
+
+    np.testing.assert_array_equal(data, data_original)
+
+
+def test_ordinal_encoder_fit_does_not_modify_input_dataframe():
+    df = pd.DataFrame(
+        {
+            "City": ["Paris", "Tokyo", "Amsterdam"],
+            "Gender": ["Male", "Female", "Male"],
+        }
+    )
+    df_original = df.copy()
+
+    encoder = utils.OrdinalEncoderWithUnknownSupport()
+    encoder.fit(df)
+
+    pd.testing.assert_frame_equal(df, df_original)
+
+
+def test_ordinal_encoder_transform_does_not_modify_input_array():
+    train_data = np.array(
+        [["Paris", "Male"], ["Tokyo", "Female"], ["Amsterdam", "Male"]]
+    )
+    test_data = np.array([["Paris", "Female"], ["Copenhagen", "Male"]])
+    test_data_original = test_data.copy()
+
+    encoder = utils.OrdinalEncoderWithUnknownSupport()
+    encoder.fit(train_data)
+    _ = encoder.transform(test_data)
+
+    np.testing.assert_array_equal(test_data, test_data_original)
+
+
+def test_ordinal_encoder_transform_does_not_modify_input_dataframe():
+    df_train = pd.DataFrame(
+        {
+            "City": ["Paris", "Tokyo", "Amsterdam"],
+            "Gender": ["Male", "Female", "Male"],
+        }
+    )
+    df_test = pd.DataFrame(
+        {
+            "City": ["Paris", "Copenhagen"],
+            "Gender": ["Female", "Male"],
+        }
+    )
+    df_test_original = df_test.copy()
+
+    encoder = utils.OrdinalEncoderWithUnknownSupport()
+    encoder.fit(df_train)
+    _ = encoder.transform(df_test)
+
+    pd.testing.assert_frame_equal(df_test, df_test_original)
+
+
+def test_train_test_split_wrapper_split_does_not_modify_input_arrays(rng):
+    X = rng.rand(100, 5)
+    y = rng.randint(0, 2, 100)
+
+    X_original = X.copy()
+    y_original = y.copy()
+
+    splitter = utils.TrainTestSplitWrapper(
+        test_size=0.3, shuffle=True, random_state=42, stratify=True
+    )
+    for _, _ in splitter.split(X, y):
+        pass
+
+    np.testing.assert_array_equal(X, X_original)
+    np.testing.assert_array_equal(y, y_original)
+
+
+def test_extract_segment_features_does_not_modify_input_dataframe(rng):
+    df = pd.DataFrame(
+        {
+            "cat_feature": rng.choice(["A", "B", "C"], 50),
+            "num_feature": rng.uniform(0, 100, 50),
+        }
+    )
+    df_original = df.copy()
+
+    _, _ = utils.extract_segment_features(
+        df=df,
+        categorical_segment_cols=["cat_feature"],
+        numerical_segment_cols=["num_feature"],
+        is_fit_phase=True,
+    )
+
+    pd.testing.assert_frame_equal(df, df_original)
+
+
+def test_extract_segment_features_predict_does_not_modify_input_dataframe(rng):
+    df_train = pd.DataFrame(
+        {
+            "cat_feature": rng.choice(["A", "B", "C"], 50),
+            "num_feature": rng.uniform(0, 100, 50),
+        }
+    )
+    df_test = pd.DataFrame(
+        {
+            "cat_feature": rng.choice(["A", "B", "C"], 20),
+            "num_feature": rng.uniform(0, 100, 20),
+        }
+    )
+    df_test_original = df_test.copy()
+
+    _, processor_state = utils.extract_segment_features(
+        df=df_train,
+        categorical_segment_cols=["cat_feature"],
+        numerical_segment_cols=["num_feature"],
+        is_fit_phase=True,
+    )
+
+    _, _ = utils.extract_segment_features(
+        df=df_test,
+        categorical_segment_cols=["cat_feature"],
+        numerical_segment_cols=["num_feature"],
+        processor_state=processor_state,
+        is_fit_phase=False,
+    )
+
+    pd.testing.assert_frame_equal(df_test, df_test_original)
+
+
+def test_collapse_categorical_features_by_frequency_does_not_modify_input_dataframe(
+    rng,
+):
+    df = pd.DataFrame(
+        {
+            "cat_feature_1": rng.choice(["A", "B", "C", "D", "E"], 100),
+            "cat_feature_2": rng.choice(["X", "Y", "Z"], 100),
+        }
+    )
+    df_original = df.copy()
+
+    processor_state = utils.FeatureProcessorState()
+    _ = utils.collapse_categorical_features_by_frequency(
+        df=df,
+        categorical_cols=["cat_feature_1", "cat_feature_2"],
+        max_n_categories=3,
+        processor_state=processor_state,
+        is_fit_phase=True,
+    )
+
+    pd.testing.assert_frame_equal(df, df_original)
+
+
+def test_collapse_categorical_features_by_frequency_predict_does_not_modify_input_dataframe(
+    rng,
+):
+    df_train = pd.DataFrame(
+        {
+            "cat_feature": rng.choice(["A", "B", "C", "D", "E"], 100),
+        }
+    )
+    df_test = pd.DataFrame(
+        {
+            "cat_feature": rng.choice(["A", "B", "C", "D", "E", "F"], 30),
+        }
+    )
+    df_test_original = df_test.copy()
+
+    processor_state = utils.FeatureProcessorState()
+    _ = utils.collapse_categorical_features_by_frequency(
+        df=df_train,
+        categorical_cols=["cat_feature"],
+        max_n_categories=3,
+        processor_state=processor_state,
+        is_fit_phase=True,
+    )
+
+    _ = utils.collapse_categorical_features_by_frequency(
+        df=df_test,
+        categorical_cols=["cat_feature"],
+        max_n_categories=3,
+        processor_state=processor_state,
+        is_fit_phase=False,
+    )
+
+    pd.testing.assert_frame_equal(df_test, df_test_original)
+
+
+def test_make_equispaced_bins_does_not_modify_input_array(rng):
+    predicted_scores = rng.uniform(0.1, 0.9, 100)
+    predicted_scores_original = predicted_scores.copy()
+
+    _ = utils.make_equispaced_bins(predicted_scores, num_bins=10)
+
+    np.testing.assert_array_equal(predicted_scores, predicted_scores_original)
+
+
+def test_make_equisized_bins_does_not_modify_input_array(rng):
+    predicted_scores = rng.uniform(0.1, 0.9, 100)
+    predicted_scores_original = predicted_scores.copy()
+
+    _ = utils.make_equisized_bins(predicted_scores, num_bins=5)
+
+    np.testing.assert_array_equal(predicted_scores, predicted_scores_original)
+
+
+def test_unshrink_does_not_modify_input_arrays(rng):
+    y = rng.randint(0, 2, 50).astype(float)
+    logits = rng.uniform(-2, 2, 50)
+    w = rng.uniform(0.5, 2.0, 50)
+
+    y_original = y.copy()
+    logits_original = logits.copy()
+    w_original = w.copy()
+
+    _ = utils.unshrink(y, logits, w)
+
+    np.testing.assert_array_equal(y, y_original)
+    np.testing.assert_array_equal(logits, logits_original)
+    np.testing.assert_array_equal(w, w_original)
+
+
+def test_logit_does_not_modify_input_array(rng):
+    probs = rng.uniform(0.1, 0.9, 100)
+    probs_original = probs.copy()
+
+    _ = utils.logit(probs)
+
+    np.testing.assert_array_equal(probs, probs_original)
+
+
+def test_absolute_error_does_not_modify_input_arrays(rng):
+    estimate = rng.uniform(0, 100, 50)
+    reference = rng.uniform(0, 100, 50)
+
+    estimate_original = estimate.copy()
+    reference_original = reference.copy()
+
+    _ = utils.absolute_error(estimate, reference)
+
+    np.testing.assert_array_equal(estimate, estimate_original)
+    np.testing.assert_array_equal(reference, reference_original)
+
+
+def test_proportional_error_does_not_modify_input_arrays(rng):
+    estimate = rng.uniform(1, 100, 50)
+    reference = rng.uniform(1, 100, 50)
+
+    estimate_original = estimate.copy()
+    reference_original = reference.copy()
+
+    _ = utils.proportional_error(estimate, reference)
+
+    np.testing.assert_array_equal(estimate, estimate_original)
+    np.testing.assert_array_equal(reference, reference_original)
+
+
+def test_make_unjoined_does_not_modify_input_arrays(rng):
+    x = rng.uniform(0, 1, (50, 3))
+    y = rng.randint(0, 2, 50)
+
+    x_original = x.copy()
+    y_original = y.copy()
+
+    _, _ = utils.make_unjoined(x, y)
+
+    np.testing.assert_array_equal(x, x_original)
+    np.testing.assert_array_equal(y, y_original)
+
+
+def test_noop_splitter_wrapper_split_does_not_modify_input_arrays(rng):
+    X = rng.rand(50, 5)
+    y = rng.randint(0, 2, 50)
+
+    X_original = X.copy()
+    y_original = y.copy()
+
+    splitter = utils.NoopSplitterWrapper()
+    for _, _ in splitter.split(X, y):
+        pass
+
+    np.testing.assert_array_equal(X, X_original)
+    np.testing.assert_array_equal(y, y_original)
+
+
+def test_geometric_mean_does_not_modify_input_array(rng):
+    x = rng.uniform(0.1, 100, 50)
+    x_original = x.copy()
+
+    _ = utils.geometric_mean(x)
+
+    np.testing.assert_array_equal(x, x_original)
+
+
+def test_logistic_vectorized_does_not_modify_input_array(rng):
+    log_odds = rng.uniform(-5, 5, 100)
+    log_odds_original = log_odds.copy()
+
+    _ = utils.logistic_vectorized(log_odds)
+
+    np.testing.assert_array_equal(log_odds, log_odds_original)
