@@ -346,7 +346,6 @@ def test_multi_cg_gives_same_result_as_cg_per_segment(rank_discount, rng):
     df["segment_2"] = rng.choice(["C", "D"], size=len(df))
 
     min_segments_size = df.groupby(by=["segment_1", "segment_2"]).count().values.min()
-    print(f"{min_segments_size=}")
     k = min(k, min_segments_size)
 
     multi_cg_scores = metrics.multi_cg_score(
