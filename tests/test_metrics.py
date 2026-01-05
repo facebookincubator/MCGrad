@@ -1096,7 +1096,7 @@ def test_wrap_sklearn_metric_func_does_not_raise_an_error_with_any_of_our_main_m
 
 
 def test_mce_wrapper_with_variant_mce_sigma_scale_has_the_right_name():
-    # This test is required to throw warnings when mce_sigma_scale is large after training mcboost
+    # This test is required to throw warnings when mce_sigma_scale is large after training mcgrad
     # See the function determine_best_num_rounds in multicalibration.methods.py
     assert (
         wrap_multicalibration_error_metric(
