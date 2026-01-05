@@ -16,7 +16,7 @@ from multicalibration.tuning import (
     default_parameter_configurations,
     ORIGINAL_LIGHTGBM_PARAMS,
     ParameterConfig,
-    tune_mcboost_params,
+    tune_mcgrad_params,
 )
 
 
@@ -57,8 +57,8 @@ def sample_val_data(rng):
 
 
 @pytest.fixture
-def mock_mcboost_model(rng):
-    model = Mock(spec=methods.MCBoost)
+def mock_mcgrad_model(rng):
+    model = Mock(spec=methods.MCGrad)
     model.predict = Mock(return_value=rng.uniform(0.1, 0.9, 80))
     model.early_stopping_estimation_method = methods.EstimationMethod.HOLDOUT
     return model
@@ -66,23 +66,23 @@ def mock_mcboost_model(rng):
 
 @pytest.fixture
 def hyperparams_for_tuning():
-    default_hyperparams = methods.MCBoost().DEFAULT_HYPERPARAMS
+    default_hyperparams = methods.MCGrad().DEFAULT_HYPERPARAMS
     lightgbm_params = default_hyperparams["lightgbm_params"]
     return default_hyperparams, lightgbm_params
 
 
 @pytest.mark.arm64_incompatible
 @patch("multicalibration.tuning.normalized_entropy")
-def test_tune_mcboost_params_with_weights(
+def test_tune_mcgrad_params_with_weights(
     mock_normalized_entropy,
     sample_data,
-    mock_mcboost_model,
+    mock_mcgrad_model,
 ):
     # Setup mocks
     mock_normalized_entropy.return_value = 0.5
 
-    result_model, trial_results = tune_mcboost_params(
-        model=mock_mcboost_model,
+    result_model, trial_results = tune_mcgrad_params(
+        model=mock_mcgrad_model,
         df_train=sample_data,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -96,8 +96,8 @@ def test_tune_mcboost_params_with_weights(
     assert isinstance(trial_results, pd.DataFrame)
 
     # Verify that fit was called with weight_column_name
-    assert mock_mcboost_model.fit.call_count >= 1
-    fit_calls = mock_mcboost_model.fit.call_args_list
+    assert mock_mcgrad_model.fit.call_count >= 1
+    fit_calls = mock_mcgrad_model.fit.call_args_list
     for call in fit_calls:
         assert call[1]["weight_column_name"] == "weight"
 
@@ -111,15 +111,15 @@ def test_tune_mcboost_params_with_weights(
 
 @pytest.mark.arm64_incompatible
 @patch("multicalibration.tuning.normalized_entropy")
-def test_tune_mcboost_params_without_weights(
+def test_tune_mcgrad_params_without_weights(
     mock_normalized_entropy,
     sample_data,
-    mock_mcboost_model,
+    mock_mcgrad_model,
 ):
     mock_normalized_entropy.return_value = 0.5
 
-    result_model, trial_results = tune_mcboost_params(
-        model=mock_mcboost_model,
+    result_model, trial_results = tune_mcgrad_params(
+        model=mock_mcgrad_model,
         df_train=sample_data,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -133,8 +133,8 @@ def test_tune_mcboost_params_without_weights(
     assert isinstance(trial_results, pd.DataFrame)
 
     # Verify that fit was called with weight_column_name=None
-    assert mock_mcboost_model.fit.call_count >= 1
-    fit_calls = mock_mcboost_model.fit.call_args_list
+    assert mock_mcgrad_model.fit.call_count >= 1
+    fit_calls = mock_mcgrad_model.fit.call_args_list
     for call in fit_calls:
         assert call[1]["weight_column_name"] is None
 
@@ -148,15 +148,15 @@ def test_tune_mcboost_params_without_weights(
 
 @pytest.mark.arm64_incompatible
 @patch("multicalibration.tuning.normalized_entropy")
-def test_tune_mcboost_params_default_parameters(
+def test_tune_mcgrad_params_default_parameters(
     mock_normalized_entropy,
     sample_data,
-    mock_mcboost_model,
+    mock_mcgrad_model,
 ):
     mock_normalized_entropy.return_value = 0.5
 
-    result_model, trial_results = tune_mcboost_params(
-        model=mock_mcboost_model,
+    result_model, trial_results = tune_mcgrad_params(
+        model=mock_mcgrad_model,
         df_train=sample_data,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -168,8 +168,8 @@ def test_tune_mcboost_params_default_parameters(
     assert isinstance(trial_results, pd.DataFrame)
 
     # Verify that fit was called with correct values
-    assert mock_mcboost_model.fit.call_count >= 1
-    fit_calls = mock_mcboost_model.fit.call_args_list
+    assert mock_mcgrad_model.fit.call_count >= 1
+    fit_calls = mock_mcgrad_model.fit.call_args_list
     for call in fit_calls:
         assert call[1]["weight_column_name"] is None
         assert call[1]["categorical_feature_column_names"] == ["cat_feature"]
@@ -178,15 +178,15 @@ def test_tune_mcboost_params_default_parameters(
 
 @pytest.mark.arm64_incompatible
 @patch("multicalibration.tuning.normalized_entropy")
-def test_tune_mcboost_params_ax_client_setup(
+def test_tune_mcgrad_params_ax_client_setup(
     mock_normalized_entropy,
     sample_data,
-    mock_mcboost_model,
+    mock_mcgrad_model,
 ):
     mock_normalized_entropy.return_value = 0.5
 
-    result_model, trial_results = tune_mcboost_params(
-        model=mock_mcboost_model,
+    result_model, trial_results = tune_mcgrad_params(
+        model=mock_mcgrad_model,
         df_train=sample_data,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -199,17 +199,17 @@ def test_tune_mcboost_params_ax_client_setup(
     assert len(trial_results) == 2
 
     # Verify that fit was called multiple times (once per trial + final fit)
-    assert mock_mcboost_model.fit.call_count >= 2
+    assert mock_mcgrad_model.fit.call_count >= 2
 
 
 @pytest.mark.arm64_incompatible
 @patch("multicalibration.tuning.normalized_entropy")
 @patch("multicalibration.tuning.train_test_split")
-def test_tune_mcboost_params_data_splitting(
+def test_tune_mcgrad_params_data_splitting(
     mock_train_test_split,
     mock_normalized_entropy,
     sample_data,
-    mock_mcboost_model,
+    mock_mcgrad_model,
 ):
     # Setup mock to return specific train/val splits
     train_data = sample_data.iloc[:80]
@@ -218,8 +218,8 @@ def test_tune_mcboost_params_data_splitting(
 
     mock_normalized_entropy.return_value = 0.5
 
-    tune_mcboost_params(
-        model=mock_mcboost_model,
+    tune_mcgrad_params(
+        model=mock_mcgrad_model,
         df_train=sample_data,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -239,12 +239,12 @@ def test_tune_mcboost_params_data_splitting(
 
 @pytest.mark.arm64_incompatible
 @patch("multicalibration.tuning.normalized_entropy")
-def test_tune_mcboost_params_with_subset_of_parameters(
+def test_tune_mcgrad_params_with_subset_of_parameters(
     mock_normalized_entropy,
     sample_data,
 ):
     mock_normalized_entropy.return_value = 0.5
-    model = methods.MCBoost()
+    model = methods.MCGrad()
 
     subset_params = ["learning_rate", "max_depth"]
     subset_configs = [
@@ -253,7 +253,7 @@ def test_tune_mcboost_params_with_subset_of_parameters(
         if config.name in subset_params
     ]
 
-    _, trial_results = tune_mcboost_params(
+    _, trial_results = tune_mcgrad_params(
         model=model,
         df_train=sample_data,
         prediction_column_name="prediction",
@@ -279,7 +279,7 @@ def test_tune_mcboost_params_with_subset_of_parameters(
         assert param not in trial_results.columns
 
 
-def test_mcboost_and_lightgbm_default_hyperparams_are_within_bounds_for_tuning(
+def test_mcgrad_and_lightgbm_default_hyperparams_are_within_bounds_for_tuning(
     hyperparams_for_tuning,
 ):
     _, lightgbm_params = hyperparams_for_tuning
@@ -328,8 +328,8 @@ def test_warm_starting_trials_produces_the_right_number_of_sobol_and_bayesian_tr
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message="Data.*is not standardized")
         warnings.filterwarnings("ignore", message="An input array is constant")
-        _, trial_results = tune_mcboost_params(
-            model=methods.MCBoost(num_rounds=0, early_stopping=False),
+        _, trial_results = tune_mcgrad_params(
+            model=methods.MCGrad(num_rounds=0, early_stopping=False),
             df_train=df_train,
             prediction_column_name="prediction",
             label_column_name="label",
@@ -400,7 +400,7 @@ def test_non_default_parameters_preserved_when_not_in_tuning_configurations(
         "max_depth": 8,
         "lambda_l2": 5.0,
     }
-    model = methods.MCBoost(lightgbm_params=non_default_params)
+    model = methods.MCGrad(lightgbm_params=non_default_params)
 
     for param, value in non_default_params.items():
         assert model.lightgbm_params[param] == value
@@ -416,7 +416,7 @@ def test_non_default_parameters_preserved_when_not_in_tuning_configurations(
         ]
 
         # Run tuning with these limited configurations
-        result_model, _ = tune_mcboost_params(
+        result_model, _ = tune_mcgrad_params(
             model=model,
             df_train=sample_data,
             prediction_column_name="prediction",
@@ -435,17 +435,17 @@ def test_non_default_parameters_preserved_when_not_in_tuning_configurations(
 @pytest.mark.arm64_incompatible
 @patch("multicalibration.tuning.normalized_entropy")
 @patch("multicalibration.tuning.train_test_split")
-def test_tune_mcboost_params_with_explicit_validation_set(
+def test_tune_mcgrad_params_with_explicit_validation_set(
     mock_train_test_split,
     mock_normalized_entropy,
     sample_data,
     sample_val_data,
-    mock_mcboost_model,
+    mock_mcgrad_model,
 ):
     mock_normalized_entropy.return_value = 0.5
 
-    tune_mcboost_params(
-        model=mock_mcboost_model,
+    tune_mcgrad_params(
+        model=mock_mcgrad_model,
         df_train=sample_data,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -459,14 +459,14 @@ def test_tune_mcboost_params_with_explicit_validation_set(
     mock_train_test_split.assert_not_called()
 
     # Verify that the model was fit with the training data
-    assert mock_mcboost_model.fit.call_count >= 1
-    fit_calls = mock_mcboost_model.fit.call_args_list
+    assert mock_mcgrad_model.fit.call_count >= 1
+    fit_calls = mock_mcgrad_model.fit.call_args_list
     for call in fit_calls:
         assert call[1]["df_train"] is sample_data
 
     # Verify that the model was evaluated on the validation data
-    assert mock_mcboost_model.predict.call_count >= 1
-    predict_calls = mock_mcboost_model.predict.call_args_list
+    assert mock_mcgrad_model.predict.call_count >= 1
+    predict_calls = mock_mcgrad_model.predict.call_args_list
     for call in predict_calls:
         assert call.kwargs["df"] is sample_val_data
 
@@ -474,11 +474,11 @@ def test_tune_mcboost_params_with_explicit_validation_set(
 @pytest.mark.arm64_incompatible
 @patch("multicalibration.tuning.normalized_entropy")
 @patch("multicalibration.tuning.train_test_split")
-def test_tune_mcboost_params_fallback_to_train_test_split(
+def test_tune_mcgrad_params_fallback_to_train_test_split(
     mock_train_test_split,
     mock_normalized_entropy,
     sample_data,
-    mock_mcboost_model,
+    mock_mcgrad_model,
 ):
     """Test that when df_val is None, train_test_split is used."""
     # Setup mock to return specific train/val splits
@@ -487,8 +487,8 @@ def test_tune_mcboost_params_fallback_to_train_test_split(
     mock_train_test_split.return_value = (train_data, val_data)
     mock_normalized_entropy.return_value = 0.5
 
-    tune_mcboost_params(
-        model=mock_mcboost_model,
+    tune_mcgrad_params(
+        model=mock_mcgrad_model,
         df_train=sample_data,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -507,31 +507,31 @@ def test_tune_mcboost_params_fallback_to_train_test_split(
     assert call_args[1]["stratify"] is sample_data["label"]
 
     # Verify that the model was fit with the training portion
-    assert mock_mcboost_model.fit.call_count >= 1
-    fit_calls = mock_mcboost_model.fit.call_args_list
+    assert mock_mcgrad_model.fit.call_count >= 1
+    fit_calls = mock_mcgrad_model.fit.call_args_list
     for call in fit_calls:
         assert call[1]["df_train"] is train_data
 
     # Verify that the model was evaluated on the validation portion
-    assert mock_mcboost_model.predict.call_count >= 1
-    predict_calls = mock_mcboost_model.predict.call_args_list
+    assert mock_mcgrad_model.predict.call_count >= 1
+    predict_calls = mock_mcgrad_model.predict.call_args_list
     for call in predict_calls:
         assert call.kwargs["df"] is val_data
 
 
 @pytest.mark.arm64_incompatible
 @patch("multicalibration.tuning.normalized_entropy")
-def test_tune_mcboost_params_pass_df_val_into_tuning_true(
+def test_tune_mcgrad_params_pass_df_val_into_tuning_true(
     mock_normalized_entropy,
     sample_data,
     sample_val_data,
-    mock_mcboost_model,
+    mock_mcgrad_model,
 ):
     """Test that df_val is passed to model.fit during tuning when pass_df_val_into_tuning=True."""
     mock_normalized_entropy.return_value = 0.5
 
-    tune_mcboost_params(
-        model=mock_mcboost_model,
+    tune_mcgrad_params(
+        model=mock_mcgrad_model,
         df_train=sample_data,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -544,7 +544,7 @@ def test_tune_mcboost_params_pass_df_val_into_tuning_true(
     )
 
     # Get all fit calls
-    fit_calls = mock_mcboost_model.fit.call_args_list
+    fit_calls = mock_mcgrad_model.fit.call_args_list
 
     # All tuning fit calls (all except the last one) should have df_val=sample_val_data
     tuning_fit_calls = fit_calls[:-1]
@@ -558,17 +558,17 @@ def test_tune_mcboost_params_pass_df_val_into_tuning_true(
 
 @pytest.mark.arm64_incompatible
 @patch("multicalibration.tuning.normalized_entropy")
-def test_tune_mcboost_params_pass_df_val_into_tuning_false(
+def test_tune_mcgrad_params_pass_df_val_into_tuning_false(
     mock_normalized_entropy,
     sample_data,
     sample_val_data,
-    mock_mcboost_model,
+    mock_mcgrad_model,
 ):
     """Test that df_val is not passed to model.fit during tuning when pass_df_val_into_tuning=False."""
     mock_normalized_entropy.return_value = 0.5
 
-    tune_mcboost_params(
-        model=mock_mcboost_model,
+    tune_mcgrad_params(
+        model=mock_mcgrad_model,
         df_train=sample_data,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -581,24 +581,24 @@ def test_tune_mcboost_params_pass_df_val_into_tuning_false(
     )
 
     # All fit calls should have df_val=None
-    fit_calls = mock_mcboost_model.fit.call_args_list
+    fit_calls = mock_mcgrad_model.fit.call_args_list
     for call in fit_calls:
         assert call[1]["df_val"] is None
 
 
 @pytest.mark.arm64_incompatible
 @patch("multicalibration.tuning.normalized_entropy")
-def test_tune_mcboost_params_pass_df_val_into_final_fit_true(
+def test_tune_mcgrad_params_pass_df_val_into_final_fit_true(
     mock_normalized_entropy,
     sample_data,
     sample_val_data,
-    mock_mcboost_model,
+    mock_mcgrad_model,
 ):
     """Test that df_val is passed to model.fit during final fit when pass_df_val_into_final_fit=True."""
     mock_normalized_entropy.return_value = 0.5
 
-    tune_mcboost_params(
-        model=mock_mcboost_model,
+    tune_mcgrad_params(
+        model=mock_mcgrad_model,
         df_train=sample_data,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -611,7 +611,7 @@ def test_tune_mcboost_params_pass_df_val_into_final_fit_true(
     )
 
     # Get all fit calls
-    fit_calls = mock_mcboost_model.fit.call_args_list
+    fit_calls = mock_mcgrad_model.fit.call_args_list
 
     # All tuning fit calls (all except the last one) should have df_val=None
     tuning_fit_calls = fit_calls[:-1]
@@ -625,17 +625,17 @@ def test_tune_mcboost_params_pass_df_val_into_final_fit_true(
 
 @pytest.mark.arm64_incompatible
 @patch("multicalibration.tuning.normalized_entropy")
-def test_tune_mcboost_params_pass_df_val_into_final_fit_false(
+def test_tune_mcgrad_params_pass_df_val_into_final_fit_false(
     mock_normalized_entropy,
     sample_data,
     sample_val_data,
-    mock_mcboost_model,
+    mock_mcgrad_model,
 ):
     """Test that df_val is not passed to model.fit during final fit when pass_df_val_into_final_fit=False."""
     mock_normalized_entropy.return_value = 0.5
 
-    tune_mcboost_params(
-        model=mock_mcboost_model,
+    tune_mcgrad_params(
+        model=mock_mcgrad_model,
         df_train=sample_data,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -648,24 +648,24 @@ def test_tune_mcboost_params_pass_df_val_into_final_fit_false(
     )
 
     # The final fit call should have df_val=None
-    fit_calls = mock_mcboost_model.fit.call_args_list
+    fit_calls = mock_mcgrad_model.fit.call_args_list
     final_fit_call = fit_calls[-1]
     assert final_fit_call[1]["df_val"] is None
 
 
 @pytest.mark.arm64_incompatible
 @patch("multicalibration.tuning.normalized_entropy")
-def test_tune_mcboost_params_pass_df_val_into_both_tuning_and_final_fit(
+def test_tune_mcgrad_params_pass_df_val_into_both_tuning_and_final_fit(
     mock_normalized_entropy,
     sample_data,
     sample_val_data,
-    mock_mcboost_model,
+    mock_mcgrad_model,
 ):
     """Test that df_val is passed to both tuning and final fit when both flags are True."""
     mock_normalized_entropy.return_value = 0.5
 
-    tune_mcboost_params(
-        model=mock_mcboost_model,
+    tune_mcgrad_params(
+        model=mock_mcgrad_model,
         df_train=sample_data,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -678,7 +678,7 @@ def test_tune_mcboost_params_pass_df_val_into_both_tuning_and_final_fit(
     )
 
     # All fit calls should have df_val=sample_val_data
-    fit_calls = mock_mcboost_model.fit.call_args_list
+    fit_calls = mock_mcgrad_model.fit.call_args_list
     for call in fit_calls:
         assert call[1]["df_val"] is sample_val_data
 
@@ -694,19 +694,19 @@ def test_tune_mcboost_params_pass_df_val_into_both_tuning_and_final_fit(
     ],
 )
 @patch("multicalibration.tuning.normalized_entropy")
-def test_tune_mcboost_params_df_val_passing_defaults_to_false(
+def test_tune_mcgrad_params_df_val_passing_defaults_to_false(
     mock_normalized_entropy,
     sample_data,
     sample_val_data,
-    mock_mcboost_model,
+    mock_mcgrad_model,
     pass_df_val_into_tuning,
     pass_df_val_into_final_fit,
 ):
     """Test all combinations of pass_df_val_into_tuning and pass_df_val_into_final_fit flags."""
     mock_normalized_entropy.return_value = 0.5
 
-    tune_mcboost_params(
-        model=mock_mcboost_model,
+    tune_mcgrad_params(
+        model=mock_mcgrad_model,
         df_train=sample_data,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -718,7 +718,7 @@ def test_tune_mcboost_params_df_val_passing_defaults_to_false(
         pass_df_val_into_final_fit=pass_df_val_into_final_fit,
     )
 
-    fit_calls = mock_mcboost_model.fit.call_args_list
+    fit_calls = mock_mcgrad_model.fit.call_args_list
 
     # Verify tuning fit calls
     tuning_fit_calls = fit_calls[:-1]
@@ -738,15 +738,15 @@ def test_tune_mcboost_params_does_not_modify_input_dataframes(
     mock_normalized_entropy,
     sample_data,
     sample_val_data,
-    mock_mcboost_model,
+    mock_mcgrad_model,
 ):
     mock_normalized_entropy.return_value = 0.5
 
     df_train_original = sample_data.copy()
     df_val_original = sample_val_data.copy()
 
-    tune_mcboost_params(
-        model=mock_mcboost_model,
+    tune_mcgrad_params(
+        model=mock_mcgrad_model,
         df_train=sample_data,
         prediction_column_name="prediction",
         label_column_name="label",
@@ -768,7 +768,7 @@ def test_tune_mcboost_params_does_not_modify_input_dataframe_when_no_df_val(
     mock_train_test_split,
     mock_normalized_entropy,
     sample_data,
-    mock_mcboost_model,
+    mock_mcgrad_model,
 ):
     train_data = sample_data.iloc[:40].copy()
     val_data = sample_data.iloc[40:].copy()
@@ -777,8 +777,8 @@ def test_tune_mcboost_params_does_not_modify_input_dataframe_when_no_df_val(
 
     df_train_original = sample_data.copy()
 
-    tune_mcboost_params(
-        model=mock_mcboost_model,
+    tune_mcgrad_params(
+        model=mock_mcgrad_model,
         df_train=sample_data,
         prediction_column_name="prediction",
         label_column_name="label",

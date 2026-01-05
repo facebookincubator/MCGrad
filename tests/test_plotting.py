@@ -449,7 +449,7 @@ def test_plot_learning_curve_with_early_stopping(rng):
         }
     )
 
-    model = methods.MCBoost(
+    model = methods.MCGrad(
         num_rounds=3,
         early_stopping=True,
         patience=1,
@@ -480,7 +480,7 @@ def test_plot_learning_curve_raises_without_early_stopping(rng):
         }
     )
 
-    model = methods.MCBoost(
+    model = methods.MCGrad(
         num_rounds=2,
         early_stopping=False,
         lightgbm_params={"max_depth": 2, "n_estimators": 2},
@@ -512,7 +512,7 @@ def test_plot_learning_curve_with_show_all(rng):
         }
     )
 
-    model = methods.MCBoost(
+    model = methods.MCGrad(
         num_rounds=3,
         early_stopping=True,
         patience=1,

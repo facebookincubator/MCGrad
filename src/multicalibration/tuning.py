@@ -121,8 +121,8 @@ def _suppress_logger(logger: logging.Logger) -> Generator[None, None, None]:
         logger.setLevel(previous_level)
 
 
-def tune_mcboost_params(
-    model: methods.MCBoost,
+def tune_mcgrad_params(
+    model: methods.MCGrad,
     df_train: pd.DataFrame,
     prediction_column_name: str,
     label_column_name: str,
@@ -135,12 +135,11 @@ def tune_mcboost_params(
     parameter_configurations: list[ParameterConfig] | None = None,
     pass_df_val_into_tuning: bool = False,
     pass_df_val_into_final_fit: bool = False,
-) -> tuple[methods.MCBoost | None, pd.DataFrame]:
-    # Make a description for this function
+) -> tuple[methods.MCGrad | None, pd.DataFrame]:
     """
-    Tune the hyperparameters of an MCBoost model using Ax.
+    Tune the hyperparameters of an MCGrad model using Ax.
 
-    :param model: The MCBoost model to be tuned. It could be a fitted model or an unfitted model.
+    :param model: The MCGrad model to be tuned. It could be a fitted model or an unfitted model.
     :param df_train: The training data: 80% of the data is used for training the model, and the remaining 20% is used for validation.
     :param prediction_column_name: The name of the prediction column in the data.
     :param label_column_name: The name of the label column in the data.
@@ -219,7 +218,7 @@ def tune_mcboost_params(
 
     ax_client = AxClient()
     ax_client.create_experiment(
-        name="mcboost_lightgbm_autotuning" + str(uuid.uuid4())[:8],
+        name="lightgbm_autotuning" + str(uuid.uuid4())[:8],
         parameters=[config.to_dict() for config in parameter_configurations],
         objectives={"normalized_entropy": ObjectiveProperties(minimize=True)},
         # If num_initialization_trials is None, the number of warm starting trials is automatically determined
@@ -233,25 +232,25 @@ def tune_mcboost_params(
         },
     )
 
-    # Construct a set of parameters for the first trial which contains the MCBoost defaults for every parameter that is tuned. If a default is not available
+    # Construct a set of parameters for the first trial which contains the defaults for every parameter that is tuned. If a default is not available
     # use the Lightgbm default
     initial_trial_parameters = {}
-    mcboost_defaults = methods.MCBoost.DEFAULT_HYPERPARAMS["lightgbm_params"]
+    mcgrad_defaults = methods.MCGrad.DEFAULT_HYPERPARAMS["lightgbm_params"]
     for config in parameter_configurations:
-        if config.name in mcboost_defaults:
-            initial_trial_parameters[config.name] = mcboost_defaults[config.name]
+        if config.name in mcgrad_defaults:
+            initial_trial_parameters[config.name] = mcgrad_defaults[config.name]
         else:
             initial_trial_parameters[config.name] = ORIGINAL_LIGHTGBM_PARAMS[
                 config.name
             ]
 
     logger.info(
-        f"Adding initial configuration from MCBoost defaults to trials: {initial_trial_parameters}"
+        f"Adding initial configuration from defaults to trials: {initial_trial_parameters}"
     )
 
     with _suppress_logger(methods.logger):
         # Attach and complete the initial trial with default hyperparameters. Note that we're only using the defaults for the parameters that are being tuned.
-        # That is, this configuration does not necessarily correspond to the out-of-the-box defaults for MCBoost.
+        # That is, this configuration does not necessarily correspond to the out-of-the-box defaults.
         _, initial_trial_index = ax_client.attach_trial(
             parameters=initial_trial_parameters
         )
@@ -273,7 +272,7 @@ def tune_mcboost_params(
         best_params = best_params[0]
 
     logger.info(f"Best parameters: {best_params}")
-    logger.info("Fitting MCBoost model with best parameters")
+    logger.info("Fitting model with best parameters")
 
     with _suppress_logger(methods.logger):
         model._set_lightgbm_params(best_params)
@@ -294,3 +293,6 @@ def tune_mcboost_params(
     )
 
     return model, trial_results
+
+
+# @oss-disable[end= ]: tune_mcboost_params = tune_mcgrad_params
