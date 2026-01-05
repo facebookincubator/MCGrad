@@ -28,8 +28,7 @@ pip install -e ".[dev]"
 
 This will install the package in editable mode along with:
 - pytest for running tests
-- black for code formatting
-- isort for import sorting
+- flake8 for code linting
 
 ## Dependencies
 

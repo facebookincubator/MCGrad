@@ -32,8 +32,7 @@ We welcome contributions to MCGrad! This guide will help you get started.
 
 We use several tools to maintain code quality:
 
-- **black** - Code formatting
-- **isort** - Import sorting
+- **flake8** - Code linting
 - **pytest** - Unit tests
 
 Run all checks:

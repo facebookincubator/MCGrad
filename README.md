@@ -91,7 +91,7 @@ pre-commit install --hook-type pre-push
 ```
 
 **What runs:**
-- **On commit:** `isort` and `black` format your code
+- **On commit:** `flake8` checks your code
 - **On push:** `pytest` runs the test suite
 
 ### Building Documentation
