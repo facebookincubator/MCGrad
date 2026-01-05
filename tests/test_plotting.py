@@ -434,3 +434,100 @@ def test_plot_calibration_curve_by_segment_empty_data():
     )
 
     assert fig is not None
+
+
+def test_plot_score_distribution_does_not_modify_input_dataframe(sample_data):
+    fig, ax = plt.subplots()
+    df = pd.DataFrame({"col": [1, 2, 3]})
+    df_original = df.copy()
+
+    plotting.plot_score_distribution(
+        scores=sample_data["scores"],
+        df=df,
+        ax=ax,
+        sample_weight=sample_data["weights"],
+    )
+
+    pd.testing.assert_frame_equal(df, df_original)
+    plt.close(fig)
+
+
+def test_plot_calibration_curve_does_not_modify_input_dataframe(sample_data, sample_df):
+    fig, ax = plt.subplots()
+    df_original = sample_df.copy()
+
+    plotting.plot_calibration_curve(
+        scores=sample_data["scores"],
+        y=sample_data["labels"],
+        df=sample_df,
+        segment_cols=["segment_A_0"],
+        ax=ax,
+        log=False,
+        num_bins=10,
+        sample_weight=sample_data["weights"],
+    )
+
+    pd.testing.assert_frame_equal(sample_df, df_original)
+    plt.close(fig)
+
+
+def test_plot_all_does_not_modify_input_dataframe(sample_data, sample_df):
+    df_original = sample_df.copy()
+
+    plotting.plot_all(
+        scores=sample_data["scores"],
+        y=sample_data["labels"],
+        df=sample_df,
+        segment_cols=["segment_A_0"],
+        sample_weight=sample_data["weights"],
+    )
+
+    pd.testing.assert_frame_equal(sample_df, df_original)
+    plt.close("all")
+
+
+def test_plot_global_calibration_curve_does_not_modify_input_dataframe(sample_df):
+    df_original = sample_df.copy()
+
+    _ = plotting.plot_global_calibration_curve(
+        data=sample_df,
+        score_col="prediction",
+        label_col="label",
+        num_bins=10,
+        sample_weight_col="weights",
+    )
+
+    pd.testing.assert_frame_equal(sample_df, df_original)
+
+
+def test_plot_global_calibration_curve_matplotlib_does_not_modify_input_dataframe(
+    sample_df,
+):
+    df_original = sample_df.copy()
+
+    plotting.plot_global_calibration_curve_matplotlib(
+        data=sample_df,
+        score_col="prediction",
+        label_col="label",
+        num_bins=10,
+        method_name="Test Method",
+        sample_weight_col="weights",
+    )
+
+    pd.testing.assert_frame_equal(sample_df, df_original)
+    plt.close("all")
+
+
+def test_plot_calibration_curve_by_segment_does_not_modify_input_dataframe(sample_df):
+    df_original = sample_df.copy()
+
+    _ = plotting.plot_calibration_curve_by_segment(
+        data=sample_df,
+        group_var="segment_A_0",
+        score_col="prediction",
+        label_col="label",
+        num_bins=5,
+        sample_weight_col="weights",
+    )
+
+    pd.testing.assert_frame_equal(sample_df, df_original)
