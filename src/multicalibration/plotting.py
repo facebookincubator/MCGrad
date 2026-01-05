@@ -696,7 +696,7 @@ def plot_learning_curve(
     """
     if not mcboost_model.early_stopping:
         raise ValueError(
-            "Learning curve can only be plotted for models that have been trained with EARLY_STOPPING=True."
+            "Learning curve can only be plotted for models that have been trained with early_stopping=True."
         )
 
     performance_metrics = mcboost_model._performance_metrics
@@ -704,7 +704,7 @@ def plot_learning_curve(
         1
         if (
             mcboost_model.early_stopping
-            and len(mcboost_model.mr) < mcboost_model.NUM_ROUNDS
+            and len(mcboost_model.mr) < mcboost_model.num_rounds
         )
         else 0
     )
@@ -713,8 +713,8 @@ def plot_learning_curve(
         1
         + len(mcboost_model.mr)
         + extra_evaluation_due_to_early_stopping
-        + mcboost_model.PATIENCE,
-        1 + mcboost_model.NUM_ROUNDS,
+        + mcboost_model.patience,
+        1 + mcboost_model.num_rounds,
     )
     x_vals = np.arange(0, tot_num_rounds)
     metric_names = [mcboost_model.early_stopping_score_func.name]
