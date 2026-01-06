@@ -293,16 +293,12 @@ def test_make_unjoined_gives_expected_result(x, y, expected_x, expected_y):
 @pytest.mark.parametrize(
     "categorical_feature,expected_result",
     [
-        ("INDIAN", 31255),
-        ("SUB_SAHARAN_AFRICA", 46892),
-        ("VIETNAMESE", 22530),
+        ("TOKYO", 54410),
+        ("AMSTERDAM", 42395),
+        ("JAKARTA", 21470),
     ],
 )
 def test_hash_categorical_feature(categorical_feature, expected_result):
-    """
-    This unit test checks for equivalence with @jiayuanm's Hack implementation in D56290586.
-    Reference values created in Hack kernel notebook N5246895.
-    """
     actual_result = utils.hash_categorical_feature(categorical_feature)
     assert actual_result == expected_result
 
