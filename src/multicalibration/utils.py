@@ -52,7 +52,7 @@ def unshrink(
     for rec_warn in recorded_warnings:
         if isinstance(rec_warn.message, LineSearchWarning):
             logger.info(
-                f"Line search warning (unshrink): {str(rec_warn.message)}. Solution is approximately optimal - no ideal step size for the gradient descent update can be found. These warnings are generally harmless, see D69983734 for details."
+                f"Line search warning (unshrink): {str(rec_warn.message)}. Solution is approximately optimal - no ideal step size for the gradient descent update can be found. These warnings are generally harmless."
             )
         else:
             logger.debug(rec_warn)
@@ -279,13 +279,13 @@ def geometric_mean(x: np.ndarray) -> float:
 
 def make_unjoined(x: np.ndarray, y: np.ndarray) -> tuple[Any, Any]:
     """
-    In the Ads organization, it is common to work with a data format that is commonly referred to as
-    'unjoined'. This means that there is always a row with a negative label and there will be a
-    second row with positive label if there is a conversion. This means that we will have 2 rows
-    for the same impression in case that that impression resulted in a conversion.
+    Converts a regular dataset to 'unjoined' format. In the unjoined format, there is always
+    a row with a negative label and there will be a second row with a positive label added to
+    the dataset for the same instance if is actually a positive instance. This contrasts a
+    regular dataset where each instance is represented by a single row with either a positive
+    or negative label.
 
-    This method takes a regular dataset (one row per impression) and returns an unjoined
-    version of that dataset.
+    This method takes a regular dataset and returns an unjoined version of that dataset.
 
     :param x: array of features
     :param y: array of labels
@@ -351,14 +351,10 @@ class OrdinalEncoderWithUnknownSupport(OrdinalEncoder):
 
 def hash_categorical_feature(categorical_feature: str) -> int:
     """
-    This implements the categorical feature encoding scheme that @Jiayuanm implemented in Hack: D56290586
-    It uses the last two bytes of SHA256 for categorical features.
+    Hashes a categorical feature using the last two bytes of SHA256.
 
-    Sometimes we need to perform the equivalent encoding in Presto, which can be done with:
+    The equivalent encoding in Presto can be done with:
         FROM_BASE(SUBSTR(TO_HEX(SHA256(CAST(categorical_feature AS VARBINARY))), -4), 16)
-
-    This Daiquery link shows that that generates equivalent output for all test cases of test_hash_categorical_feature in test_base.py:
-        https://fburl.com/daiquery/neiirvol
     """
     signature = hashlib.sha256(categorical_feature.encode("utf-8")).digest().hex()
     last_four_hex_chars = signature[-4:]
