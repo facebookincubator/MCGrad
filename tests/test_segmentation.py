@@ -32,7 +32,7 @@ def test_that_get_segment_masks_returns_full_data_at_depth_zero():
 
 
 def test_that_get_segment_masks_works_as_expected_with_nans():
-    # Expected behavior is that nana values are treated as a separate segment
+    # Expected behavior is that NaN values are treated as a separate segment
     test_df = pd.DataFrame({"segment_A": ["a", np.nan, "b", np.nan]})
     generator = segmentation.get_segment_masks(
         test_df,
@@ -103,7 +103,7 @@ def test_that_get_segment_masks_returns_whole_dataset_if_no_features_are_specifi
 
 
 def test_that_get_segment_masks_works_as_expected_with_nans_in_numerical_feature():
-    # Expected behavior is that nana values are treated as a separate segment
+    # Expected behavior is that NaN values are treated as a separate segment
     df = pd.DataFrame({"segment_A": [0.1, None, 0.3, None, 0.4, 0.5, 0.6]})
     generator = segmentation.get_segment_masks(
         df,
@@ -274,7 +274,7 @@ def test_that_collapse_infrequent_values_collapses_all_values_to_collapse_value_
         ),
     ],
 )
-def test_that_collapse_infequent_values_collapses_correctly_for_happy_path(
+def test_that_collapse_infrequent_values_collapses_correctly_for_happy_path(
     test_array, expected
 ):
     results = segmentation.collapse_infrequent_values(
@@ -296,7 +296,7 @@ def test_that_collapse_numeric_values_returns_identity_for_unique_values_lt_max_
     assert np.array_equal(results, test_array, equal_nan=True)
 
 
-def test_that_collapse_numeric_values_returns_correct_numer_of_values():
+def test_that_collapse_numeric_values_returns_correct_number_of_values():
     test_array = pd.Series([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     results = segmentation.collapse_numeric_values(test_array, max_unique_values=3)
     assert len(np.unique(results)) == 3
@@ -317,7 +317,7 @@ def test_that_collapse_numeric_values_missing_values_do_not_affect_other_rows():
     )
 
 
-def test_that_collapse_numeric_values_returns_correct_numer_of_values_with_max_values_1():
+def test_that_collapse_numeric_values_returns_correct_number_of_values_with_max_values_1():
     test_array = pd.Series([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     results = segmentation.collapse_numeric_values(test_array, max_unique_values=1)
     assert len(np.unique(results)) == 1
