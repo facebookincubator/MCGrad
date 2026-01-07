@@ -11,7 +11,7 @@ For detailed Python API documentation with docstrings, please refer to the sourc
 
 ```python
 from multicalibration import methods
-help(methods.MCBoost)
+help(methods.MCGrad)
 ```
 :::
 
@@ -26,12 +26,12 @@ MCGrad takes base model predictions and features, then builds a lightweight cali
 ### Basic Usage
 
 ```python
-from multicalibration.methods import MCBoost
+from multicalibration.methods import MCGrad
 import pandas as pd
 import numpy as np
 
 # Initialize MCGrad
-mcboost = MCBoost(
+mcgrad = MCGrad(
     num_rounds=100,
     learning_rate=0.1,
     max_depth=3
@@ -47,7 +47,7 @@ df_train = pd.DataFrame({
 })
 
 # Fit on training data
-mcboost.fit(
+mcgrad.fit(
     df_train=df_train,
     prediction_column_name='prediction',
     label_column_name='label',
@@ -56,7 +56,7 @@ mcboost.fit(
 )
 
 # Get calibrated predictions
-calibrated_preds = mcboost.predict(
+calibrated_preds = mcgrad.predict(
     df=df_train,
     prediction_column_name='prediction',
     categorical_feature_column_names=['country', 'content_type'],

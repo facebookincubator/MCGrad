@@ -61,8 +61,8 @@ df = pd.DataFrame({
 })
 
 # Verify MCGrad can be instantiated and fit
-mcboost = methods.MCBoost()
-mcboost.fit(
+mcgrad = methods.MCGrad()
+mcgrad.fit(
     df_train=df,
     prediction_column_name='prediction',
     label_column_name='label',

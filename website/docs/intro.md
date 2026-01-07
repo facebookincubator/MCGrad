@@ -17,7 +17,7 @@ MCGrad takes your base model's predictions and automatically finds and fixes mis
 ```python
 from multicalibration import methods
 
-mcgrad = methods.MCBoost()
+mcgrad = methods.MCGrad()
 mcgrad.fit(
     df_train=df,
     prediction_column_name='prediction',
