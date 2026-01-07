@@ -44,7 +44,7 @@ const Feature = ({title, content}) => {
   );
 };
 
-const codeExample = `from multicalibration import MCBoost
+const codeExample = `from multicalibration import MCGrad
 import pandas as pd
 import numpy as np
 
@@ -58,8 +58,8 @@ df = pd.DataFrame({
 })
 
 # Train MCGrad
-mcboost = MCBoost()
-mcboost.fit(
+mcgrad = MCGrad()
+mcgrad.fit(
     df_train=df,
     prediction_column_name='prediction',
     label_column_name='label',
@@ -67,7 +67,7 @@ mcboost.fit(
 )
 
 # Get multi-calibrated predictions
-calibrated_predictions = mcboost.predict(
+calibrated_predictions = mcgrad.predict(
     df=df,
     prediction_column_name='prediction',
     categorical_feature_column_names=['country', 'content_type', 'surface']

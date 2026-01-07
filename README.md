@@ -48,8 +48,8 @@ df = pd.DataFrame({
 })
 
 # Apply MCGrad
-mcboost = methods.MCBoost()
-mcboost.fit(
+mcgrad = methods.MCGrad()
+mcgrad.fit(
     df_train=df,
     prediction_column_name='prediction',
     label_column_name='label',
@@ -57,7 +57,7 @@ mcboost.fit(
 )
 
 # Get calibrated predictions
-calibrated_predictions = mcboost.predict(
+calibrated_predictions = mcgrad.predict(
     df=df,
     prediction_column_name='prediction',
     categorical_feature_column_names=['country', 'content_type']
