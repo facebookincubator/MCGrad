@@ -46,21 +46,32 @@ def get_segment_masks(
     None,
 ]:
     """
-    Generates boolean masks for the dataframe segmented based on combinations of categorical and numerical segmentation feature values.
+    Generate boolean masks for dataframe segments.
+
+    Segments are based on combinations of categorical and numerical
+    segmentation feature values.
 
     :param df: The dataframe to segment.
-    :param categorical_segment_columns: A list of column names in the dataframe that are categorical.
-    :param numerical_segment_columns: A list of column names in the dataframe that are numerical.
-    :param min_depth: The minimum depth of combinations to consider for creating segments.
-    :param max_depth: The maximum depth of combinations to consider for creating segments. If None segmentation will continue until all combinations are considered.
-    :param max_values_per_segment_feature: The maximum number of unique values (or bins for numerical columns) to retain per segment feature before collapsing others into a distinct category (or bin).
-    :param min_samples_per_segment: The minimum number of samples per segment to be returned. Segments with fewer samples will be discarded if return_small_segments is False.
+    :param categorical_segment_columns: Column names that are categorical.
+    :param numerical_segment_columns: Column names that are numerical.
+    :param min_depth: Minimum depth of combinations for creating segments.
+    :param max_depth: Maximum depth of combinations for creating segments.
+        If None, segmentation continues until all combinations are considered.
+    :param max_values_per_segment_feature: Maximum unique values (or bins for
+        numerical columns) to retain per segment feature before collapsing
+        others into a distinct category (or bin).
+    :param min_samples_per_segment: Minimum samples per segment to be returned.
+        Segments with fewer samples will be discarded.
     :param chunk_size: The number of segments to return in each chunk.
-    :return: A generator that yields a tuple (chunk, n_segments_in_chunk), where chunk is an array of booleans corresponding to whether a sample belongs to the segment.
+    :return: A generator yielding tuples of (chunk, n_segments_in_chunk,
+        feature_values_df), where chunk is an array of booleans corresponding
+        to whether a sample belongs to the segment.
+
     Notes:
-    ------
-    - If both `categorical_segment_columns` and `numerical_segment_columns` are None, all samples of the dataframe are yielded as a single segment.
-    - Missing values in categorical and numerical segment columns are replaced with a predefined constant and a warning is logged.
+        - If both `categorical_segment_columns` and `numerical_segment_columns`
+          are None, all samples are yielded as a single segment.
+        - Missing values in segment columns are replaced with a predefined
+          constant and a warning is logged.
     """
     if categorical_segment_columns is None and numerical_segment_columns is None:
         yield (
@@ -209,8 +220,12 @@ def replace_missing_values(
         for col in numerical_segment_columns:
             df_subset[col] = df_subset[col].fillna(NA_SEGMENT_VALUE_NUMERICAL)
         logger.debug(
-            f"Missing values found in the data. Replaced with {NA_SEGMENT_VALUE_CATEGORICAL} for categorical and {NA_SEGMENT_VALUE_NUMERICAL} for numerical data."
-            " Missing values are treated as an additional segment feature value and are not counted towards the specified max_values_per_segment_feature limit."
+            "Missing values found in the data. Replaced with %s for categorical "
+            "and %s for numerical data. Missing values are treated as an "
+            "additional segment feature value and are not counted towards the "
+            "specified max_values_per_segment_feature limit.",
+            NA_SEGMENT_VALUE_CATEGORICAL,
+            NA_SEGMENT_VALUE_NUMERICAL,
         )
     return df_subset
 
