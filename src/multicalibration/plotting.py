@@ -5,16 +5,21 @@
 # pyre-strict
 
 import math
-from typing import Tuple
+from typing import Any, get_args, Literal, Tuple
 
 import numpy as np
 import pandas as pd
-import plotly.subplots as sp
+import plotly.express as px
+import plotly.graph_objects as go
 
 from multicalibration import methods, metrics, utils
 from multicalibration.utils import BinningMethodInterface
-from plotly import express as px, graph_objects as go
 from plotly.subplots import make_subplots
+
+BinningMethod = Literal["equispaced", "equisized"]
+
+_MARKER_COLOR_CALIBRATED = "blue"
+_MARKER_COLOR_MISCALIBRATED = "red"
 
 
 def _compute_calibration_curve(
@@ -49,24 +54,34 @@ def _compute_calibration_curve(
     )
 
 
+def _get_binning_function(
+    binning_method: BinningMethod,
+) -> BinningMethodInterface:
+    if binning_method == "equispaced":
+        return utils.make_equispaced_bins
+    elif binning_method == "equisized":
+        return utils.make_equisized_bins
+    else:
+        raise ValueError(
+            f"Invalid binning_method '{binning_method}'. "
+            "Must be 'equispaced' or 'equisized'."
+        )
+
+
 def plot_global_calibration_curve(
     data: pd.DataFrame,
     score_col: str,
     label_col: str,
     num_bins: int = metrics.CALIBRATION_ERROR_NUM_BINS,
     sample_weight_col: str | None = None,
-    binning_method: str = "equispaced",
+    binning_method: BinningMethod = "equispaced",
     plot_incomplete_cis: bool = True,
     x_lim: Tuple[float, float] = (0, 1.1),
 ) -> go.Figure:
-    assert binning_method in ["equispaced", "equisized"]
+    binning_fun = _get_binning_function(binning_method)
 
-    binning_fun = (
-        utils.make_equispaced_bins
-        if binning_method == "equispaced"
-        else utils.make_equisized_bins
-    )
-    # TODO: Make confidence interval calculation for calibration curve with sample_weights more correct by calculating the effective sample size from the sample weights
+    # TODO: Make confidence interval calculation for calibration curve with
+    # sample_weights more correct by calculating the effective sample size
     curves = _compute_calibration_curve(
         data,
         score_col=score_col,
@@ -77,24 +92,25 @@ def plot_global_calibration_curve(
     )
     if not plot_incomplete_cis:
         curves = curves.dropna()
-    curves["sig_diff"] = (curves.bin < curves.lower) | (curves.bin > curves.upper)
+    curves["is_miscalibrated"] = (curves.bin < curves.lower) | (
+        curves.bin > curves.upper
+    )
 
     fig = go.Figure()
 
-    # Separate the data into two groups based on the sig_diff values
-    group1 = curves[curves.sig_diff == 0]
-    group2 = curves[curves.sig_diff == 1]
+    calibrated_bins = curves[~curves.is_miscalibrated]
+    miscalibrated_bins = curves[curves.is_miscalibrated]
 
-    # Create a trace for each group
-    for df, color in zip([group1, group2], ["blue", "red"]):
+    for df, color in [
+        (calibrated_bins, _MARKER_COLOR_CALIBRATED),
+        (miscalibrated_bins, _MARKER_COLOR_MISCALIBRATED),
+    ]:
         fig.add_trace(
             go.Scatter(
                 x=df.bin,
                 y=df.label_prop_positive,
                 mode="markers",
-                marker={
-                    "color": color,
-                },
+                marker={"color": color},
                 error_y={
                     "type": "data",
                     "symmetric": False,
@@ -111,10 +127,7 @@ def plot_global_calibration_curve(
         y0=0,
         x1=1,
         y1=1,
-        line={
-            "color": "Grey",
-            "width": 2,
-        },
+        line={"color": "Grey", "width": 2},
     )
 
     # Add histogram of the scores
@@ -153,15 +166,9 @@ def plot_calibration_curve_by_segment(
     num_bins: int = 20,
     n_cols: int = 4,
     sample_weight_col: str | None = None,
-    binning_method: str = "equispaced",
+    binning_method: BinningMethod = "equispaced",
 ) -> go.Figure:
-    assert binning_method in ["equispaced", "equisized"]
-
-    binning_fun = (
-        utils.make_equispaced_bins
-        if binning_method == "equispaced"
-        else utils.make_equisized_bins
-    )
+    binning_fun = _get_binning_function(binning_method)
 
     agg_df = data.groupby(group_var).apply(
         lambda x: _compute_calibration_curve(
@@ -181,113 +188,56 @@ def plot_calibration_curve_by_segment(
     curves["error_minus"] = curves.label_prop_positive - curves.lower
     curves["error_plus"] = curves.upper - curves.label_prop_positive
 
-    def _list_by_groupvar(
-        df: pd.DataFrame, group_var: str, data_col: str
-    ) -> list[list[float]]:
-        return [
-            list(df[df[group_var] == g][data_col].values)
-            for g in df[group_var].unique()
-        ]
-
     groups = curves[group_var].unique()
-    x_values = _list_by_groupvar(curves, group_var, "bin")
-    y_values = _list_by_groupvar(curves, group_var, "label_prop_positive")
-    y_error_minus = _list_by_groupvar(curves, group_var, "error_minus")
-    y_error = _list_by_groupvar(curves, group_var, "error_plus")
-
-    # Calculate the number of rows needed
-    num_rows = max(math.ceil(len(groups) / n_cols), 1)
-
-    # Create subplots for each group
     if isinstance(groups, np.ndarray):
-        groups = groups.tolist()
-        groups = [str(group) for group in groups]
+        groups = [str(g) for g in groups.tolist()]
 
-    fig = sp.make_subplots(rows=num_rows, cols=n_cols, subplot_titles=groups)
+    num_rows = max(math.ceil(len(groups) / n_cols), 1)
+    fig = make_subplots(rows=num_rows, cols=n_cols, subplot_titles=groups)
 
-    for i in range(len(groups)):
+    for i, group in enumerate(groups):
         row = i // n_cols + 1
         col = i % n_cols + 1
 
-        # Add a 45-degree line to the plot
         fig.add_shape(
             type="line",
             x0=0,
             y0=0,
             x1=1,
             y1=1,
-            line={
-                "color": "Grey",
-                "width": 2,
-            },
+            line={"color": "Grey", "width": 2},
             row=row,
             col=col,
         )
 
-        # Check if the error bars overlap with the 45-degree line
-        x_overlap = []
-        y_overlap = []
-        y_minus_overlap = []
-        y_plus_overlap = []
-        x_no_overlap = []
-        y_no_overlap = []
-        y_minus_no_overlap = []
-        y_plus_no_overlap = []
-        for j in range(len(y_values[i])):
-            if (
-                (y_values[i][j] - y_error_minus[i][j])
-                <= x_values[i][j]
-                <= (y_values[i][j] + y_error[i][j])
-            ):
-                x_overlap.append(x_values[i][j])
-                y_overlap.append(y_values[i][j])
-                y_minus_overlap.append(y_error_minus[i][j])
-                y_plus_overlap.append(y_error[i][j])
-            else:
-                x_no_overlap.append(x_values[i][j])
-                y_no_overlap.append(y_values[i][j])
-                y_minus_no_overlap.append(y_error_minus[i][j])
-                y_plus_no_overlap.append(y_error[i][j])
+        group_data = curves[curves[group_var] == group]
+        is_calibrated = (
+            (group_data.label_prop_positive - group_data.error_minus) <= group_data.bin
+        ) & (group_data.bin <= (group_data.label_prop_positive + group_data.error_plus))
 
-        # Add traces for points that overlap with the 45-degree line
-        fig.add_trace(
-            go.Scatter(
-                x=x_overlap,
-                y=y_overlap,
-                mode="markers",  # Only display markers
-                marker={"color": "blue"},  # Set marker color
-                error_y={
-                    "type": "data",
-                    "array": y_plus_overlap,
-                    "arrayminus": y_minus_overlap,
-                    "visible": True,
-                    "color": "blue",  # Set error bar color
-                },
-                name=f"{groups[i]} (overlap)",
-            ),
-            row=row,
-            col=col,
-        )
-
-        # Add traces for points that do not overlap with the 45-degree line
-        fig.add_trace(
-            go.Scatter(
-                x=x_no_overlap,
-                y=y_no_overlap,
-                mode="markers",  # Only display markers
-                marker={"color": "red"},  # Set marker color
-                error_y={
-                    "type": "data",
-                    "array": y_plus_no_overlap,
-                    "arrayminus": y_minus_no_overlap,
-                    "visible": True,
-                    "color": "red",  # Set error bar color
-                },
-                name=f"{groups[i]} (no overlap)",
-            ),
-            row=row,
-            col=col,
-        )
+        for mask, color, suffix in [
+            (is_calibrated, _MARKER_COLOR_CALIBRATED, "calibrated"),
+            (~is_calibrated, _MARKER_COLOR_MISCALIBRATED, "miscalibrated"),
+        ]:
+            subset = group_data[mask]
+            fig.add_trace(
+                go.Scatter(
+                    x=subset.bin.tolist(),
+                    y=subset.label_prop_positive.tolist(),
+                    mode="markers",
+                    marker={"color": color},
+                    error_y={
+                        "type": "data",
+                        "array": subset.error_plus.tolist(),
+                        "arrayminus": subset.error_minus.tolist(),
+                        "visible": True,
+                        "color": color,
+                    },
+                    name=f"{group} ({suffix})",
+                ),
+                row=row,
+                col=col,
+            )
 
     fig.update_layout(showlegend=False)
     fig.update_xaxes(title_text="Average Score in Bin", range=[0, 1.1])
@@ -296,10 +246,20 @@ def plot_calibration_curve_by_segment(
     return fig
 
 
+SegmentQuantity = Literal[
+    "segment_ecces",
+    "segment_ecces_absolute",
+    "segment_p_values",
+    "segment_sigmas",
+    "segment_ecces_sigma_scale",
+]
+_VALID_SEGMENT_QUANTITIES: tuple[str, ...] = get_args(SegmentQuantity)
+
+
 def plot_segment_calibration_errors(
     mce: metrics.MulticalibrationError,
     highlight_feature: str | None = None,
-    quantity: str = "segment_ecces",
+    quantity: SegmentQuantity = "segment_ecces",
 ) -> go.Figure:
     """
     Plots a multi-segment Kuiper statistic scatter plot. This visualization helps in assessing the
@@ -313,16 +273,9 @@ def plot_segment_calibration_errors(
     :returns: A Plotly Figure object representing the scatter plot of the Kuiper statistic
         against segment size, with optional highlighting of a specific feature.
     """
-    valid_quantities = [
-        "segment_ecces",
-        "segment_ecces_absolute",
-        "segment_p_values",
-        "segment_sigmas",
-        "segment_ecces_sigma_scale",
-    ]
-    if quantity not in valid_quantities:
+    if quantity not in _VALID_SEGMENT_QUANTITIES:
         raise ValueError(
-            f"Invalid quantity {quantity}. Options are {valid_quantities}."
+            f"Invalid quantity '{quantity}'. Options are {_VALID_SEGMENT_QUANTITIES}."
         )
     segment_mask, segment_feature_values = mce.segments
     segment_mask = segment_mask.reshape(-1, segment_mask.shape[-1])
@@ -330,25 +283,21 @@ def plot_segment_calibration_errors(
     numerical_segment_columns = mce.numerical_segment_columns or []
     all_eval_cols = categorical_segment_columns + numerical_segment_columns
 
-    dicts = []
     mce_quantity = getattr(mce, quantity)
+    rows = []
     for segment_idx in range(mce.total_number_segments):
         mask = segment_mask[segment_idx]
-        value = mce_quantity[segment_idx]
         segment_features = segment_feature_values[
             segment_feature_values["idx_segment"] == segment_idx
         ].drop(columns=["idx_segment"])
-        this_dict = {quantity: value, "segment_size": mask.sum()}
-        for val_col in all_eval_cols:
-            try:
-                this_dict[val_col] = segment_features[
-                    segment_features.segment_column == val_col
-                ]["value"].values[0]
-            except IndexError:
-                this_dict[val_col] = "_all_"
-        dicts.append(this_dict)
 
-    plot_data = pd.DataFrame(dicts)
+        row = {quantity: mce_quantity[segment_idx], "segment_size": mask.sum()}
+        for col in all_eval_cols:
+            matching = segment_features[segment_features.segment_column == col]
+            row[col] = matching["value"].values[0] if len(matching) > 0 else "_all_"
+        rows.append(row)
+
+    plot_data = pd.DataFrame(rows)
 
     fig_args = {
         "data_frame": plot_data,
@@ -362,18 +311,22 @@ def plot_segment_calibration_errors(
     fig = px.scatter(**fig_args)
     fig.update_xaxes(title="Segment Size")
 
-    if quantity == "segment_ecces":
-        fig.update_yaxes(title="ECCE").update_layout(yaxis={"ticksuffix": "%"})
-    elif quantity == "segment_sigmas":
-        fig.update_yaxes(title="Standard deviation")
-    elif quantity == "segment_p_values":
-        fig.update_yaxes(title="P-value")
-    elif quantity == "segment_ecces_sigma_scale":
-        fig.update_yaxes(title="ECCE / Standard Deviation").update_layout(
-            yaxis={"ticksuffix": "\u03c3"}
-        )
+    y_axis_config = {
+        "segment_ecces": ("ECCE", "%"),
+        "segment_ecces_absolute": ("ECCE (absolute)", None),
+        "segment_sigmas": ("Standard deviation", None),
+        "segment_p_values": ("P-value", None),
+        "segment_ecces_sigma_scale": ("ECCE / Standard Deviation", "\u03c3"),
+    }
+    title, suffix = y_axis_config[quantity]
+    fig.update_yaxes(title=title)
+    if suffix:
+        fig.update_layout(yaxis={"ticksuffix": suffix})
 
     return fig
+
+
+_LEARNING_CURVE_COLORS = {"validation": "#007bff", "training": "#dc3545"}
 
 
 def plot_learning_curve(
@@ -383,42 +336,36 @@ def plot_learning_curve(
     Plots a learning curve for an MCGrad model.
 
     :param mcgrad_model: An MCGrad model object.
-    :param show_all: Whether to show all metrics in the learning curve. If False, only the metric specified in the model's early_stopping_score_func is shown.
+    :param show_all: Whether to show all metrics in the learning curve.
+        If False, only the metric specified in the model's early_stopping_score_func
+        is shown.
     :returns: A Plotly Figure object representing the learning curve.
     """
     if not mcgrad_model.early_stopping:
         raise ValueError(
-            "Learning curve can only be plotted for models that have been trained with early_stopping=True."
+            "Learning curve can only be plotted for models trained with "
+            "early_stopping=True."
         )
 
     performance_metrics = mcgrad_model._performance_metrics
-    extra_evaluation_due_to_early_stopping = (
-        1
-        if (
-            mcgrad_model.early_stopping
-            and len(mcgrad_model.mr) < mcgrad_model.num_rounds
-        )
-        else 0
-    )
-    # Calculate the total number of rounds (including the initial round)
+    stopped_early = len(mcgrad_model.mr) < mcgrad_model.num_rounds
+    extra_eval = 1 if stopped_early else 0
+
     tot_num_rounds = min(
-        1
-        + len(mcgrad_model.mr)
-        + extra_evaluation_due_to_early_stopping
-        + mcgrad_model.patience,
+        1 + len(mcgrad_model.mr) + extra_eval + mcgrad_model.patience,
         1 + mcgrad_model.num_rounds,
     )
     x_vals = np.arange(0, tot_num_rounds)
-    metric_names = [mcgrad_model.early_stopping_score_func.name]
-    for metric_name in performance_metrics.keys():
-        if (
-            "valid" in metric_name
-            and mcgrad_model.early_stopping_score_func.name not in metric_name
-            and show_all
-        ):
-            metric_names.append(metric_name.split("performance_")[-1])
 
-    # Create subplots
+    metric_names = [mcgrad_model.early_stopping_score_func.name]
+    if show_all:
+        for metric_name in performance_metrics:
+            if (
+                "valid" in metric_name
+                and mcgrad_model.early_stopping_score_func.name not in metric_name
+            ):
+                metric_names.append(metric_name.split("performance_")[-1])
+
     fig = make_subplots(
         rows=len(metric_names),
         cols=1,
@@ -426,74 +373,72 @@ def plot_learning_curve(
         shared_xaxes=True,
     )
 
-    colors = ["#007bff", "#dc3545"]  # Blue and Red
+    selected_round = len(mcgrad_model.mr)
+    model_name = mcgrad_model.__class__.__name__
 
     for i, metric_name in enumerate(metric_names):
-        test_performance = performance_metrics[f"avg_valid_performance_{metric_name}"]
-        max_perf_for_annotation = np.max(test_performance)
-        # Plot the test performance (held-out validation set)
+        row_num = i + 1
+        is_first_row = i == 0
+        is_last_row = i == len(metric_names) - 1
+
+        valid_perf = performance_metrics[f"avg_valid_performance_{metric_name}"]
+        max_perf = np.max(valid_perf)
+
         fig.add_trace(
             go.Scatter(
                 x=x_vals,
-                y=test_performance,
+                y=valid_perf,
                 mode="lines+markers",
-                name="Held-out Validation Set" if i == 0 else "",
-                line={"color": colors[0]},
+                name="Held-out Validation Set" if is_first_row else "",
+                line={"color": _LEARNING_CURVE_COLORS["validation"]},
                 marker={
-                    "color": colors[0],
-                    "opacity": 1,
+                    "color": _LEARNING_CURVE_COLORS["validation"],
                     "symbol": "star",
                     "size": 12,
                 },
-                showlegend=False if i > 0 else True,
+                showlegend=is_first_row,
             ),
-            row=i + 1,
+            row=row_num,
             col=1,
         )
+
         if mcgrad_model.save_training_performance:
-            train_performance = mcgrad_model._performance_metrics[
-                f"avg_train_performance_{metric_name}"
-            ]
-            # Plot the training performance (training set)
+            train_perf = performance_metrics[f"avg_train_performance_{metric_name}"]
             fig.add_trace(
                 go.Scatter(
                     x=x_vals,
-                    y=train_performance,
+                    y=train_perf,
                     mode="lines+markers",
-                    name="Training Set" if i == 0 else None,
-                    line={"color": colors[1]},
+                    name="Training Set" if is_first_row else None,
+                    line={"color": _LEARNING_CURVE_COLORS["training"]},
                     marker={
-                        "color": colors[1],
-                        "opacity": 1,
+                        "color": _LEARNING_CURVE_COLORS["training"],
                         "symbol": "star",
                         "size": 12,
                     },
-                    showlegend=False if i > 0 else True,
+                    showlegend=is_first_row,
                 ),
-                row=i + 1,
+                row=row_num,
                 col=1,
             )
-            # Required for plotting the horizontal lines for MCE
-            max_perf_for_annotation = max(
-                max_perf_for_annotation, np.max(train_performance)
-            )
-        # Add vertical line for the selected iteration
+            max_perf = max(max_perf, np.max(train_perf))
+
         fig.add_vline(
-            x=len(mcgrad_model.mr),
+            x=selected_round,
             line_dash="dash",
             line_color="black",
             opacity=0.5,
-            row=i + 1,
+            row=row_num,
             col=1,
         )
-        if i == 0:
-            # Add annotation for the selected iteration
+
+        if is_first_row:
             fig.add_annotation(
                 text="Selected round by early stopping",
                 xref="x",
                 yref="y",
-                x=len(mcgrad_model.mr) - 0.05,
-                y=max_perf_for_annotation * 1.075,
+                x=selected_round - 0.05,
+                y=max_perf * 1.075,
                 xanchor="center",
                 yanchor="middle",
                 showarrow=False,
@@ -503,68 +448,24 @@ def plot_learning_curve(
                 borderpad=1,
                 bgcolor="lightgrey",
                 opacity=0.7,
-                row=i + 1,
+                row=row_num,
                 col=1,
             )
+
         if "mce_sigma_scale" in metric_name:
-            if max_perf_for_annotation >= mcgrad_model.MCE_STRONG_EVIDENCE_THRESHOLD:
-                fig.add_hline(
-                    y=mcgrad_model.MCE_STRONG_EVIDENCE_THRESHOLD,
-                    line_dash="dash",
-                    line_color="darkgreen",
-                    opacity=1,
-                    row=i + 1,
-                    col=1,
-                    annotation_text="Strong<br>Miscalibration<br>.<br>.",
-                    annotation_position="right",
-                    annotation_font_color="darkgreen",
-                    annotation_font_size=12,
-                    annotation_textangle=90,
-                )
+            _add_mce_threshold_annotations(
+                fig, mcgrad_model, valid_perf, max_perf, row_num, tot_num_rounds
+            )
 
-            if max_perf_for_annotation >= mcgrad_model.MCE_STAT_SIGN_THRESHOLD:
-                fig.add_hline(
-                    y=mcgrad_model.MCE_STAT_SIGN_THRESHOLD,
-                    line_dash="dash",
-                    line_color="darkorange",
-                    opacity=0.7,
-                    row=i + 1,
-                    col=1,
-                    annotation_text="Stat. Significant<br>Miscalibration",
-                    annotation_position="right",
-                    annotation_font_color="darkorange",
-                    annotation_font_size=12,
-                    annotation_textangle=90,
-                )
+        fig.update_yaxes(title_text=metric_name, row=row_num, col=1)
+        _update_x_axis_ticks(
+            fig, x_vals.tolist(), model_name, row_num, is_last_row=is_last_row
+        )
 
-            if (
-                test_performance[len(mcgrad_model.mr)]
-                >= mcgrad_model.MCE_STRONG_EVIDENCE_THRESHOLD
-            ):
-                fig.add_annotation(
-                    text=f"<b>WARNING: {mcgrad_model.__class__.__name__} run failed to remove strong evidence of multicalibration!</b>",
-                    xref="paper",
-                    yref="paper",
-                    x=tot_num_rounds - 1,
-                    y=min(test_performance)
-                    + (max(test_performance) - min(test_performance)) / 2,
-                    xanchor="right",
-                    yanchor="middle",
-                    showarrow=False,
-                    font={"size": 12, "color": "darkred"},
-                    bordercolor="darkred",
-                    borderwidth=2,
-                    borderpad=2,
-                    bgcolor="yellow",
-                    opacity=0.85,
-                    row=i + 1,
-                    col=1,
-                )
-    # Create the title and legend
     fig.update_layout(
         title_text="Learning Curves",
         font={"size": 16, "color": "#7f7f7f"},
-        height=300 * len(metric_names),  # Adjust height based on number of metrics
+        height=300 * len(metric_names),
         legend={
             "orientation": "h",
             "yanchor": "bottom",
@@ -574,38 +475,87 @@ def plot_learning_curve(
         },
     )
 
-    # Update y-axis labels with metric names
-    for i, metric_name in enumerate(metric_names):
-        fig.update_yaxes(
-            title_text=metric_name,
-            row=i + 1,
+    return fig
+
+
+def _add_mce_threshold_annotations(
+    fig: go.Figure,
+    model: methods.MCGrad,
+    valid_perf: list[Any],
+    max_perf: float,
+    row: int,
+    tot_rounds: int,
+) -> None:
+    if max_perf >= model.MCE_STRONG_EVIDENCE_THRESHOLD:
+        fig.add_hline(
+            y=model.MCE_STRONG_EVIDENCE_THRESHOLD,
+            line_dash="dash",
+            line_color="darkgreen",
+            opacity=1,
+            row=row,
+            col=1,
+            annotation_text="Strong<br>Miscalibration<br>.<br>.",
+            annotation_position="right",
+            annotation_font_color="darkgreen",
+            annotation_font_size=12,
+            annotation_textangle=90,
+        )
+
+    if max_perf >= model.MCE_STAT_SIGN_THRESHOLD:
+        fig.add_hline(
+            y=model.MCE_STAT_SIGN_THRESHOLD,
+            line_dash="dash",
+            line_color="darkorange",
+            opacity=0.7,
+            row=row,
+            col=1,
+            annotation_text="Stat. Significant<br>Miscalibration",
+            annotation_position="right",
+            annotation_font_color="darkorange",
+            annotation_font_size=12,
+            annotation_textangle=90,
+        )
+
+    selected_round = len(model.mr)
+    if valid_perf[selected_round] >= model.MCE_STRONG_EVIDENCE_THRESHOLD:
+        fig.add_annotation(
+            text=f"<b>WARNING: {model.__class__.__name__} run failed to remove "
+            "strong evidence of multicalibration!</b>",
+            xref="paper",
+            yref="paper",
+            x=tot_rounds - 1,
+            y=min(valid_perf) + (max(valid_perf) - min(valid_perf)) / 2,
+            xanchor="right",
+            yanchor="middle",
+            showarrow=False,
+            font={"size": 12, "color": "darkred"},
+            bordercolor="darkred",
+            borderwidth=2,
+            borderpad=2,
+            bgcolor="yellow",
+            opacity=0.85,
+            row=row,
             col=1,
         )
-        # Update x-axis labels including "without MCGrad" for the 0th iteration
-        if len(x_vals) <= 10:
-            fig.update_xaxes(
-                title_text=f"{mcgrad_model.__class__.__name__} round"
-                if i == len(metric_names) - 1
-                else "",
-                tickmode="array",
-                tickvals=x_vals,
-                ticktext=[f"without<br>{mcgrad_model.__class__.__name__}"]
-                + [str(int(val)) for val in x_vals[1:]],
-                row=i + 1,
-                col=1,
-            )
-        else:
-            x_vals = np.arange(0, len(x_vals), np.ceil(len(x_vals) / 5))
-            fig.update_xaxes(
-                title_text=f"{mcgrad_model.__class__.__name__} round"
-                if i == len(metric_names) - 1
-                else "",
-                tickmode="array",
-                tickvals=x_vals,
-                ticktext=[f"without<br>{mcgrad_model.__class__.__name__}"]
-                + [str(int(val)) for val in x_vals[1:]],
-                row=i + 1,
-                col=1,
-            )
 
-    return fig
+
+def _update_x_axis_ticks(
+    fig: go.Figure,
+    x_vals: list[Any],
+    model_name: str,
+    row: int,
+    is_last_row: bool,
+) -> None:
+    title = f"{model_name} round" if is_last_row else ""
+
+    if len(x_vals) > 10:
+        x_vals = list(np.arange(0, len(x_vals), int(np.ceil(len(x_vals) / 5))))
+
+    fig.update_xaxes(
+        title_text=title,
+        tickmode="array",
+        tickvals=x_vals,
+        ticktext=[f"without<br>{model_name}"] + [str(int(v)) for v in x_vals[1:]],
+        row=row,
+        col=1,
+    )
