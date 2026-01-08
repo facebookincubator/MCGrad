@@ -84,22 +84,15 @@ The plotting module provides tools for visualizing calibration:
 
 ```python
 from multicalibration import plotting
-import matplotlib.pyplot as plt
-
-# Create a figure and axis
-fig, ax = plt.subplots()
 
 # Create calibration plot
-plotting.plot_calibration_curve(
-    scores=calibrated_predictions,
-    y=df['label'].values,
-    df=df,
-    segment_cols=['country', 'content_type', 'surface'],
-    ax=ax,
-    num_bins=10
+fig = plotting.plot_global_calibration_curve(
+    data=df,
+    score_col='prediction',
+    label_col='label',
 )
 
-plt.show()
+fig.show()
 ```
 
 See the [plotting API](api/plotting.md) for more visualization options.
