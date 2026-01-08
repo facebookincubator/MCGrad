@@ -18,6 +18,7 @@ from multicalibration.tuning import (
     ParameterConfig,
     tune_mcgrad_params,
 )
+from sklearn.model_selection import train_test_split
 
 
 @pytest.fixture
@@ -208,12 +209,14 @@ def test_tune_mcgrad_params_ax_client_setup(
 def test_tune_mcgrad_params_data_splitting(
     mock_train_test_split,
     mock_normalized_entropy,
+    rng,
     sample_data,
     mock_mcgrad_model,
 ):
-    # Setup mock to return specific train/val splits
-    train_data = sample_data.iloc[:80]
-    val_data = sample_data.iloc[80:]
+    # Setup mock to return specific train/val splits using sklearn's splitter
+    train_data, val_data = train_test_split(
+        sample_data, test_size=0.2, random_state=rng
+    )
     mock_train_test_split.return_value = (train_data, val_data)
 
     mock_normalized_entropy.return_value = 0.5
@@ -342,19 +345,18 @@ def test_warm_starting_trials_produces_the_right_number_of_sobol_and_bayesian_tr
 
     value_counter = trial_results["generation_node"].value_counts().to_dict()
     sobol_count = value_counter["GenerationStep_0"]
-    BoTorch_count = value_counter["GenerationStep_1"]
+    botorch_count = value_counter["GenerationStep_1"]
 
-    assert len(trial_results) == total_trials, "Expected {} trials, got {}.".format(
-        total_trials, len(trial_results)
-    )
+    expected_botorch = total_trials - n_warmup_random_trials - 1
+    assert (
+        len(trial_results) == total_trials
+    ), f"Expected {total_trials} trials, got {len(trial_results)}."
     assert (
         sobol_count == n_warmup_random_trials
-    ), "Expected {} Sobol trials, got {}.".format(n_warmup_random_trials, sobol_count)
+    ), f"Expected {n_warmup_random_trials} Sobol trials, got {sobol_count}."
     assert (
-        BoTorch_count == total_trials - n_warmup_random_trials - 1
-    ), "Expected {} BoTorch trials, got {}.".format(
-        total_trials - n_warmup_random_trials - 1, BoTorch_count
-    )
+        botorch_count == expected_botorch
+    ), f"Expected {expected_botorch} BoTorch trials, got {botorch_count}."
 
 
 # Tests for ParameterConfig class
@@ -477,13 +479,15 @@ def test_tune_mcgrad_params_with_explicit_validation_set(
 def test_tune_mcgrad_params_fallback_to_train_test_split(
     mock_train_test_split,
     mock_normalized_entropy,
+    rng,
     sample_data,
     mock_mcgrad_model,
 ):
     """Test that when df_val is None, train_test_split is used."""
-    # Setup mock to return specific train/val splits
-    train_data = sample_data.iloc[:80]
-    val_data = sample_data.iloc[80:]
+    # Setup mock to return specific train/val splits using sklearn's splitter
+    train_data, val_data = train_test_split(
+        sample_data, test_size=0.2, random_state=rng
+    )
     mock_train_test_split.return_value = (train_data, val_data)
     mock_normalized_entropy.return_value = 0.5
 
@@ -767,11 +771,13 @@ def test_tune_mcboost_params_does_not_modify_input_dataframes(
 def test_tune_mcboost_params_does_not_modify_input_dataframe_when_no_df_val(
     mock_train_test_split,
     mock_normalized_entropy,
+    rng,
     sample_data,
     mock_mcgrad_model,
 ):
-    train_data = sample_data.iloc[:40].copy()
-    val_data = sample_data.iloc[40:].copy()
+    train_data, val_data = train_test_split(
+        sample_data, test_size=0.2, random_state=rng
+    )
     mock_train_test_split.return_value = (train_data, val_data)
     mock_normalized_entropy.return_value = 0.5
 
