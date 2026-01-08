@@ -40,7 +40,6 @@ MCGrad depends on several core libraries:
 - **torch** - PyTorch for deep learning components
 - **lightgbm** - Gradient boosting framework (core for MCGrad)
 - **plotly** - Interactive visualizations
-- **matplotlib** - Static visualizations
 
 All dependencies will be automatically installed when you install MCGrad.
 

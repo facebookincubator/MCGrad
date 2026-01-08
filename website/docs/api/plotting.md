@@ -15,26 +15,20 @@ help(plotting)
 ```
 :::
 
-## Calibration Curves
+## Global Calibration Curves
 
 ```python
 from multicalibration import plotting
-import matplotlib.pyplot as plt
 
-# Create a figure and axis
-fig, ax = plt.subplots()
-
-# Plot calibration curve
-plotting.plot_calibration_curve(
-    scores=calibrated_predictions,
-    y=labels,
-    df=df,
-    segment_cols=['country', 'content_type'],
-    ax=ax,
-    num_bins=10
+# Plot global calibration curve
+fig = plotting.plot_global_calibration_curve(
+    data=df,
+    score_col='prediction',
+    label_col='label',
+    sample_weight_col='weights',  # optional
 )
 
-plt.show()
+fig.show()
 ```
 
 ## Multicalibration Analysis
@@ -43,19 +37,40 @@ Visualize calibration across segments:
 
 ```python
 from multicalibration import plotting
-import matplotlib.pyplot as plt
 
-fig, ax = plt.subplots()
-
-plotting.plot_calibration_curve_by_segment(
-    scores=calibrated_predictions,
-    y=labels,
-    df=df,
-    segment_cols=['country', 'content_type'],
-    ax=ax
+# Plot calibration curves for each segment
+fig = plotting.plot_calibration_curve_by_segment(
+    data=df,
+    group_var='country',
+    score_col='prediction',
+    label_col='label',
 )
 
-plt.show()
+fig.show()
+```
+
+## Segment Calibration Errors
+
+Visualize calibration errors across multiple segments:
+
+```python
+from multicalibration import metrics, plotting
+
+# Create a MulticalibrationError object
+mce = metrics.MulticalibrationError(
+    df=df,
+    label_column='label',
+    score_column='prediction',
+    categorical_segment_columns=['country', 'content_type'],
+)
+
+# Plot segment calibration errors
+fig = plotting.plot_segment_calibration_errors(
+    mce=mce,
+    quantity='segment_ecces_sigma_scale',
+)
+
+fig.show()
 ```
 
 See the [source code](https://github.com/facebookincubator/MCGrad/blob/main/src/multicalibration/plotting.py) for more visualization options.
