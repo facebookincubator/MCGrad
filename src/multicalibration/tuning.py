@@ -23,6 +23,21 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 @dataclass
 class ParameterConfig:
+    """
+    Configuration for a single hyperparameter to be tuned.
+
+    This dataclass defines the search space for a hyperparameter during
+    Ax-based Bayesian optimization.
+
+    :param name: The name of the hyperparameter (e.g., "learning_rate").
+    :param bounds: The lower and upper bounds for the parameter search space.
+    :param value_type: The type of the parameter value ("float" or "int").
+    :param log_scale: Whether to search in log space. Useful for parameters
+        like learning rate where orders of magnitude matter.
+    :param config_type: The Ax parameter type (typically "range" for continuous parameters).
+        See https://ax.readthedocs.io/en/stable/service.html#ax.service.ax_client.AxClient.create_experiment for available options.
+    """
+
     name: str
     bounds: List[float | int]
     value_type: str
@@ -30,6 +45,7 @@ class ParameterConfig:
     config_type: str
 
     def to_dict(self) -> dict[str, Any]:
+        """Convert the parameter configuration to an Ax-compatible dictionary."""
         return {
             "name": self.name,
             "bounds": self.bounds,
@@ -156,6 +172,10 @@ def tune_mcgrad_params(
     :param parameter_configurations: The list of parameter configurations to tune. If None, the default parameter configurations are used.
     :param pass_df_val_into_tuning: Whether to pass the validation data into the tuning process. If True, the validation data is passed into the tuning process.
     :param pass_df_val_into_final_fit: Whether to pass the validation data into the final fit. If True, the validation data is passed into the final fit.
+
+    :returns: A tuple containing:
+        - The fitted MCGrad model with the best hyperparameters found during tuning.
+        - A DataFrame containing the results of all trials, sorted by normalized entropy.
     """
 
     if df_val is None:
@@ -300,4 +320,5 @@ def tune_mcgrad_params(
     return model, trial_results
 
 
+# @oss-disable: # Alias for backward compatibility and internal use.
 # @oss-disable[end= ]: tune_mcboost_params = tune_mcgrad_params
