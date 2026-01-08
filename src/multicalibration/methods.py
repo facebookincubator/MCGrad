@@ -77,6 +77,7 @@ class BaseMCGrad(
     an abstract interface that all MCGrad models must implement.
     """
 
+    _SERIALIZATION_KEY = "mcgrad"
     VALID_SIZE = 0.4
     MCE_STAT_SIGN_THRESHOLD = 2.49767216
     MCE_STRONG_EVIDENCE_THRESHOLD = 4.70812972
@@ -1144,7 +1145,7 @@ class BaseMCGrad(
         """
         serialized_boosters = [booster.model_to_string() for booster in self.mr]
         json_obj: dict[str, Any] = {
-            "mcboost": [
+            self._SERIALIZATION_KEY: [
                 {
                     "booster": serialized_booster,
                     "unshrink_factor": unshrink_factor,
@@ -1180,7 +1181,7 @@ class BaseMCGrad(
         model.mr = []
         model.unshrink_factors = []
 
-        for model_info in json_obj["mcboost"]:
+        for model_info in json_obj[cls._SERIALIZATION_KEY]:
             booster = lgb.Booster(model_str=model_info["booster"])
             model.mr.append(booster)
             model.unshrink_factors.append(model_info["unshrink_factor"])
@@ -1484,14 +1485,14 @@ class RegressionMCGrad(BaseMCGrad):
     # @oss-disable[end= ]: MCGrad,
     # @oss-disable[end= ]: DeprecatedAttributesMixin,
 # @oss-disable[end= ]: ):
-    # @oss-disable[end= ]: pass
+    # @oss-disable[end= ]: _SERIALIZATION_KEY = "mcboost"
 
 
 # @oss-disable[end= ]: class RegressionMCBoost(
     # @oss-disable[end= ]: RegressionMCGrad,
     # @oss-disable[end= ]: DeprecatedAttributesMixin,
 # @oss-disable[end= ]: ):
-    # @oss-disable[end= ]: pass
+    # @oss-disable[end= ]: _SERIALIZATION_KEY = "mcboost"
 
 
 class PlattScaling(BaseCalibrator):
