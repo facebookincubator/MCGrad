@@ -4,7 +4,6 @@
 # LICENSE file in the root directory of this source tree.
 # pyre-unsafe
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
@@ -110,176 +109,6 @@ def test_plot_segment_calibration_errors_raises_on_invalid_quantity(sample_df):
         plotting.plot_segment_calibration_errors(mce=mce, quantity="invalid_quantity")
 
 
-def test_plot_orchestrator_function_with_basic_parameters(sample_data, sample_df):
-    plotting.plot_all(
-        scores=sample_data["scores"],
-        y=sample_data["labels"],
-        df=sample_df,
-        segment_cols=["segment_A_0"],
-        title="Test Plot",
-    )
-    plt.close("all")
-
-
-def test_plot_all_with_weights(sample_data, sample_df):
-    plotting.plot_all(
-        scores=sample_data["scores"],
-        y=sample_data["labels"],
-        df=sample_df,
-        segment_cols=["segment_A_0"],
-        sample_weight=sample_data["weights"],
-    )
-    plt.close("all")
-
-
-def test_plot_all_with_custom_metrics(sample_data, sample_df):
-    def custom_metric(y, scores, sample_weight=None):
-        return np.mean(scores)
-
-    metrics_dict = {"custom": custom_metric}
-
-    plotting.plot_all(
-        scores=sample_data["scores"],
-        y=sample_data["labels"],
-        df=sample_df,
-        segment_cols=["segment_A_0"],
-        metrics=metrics_dict,
-    )
-    plt.close("all")
-
-
-def test_plot_all_with_explicit_num_bins_parameter(sample_data, sample_df):
-    plotting.plot_all(
-        scores=sample_data["scores"],
-        y=sample_data["labels"],
-        df=sample_df,
-        segment_cols=["segment_A_0"],
-        num_bins=20,
-    )
-    plt.close("all")
-
-
-def test_plot_score_distribution_basic(sample_data):
-    fig, ax = plt.subplots()
-    df = pd.DataFrame()  # Not used in the function
-
-    plotting.plot_score_distribution(
-        scores=sample_data["scores"], df=df, ax=ax, sample_weight=None
-    )
-
-    assert ax.get_xlabel() == "model score"
-    plt.close(fig)
-
-
-def test_plot_score_distribution_with_weights(sample_data):
-    fig, ax = plt.subplots()
-    df = pd.DataFrame()
-
-    plotting.plot_score_distribution(
-        scores=sample_data["scores"],
-        df=df,
-        ax=ax,
-        sample_weight=sample_data["weights"],
-    )
-
-    assert ax.get_xlabel() == "model score"
-    plt.close(fig)
-
-
-def test_plot_pr_curve_basic(sample_data):
-    fig, ax = plt.subplots()
-
-    plotting.plot_pr_curve(
-        scores=sample_data["scores"], y=sample_data["labels"], ax=ax, sample_weight=None
-    )
-
-    assert ax.get_xlabel() == "recall"
-    assert ax.get_ylabel() == "precision"
-    plt.close(fig)
-
-
-def test_plot_pr_curve_with_weights(sample_data):
-    fig, ax = plt.subplots()
-
-    plotting.plot_pr_curve(
-        scores=sample_data["scores"],
-        y=sample_data["labels"],
-        ax=ax,
-        sample_weight=sample_data["weights"],
-    )
-
-    assert ax.get_xlabel() == "recall"
-    plt.close(fig)
-
-
-def test_plot_calibration_curve_with_segments(sample_data, sample_df):
-    fig, ax = plt.subplots()
-
-    plotting.plot_calibration_curve(
-        scores=sample_data["scores"],
-        y=sample_data["labels"],
-        df=sample_df,
-        segment_cols=["segment_A_0"],
-        ax=ax,
-        log=False,
-        num_bins=10,
-    )
-
-    assert ax.get_xlabel() == "model score"
-    assert ax.get_ylabel() == "share of positives"
-    plt.close(fig)
-
-
-def test_plot_calibration_curve_log_scale_with_segments(sample_data, sample_df):
-    fig, ax = plt.subplots()
-
-    plotting.plot_calibration_curve(
-        scores=sample_data["scores"],
-        y=sample_data["labels"],
-        df=sample_df,
-        segment_cols=["segment_A_0"],
-        ax=ax,
-        log=True,
-        num_bins=10,
-    )
-
-    assert ax.get_xlabel() == "model score"
-    plt.close(fig)
-
-
-def test_plot_all_basic_without_segments(sample_data, sample_df):
-    plotting.plot_all(
-        scores=sample_data["scores"],
-        y=sample_data["labels"],
-        df=sample_df,
-        segment_cols=[],  # No segments
-        title="Test Plot",
-    )
-    plt.close("all")
-
-
-def test_plot_all_with_segments(sample_data, sample_df):
-    plotting.plot_all(
-        scores=sample_data["scores"],
-        y=sample_data["labels"],
-        df=sample_df,
-        segment_cols=["segment_A_0"],
-        sample_weight=sample_data["weights"],
-    )
-    plt.close("all")
-
-
-def test_plot_all_with_explicit_num_bins_parameter_no_segment(sample_data, sample_df):
-    plotting.plot_all(
-        scores=sample_data["scores"],
-        y=sample_data["labels"],
-        df=sample_df,
-        segment_cols=[],
-        num_bins=20,
-    )
-    plt.close("all")
-
-
 def test_plot_global_calibration_curve_basic(sample_df):
     fig = plotting.plot_global_calibration_curve(
         data=sample_df,
@@ -334,54 +163,6 @@ def test_plot_global_calibration_curve_incomplete_cis(sample_df):
     )
 
     assert fig is not None
-
-
-def test_plot_global_calibration_curve_matplotlib_basic(sample_df):
-    plotting.plot_global_calibration_curve_matplotlib(
-        data=sample_df,
-        score_col="prediction",
-        label_col="label",
-        num_bins=10,
-        method_name="Test Method",
-    )
-    plt.close("all")
-
-
-def test_plot_global_calibration_curve_matplotlib_with_weights(sample_df):
-    plotting.plot_global_calibration_curve_matplotlib(
-        data=sample_df,
-        score_col="prediction",
-        label_col="label",
-        num_bins=10,
-        method_name="Test Method",
-        sample_weight_col="weights",
-    )
-    plt.close("all")
-
-
-def test_plot_global_calibration_curve_matplotlib_log_axes(sample_df):
-    plotting.plot_global_calibration_curve_matplotlib(
-        data=sample_df,
-        score_col="prediction",
-        label_col="label",
-        num_bins=10,
-        method_name="Test Method",
-        log_x_axis=True,
-        log_y_axis=True,
-    )
-    plt.close("all")
-
-
-def test_plot_global_calibration_curve_matplotlib_incomplete_cis(sample_df):
-    plotting.plot_global_calibration_curve_matplotlib(
-        data=sample_df,
-        score_col="prediction",
-        label_col="label",
-        num_bins=10,
-        method_name="Test Method",
-        plot_incomplete_cis=False,
-    )
-    plt.close("all")
 
 
 def test_plot_calibration_curve_by_segment_basic(sample_df):
@@ -531,56 +312,6 @@ def test_plot_learning_curve_with_show_all(rng):
     assert fig is not None
 
 
-def test_plot_score_distribution_does_not_modify_input_dataframe(sample_data):
-    fig, ax = plt.subplots()
-    df = pd.DataFrame({"col": [1, 2, 3]})
-    df_original = df.copy()
-
-    plotting.plot_score_distribution(
-        scores=sample_data["scores"],
-        df=df,
-        ax=ax,
-        sample_weight=sample_data["weights"],
-    )
-
-    pd.testing.assert_frame_equal(df, df_original)
-    plt.close(fig)
-
-
-def test_plot_calibration_curve_does_not_modify_input_dataframe(sample_data, sample_df):
-    fig, ax = plt.subplots()
-    df_original = sample_df.copy()
-
-    plotting.plot_calibration_curve(
-        scores=sample_data["scores"],
-        y=sample_data["labels"],
-        df=sample_df,
-        segment_cols=["segment_A_0"],
-        ax=ax,
-        log=False,
-        num_bins=10,
-        sample_weight=sample_data["weights"],
-    )
-
-    pd.testing.assert_frame_equal(sample_df, df_original)
-    plt.close(fig)
-
-
-def test_plot_all_does_not_modify_input_dataframe(sample_data, sample_df):
-    df_original = sample_df.copy()
-
-    plotting.plot_all(
-        scores=sample_data["scores"],
-        y=sample_data["labels"],
-        df=sample_df,
-        segment_cols=["segment_A_0"],
-        sample_weight=sample_data["weights"],
-    )
-
-    pd.testing.assert_frame_equal(sample_df, df_original)
-    plt.close("all")
-
-
 def test_plot_global_calibration_curve_does_not_modify_input_dataframe(sample_df):
     df_original = sample_df.copy()
 
@@ -593,24 +324,6 @@ def test_plot_global_calibration_curve_does_not_modify_input_dataframe(sample_df
     )
 
     pd.testing.assert_frame_equal(sample_df, df_original)
-
-
-def test_plot_global_calibration_curve_matplotlib_does_not_modify_input_dataframe(
-    sample_df,
-):
-    df_original = sample_df.copy()
-
-    plotting.plot_global_calibration_curve_matplotlib(
-        data=sample_df,
-        score_col="prediction",
-        label_col="label",
-        num_bins=10,
-        method_name="Test Method",
-        sample_weight_col="weights",
-    )
-
-    pd.testing.assert_frame_equal(sample_df, df_original)
-    plt.close("all")
 
 
 def test_plot_calibration_curve_by_segment_does_not_modify_input_dataframe(sample_df):
