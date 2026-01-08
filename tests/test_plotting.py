@@ -55,97 +55,69 @@ def sample_df(rng):
     )
 
 
-def test_plot_segment_calibration_errors_does_not_raise_errors_with_valid_inputs(
-    sample_df,
-):
-    categorical_segment_columns = [f"segment_A_{t}" for t in range(2)]
-    numerical_segment_columns = [f"segment_B_{t}" for t in range(2)]
-
-    mce = metrics.MulticalibrationError(
+@pytest.fixture
+def mce_with_all_segments(sample_df):
+    """Fixture providing MulticalibrationError with categorical and numerical segments."""
+    return metrics.MulticalibrationError(
         df=sample_df,
         label_column="label",
         score_column="prediction",
-        categorical_segment_columns=categorical_segment_columns,
-        numerical_segment_columns=numerical_segment_columns,
+        categorical_segment_columns=[f"segment_A_{t}" for t in range(2)],
+        numerical_segment_columns=[f"segment_B_{t}" for t in range(2)],
         weight_column="weights",
     )
 
+
+def test_plot_segment_calibration_errors_basic(mce_with_all_segments):
     fig = plotting.plot_segment_calibration_errors(
-        mce=mce, quantity="segment_ecces_sigma_scale"
+        mce=mce_with_all_segments, quantity="segment_ecces_sigma_scale"
     )
     assert fig is not None
 
 
-def test_plot_segment_calibration_errors_with_different_quantities(sample_df):
-    categorical_segment_columns = [f"segment_A_{t}" for t in range(2)]
-    numerical_segment_columns = [f"segment_B_{t}" for t in range(2)]
-
-    mce = metrics.MulticalibrationError(
-        df=sample_df,
-        label_column="label",
-        score_column="prediction",
-        categorical_segment_columns=categorical_segment_columns,
-        numerical_segment_columns=numerical_segment_columns,
-        weight_column="weights",
+@pytest.mark.parametrize(
+    "quantity",
+    ["segment_ecces", "segment_p_values", "segment_sigmas", "segment_ecces_absolute"],
+)
+def test_plot_segment_calibration_errors_quantities(mce_with_all_segments, quantity):
+    fig = plotting.plot_segment_calibration_errors(
+        mce=mce_with_all_segments, quantity=quantity
     )
-
-    for quantity in ["segment_ecces", "segment_p_values", "segment_sigmas"]:
-        fig = plotting.plot_segment_calibration_errors(mce=mce, quantity=quantity)
-        assert fig is not None
+    assert fig is not None
 
 
-def test_plot_segment_calibration_errors_raises_on_invalid_quantity(sample_df):
-    categorical_segment_columns = [f"segment_A_{t}" for t in range(2)]
-
-    mce = metrics.MulticalibrationError(
-        df=sample_df,
-        label_column="label",
-        score_column="prediction",
-        categorical_segment_columns=categorical_segment_columns,
-        weight_column="weights",
-    )
-
+def test_plot_segment_calibration_errors_raises_on_invalid_quantity(
+    mce_with_all_segments,
+):
     with pytest.raises(ValueError, match="Invalid quantity"):
-        plotting.plot_segment_calibration_errors(mce=mce, quantity="invalid_quantity")
+        plotting.plot_segment_calibration_errors(
+            mce=mce_with_all_segments, quantity="invalid_quantity"
+        )
 
 
-def test_plot_global_calibration_curve_basic(sample_df):
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {},
+        {"sample_weight_col": "weights"},
+        {"binning_method": "equisized"},
+        {"plot_incomplete_cis": False},
+    ],
+    ids=["basic", "with_weights", "equisized", "incomplete_cis"],
+)
+def test_plot_global_calibration_curve(sample_df, kwargs):
     fig = plotting.plot_global_calibration_curve(
         data=sample_df,
         score_col="prediction",
         label_col="label",
         num_bins=10,
+        **kwargs,
     )
-
-    assert fig is not None
-
-
-def test_plot_global_calibration_curve_with_weights(sample_df):
-    fig = plotting.plot_global_calibration_curve(
-        data=sample_df,
-        score_col="prediction",
-        label_col="label",
-        num_bins=10,
-        sample_weight_col="weights",
-    )
-
-    assert fig is not None
-
-
-def test_plot_global_calibration_curve_equisized_binning(sample_df):
-    fig = plotting.plot_global_calibration_curve(
-        data=sample_df,
-        score_col="prediction",
-        label_col="label",
-        num_bins=10,
-        binning_method="equisized",
-    )
-
     assert fig is not None
 
 
 def test_plot_global_calibration_curve_invalid_binning_raises_error(sample_df):
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError, match="Invalid binning_method"):
         plotting.plot_global_calibration_curve(
             data=sample_df,
             score_col="prediction",
@@ -154,52 +126,24 @@ def test_plot_global_calibration_curve_invalid_binning_raises_error(sample_df):
         )
 
 
-def test_plot_global_calibration_curve_incomplete_cis(sample_df):
-    fig = plotting.plot_global_calibration_curve(
-        data=sample_df,
-        score_col="prediction",
-        label_col="label",
-        plot_incomplete_cis=False,
-    )
-
-    assert fig is not None
-
-
-def test_plot_calibration_curve_by_segment_basic(sample_df):
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {},
+        {"sample_weight_col": "weights"},
+        {"binning_method": "equisized"},
+    ],
+    ids=["basic", "with_weights", "equisized"],
+)
+def test_plot_calibration_curve_by_segment(sample_df, kwargs):
     fig = plotting.plot_calibration_curve_by_segment(
         data=sample_df,
         group_var="segment_A_0",
         score_col="prediction",
         label_col="label",
         num_bins=5,
+        **kwargs,
     )
-
-    assert fig is not None
-
-
-def test_plot_calibration_curve_by_segment_with_weights(sample_df):
-    fig = plotting.plot_calibration_curve_by_segment(
-        data=sample_df,
-        group_var="segment_A_0",
-        score_col="prediction",
-        label_col="label",
-        num_bins=5,
-        sample_weight_col="weights",
-    )
-
-    assert fig is not None
-
-
-def test_plot_calibration_curve_by_segment_equisized_binning(sample_df):
-    fig = plotting.plot_calibration_curve_by_segment(
-        data=sample_df,
-        group_var="segment_A_0",
-        score_col="prediction",
-        label_col="label",
-        num_bins=5,
-        binning_method="equisized",
-    )
-
     assert fig is not None
 
 
@@ -217,98 +161,66 @@ def test_plot_calibration_curve_by_segment_empty_data():
     assert fig is not None
 
 
-def test_plot_learning_curve_with_early_stopping(rng):
+@pytest.fixture
+def mcgrad_training_df(rng):
+    """Fixture providing training data for MCGrad model tests."""
     n_samples = 200
-    predictions = rng.rand(n_samples)
-    labels = rng.randint(0, 2, n_samples)
-
-    df = pd.DataFrame(
+    return pd.DataFrame(
         {
-            "prediction": predictions,
-            "label": labels,
+            "prediction": rng.rand(n_samples),
+            "label": rng.randint(0, 2, n_samples),
             "feature": rng.choice(["a", "b", "c"], n_samples),
         }
     )
 
-    model = methods.MCGrad(
-        num_rounds=3,
-        early_stopping=True,
-        patience=1,
-        lightgbm_params={"max_depth": 2, "n_estimators": 2},
-    )
+
+def _fit_mcgrad_model(
+    df: pd.DataFrame,
+    early_stopping: bool = True,
+    save_training_performance: bool = False,
+) -> methods.MCGrad:
+    if early_stopping:
+        model = methods.MCGrad(
+            num_rounds=2,
+            early_stopping=True,
+            patience=1,
+            save_training_performance=save_training_performance,
+            lightgbm_params={"max_depth": 2, "n_estimators": 2},
+        )
+    else:
+        model = methods.MCGrad(
+            num_rounds=2,
+            early_stopping=False,
+            save_training_performance=save_training_performance,
+            lightgbm_params={"max_depth": 2, "n_estimators": 2},
+        )
     model.fit(
         df_train=df,
         prediction_column_name="prediction",
         label_column_name="label",
         categorical_feature_column_names=["feature"],
     )
+    return model
 
+
+def test_plot_learning_curve_basic(mcgrad_training_df):
+    model = _fit_mcgrad_model(mcgrad_training_df)
     fig = plotting.plot_learning_curve(model)
-
     assert fig is not None
 
 
-def test_plot_learning_curve_raises_without_early_stopping(rng):
-    n_samples = 100
-    predictions = rng.rand(n_samples)
-    labels = rng.randint(0, 2, n_samples)
-
-    df = pd.DataFrame(
-        {
-            "prediction": predictions,
-            "label": labels,
-            "feature": rng.choice(["a", "b"], n_samples),
-        }
-    )
-
-    model = methods.MCGrad(
-        num_rounds=2,
-        early_stopping=False,
-        lightgbm_params={"max_depth": 2, "n_estimators": 2},
-    )
-    model.fit(
-        df_train=df,
-        prediction_column_name="prediction",
-        label_column_name="label",
-        categorical_feature_column_names=["feature"],
-    )
-
+def test_plot_learning_curve_raises_without_early_stopping(mcgrad_training_df):
+    model = _fit_mcgrad_model(mcgrad_training_df, early_stopping=False)
     with pytest.raises(
         ValueError,
-        match="Learning curve can only be plotted for models that have been trained with early_stopping=True",
+        match="Learning curve can only be plotted for models trained with early_stopping=True",
     ):
         plotting.plot_learning_curve(model)
 
 
-def test_plot_learning_curve_with_show_all(rng):
-    n_samples = 200
-    predictions = rng.rand(n_samples)
-    labels = rng.randint(0, 2, n_samples)
-
-    df = pd.DataFrame(
-        {
-            "prediction": predictions,
-            "label": labels,
-            "feature": rng.choice(["a", "b", "c"], n_samples),
-        }
-    )
-
-    model = methods.MCGrad(
-        num_rounds=3,
-        early_stopping=True,
-        patience=1,
-        save_training_performance=True,
-        lightgbm_params={"max_depth": 2, "n_estimators": 2},
-    )
-    model.fit(
-        df_train=df,
-        prediction_column_name="prediction",
-        label_column_name="label",
-        categorical_feature_column_names=["feature"],
-    )
-
+def test_plot_learning_curve_with_show_all(mcgrad_training_df):
+    model = _fit_mcgrad_model(mcgrad_training_df, save_training_performance=True)
     fig = plotting.plot_learning_curve(model, show_all=True)
-
     assert fig is not None
 
 
