@@ -98,7 +98,8 @@ default_parameter_configurations: list[ParameterConfig] = [
     ),
 ]
 
-# These are the default hyperparameters used in the original lightgbm library (https://lightgbm.readthedocs.io/en/latest/Parameters.html)
+# Default hyperparameters from the original LightGBM library.
+# Reference: https://lightgbm.readthedocs.io/en/v4.5.0/Parameters.html
 ORIGINAL_LIGHTGBM_PARAMS: dict[str, int | float] = {
     "learning_rate": 0.1,
     "min_child_samples": 20,
@@ -106,7 +107,8 @@ ORIGINAL_LIGHTGBM_PARAMS: dict[str, int | float] = {
     "n_estimators": 100,
     "lambda_l2": 0.0,
     "min_gain_to_split": 0.0,
-    "max_depth": 15,  # the original paper uses -1, which means no limit, but it usually leads to overfitting. We set it to a high value.
+    # Original uses -1 (no limit) but that often leads to overfitting.
+    "max_depth": 15,
     "min_sum_hessian_in_leaf": 1e-3,
 }
 
@@ -163,7 +165,10 @@ def tune_mcgrad_params(
             random_state=42,
             stratify=df_train[label_column_name],
         )
-    assert df_val is not None
+    if df_val is None:
+        raise ValueError(
+            "df_val must be provided or train_test_split must produce a validation set"
+        )
 
     if (
         model.early_stopping_estimation_method
@@ -218,7 +223,7 @@ def tune_mcgrad_params(
 
     ax_client = AxClient()
     ax_client.create_experiment(
-        name="lightgbm_autotuning" + str(uuid.uuid4())[:8],
+        name=f"lightgbm_autotuning_{uuid.uuid4().hex[:8]}",
         parameters=[config.to_dict() for config in parameter_configurations],
         objectives={"normalized_entropy": ObjectiveProperties(minimize=True)},
         # If num_initialization_trials is None, the number of warm starting trials is automatically determined
