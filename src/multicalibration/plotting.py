@@ -78,6 +78,26 @@ def plot_global_calibration_curve(
     plot_incomplete_cis: bool = True,
     x_lim: Tuple[float, float] = (0, 1.1),
 ) -> go.Figure:
+    """
+    Plots a global calibration curve with confidence intervals and score histogram.
+
+    The calibration curve shows the relationship between predicted scores and actual
+    label proportions. Calibrated bins (where the diagonal falls within the confidence
+    interval) are shown in blue, while miscalibrated bins are shown in red.
+
+    :param data: DataFrame containing scores and labels.
+    :param score_col: Column name for the predicted scores.
+    :param label_col: Column name for the binary labels.
+    :param num_bins: Number of bins for the calibration curve.
+    :param sample_weight_col: Optional column name for sample weights.
+    :param binning_method: Method for binning scores. Either "equispaced" (equal-width
+        bins) or "equisized" (equal-count bins).
+    :param plot_incomplete_cis: Whether to plot bins with incomplete confidence
+        intervals (i.e., bins with NaN values).
+    :param x_lim: Tuple specifying the x-axis and y-axis limits.
+    :return: A Plotly Figure object with the calibration curve, confidence intervals,
+        and a histogram of scores.
+    """
     binning_fun = _get_binning_function(binning_method)
 
     # TODO: Make confidence interval calculation for calibration curve with
@@ -168,6 +188,24 @@ def plot_calibration_curve_by_segment(
     sample_weight_col: str | None = None,
     binning_method: BinningMethod = "equispaced",
 ) -> go.Figure:
+    """
+    Plots calibration curves for each segment defined by a grouping variable.
+
+    Creates a grid of subplots, one per unique value of the grouping variable.
+    Each subplot shows a calibration curve with confidence intervals. Calibrated
+    bins are shown in blue, miscalibrated bins in red.
+
+    :param data: DataFrame containing scores, labels, and the grouping variable.
+    :param group_var: Column name for the grouping variable that defines segments.
+    :param score_col: Column name for the predicted scores.
+    :param label_col: Column name for the binary labels.
+    :param num_bins: Number of bins for each calibration curve.
+    :param n_cols: Number of columns in the subplot grid.
+    :param sample_weight_col: Optional column name for sample weights.
+    :param binning_method: Method for binning scores. Either "equispaced" (equal-width
+        bins) or "equisized" (equal-count bins).
+    :return: A Plotly Figure object with a grid of calibration curve subplots.
+    """
     binning_fun = _get_binning_function(binning_method)
 
     agg_df = data.groupby(group_var).apply(
@@ -262,16 +300,19 @@ def plot_segment_calibration_errors(
     quantity: SegmentQuantity = "segment_ecces",
 ) -> go.Figure:
     """
-    Plots a multi-segment Kuiper statistic scatter plot. This visualization helps in assessing the
-    calibration error across different segments of data, which can be defined by categorical and
-    numerical features.
+    Plots a segment-level calibration error scatter plot.
 
-    :param mce: A MulticalibrationError object
-    :param highlight_feature: An optional feature to highlight in the plot.
-    :param quantity: The quantity to plot. Options are "segment_ecces", "segment_p_values", "segment_sigmas",
-        and "segment_ecces_sigma_scale"
-    :returns: A Plotly Figure object representing the scatter plot of the Kuiper statistic
-        against segment size, with optional highlighting of a specific feature.
+    This visualization displays the specified calibration quantity against segment size,
+    helping to assess calibration across different data segments defined by categorical
+    and numerical features.
+
+    :param mce: A MulticalibrationError object containing computed segment-level metrics.
+    :param highlight_feature: Optional feature name to color-code points by.
+    :param quantity: The quantity to plot. Options are "segment_ecces",
+        "segment_ecces_absolute", "segment_p_values", "segment_sigmas",
+        and "segment_ecces_sigma_scale".
+    :return: A Plotly Figure object with the scatter plot of the specified quantity
+        against segment size.
     """
     if quantity not in _VALID_SEGMENT_QUANTITIES:
         raise ValueError(
