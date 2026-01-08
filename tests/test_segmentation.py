@@ -5,11 +5,16 @@
 # pyre-unsafe
 
 import numpy as np
-
 import pandas as pd
 import pytest
 
 from multicalibration import segmentation
+
+
+def _count_segments(generator):
+    first_chunk = next(generator)[0]
+    segment_count = np.count_nonzero(first_chunk.sum(axis=1))
+    return first_chunk, segment_count
 
 
 def test_that_get_segment_masks_returns_full_data_at_depth_zero():
@@ -25,10 +30,9 @@ def test_that_get_segment_masks_returns_full_data_at_depth_zero():
         min_samples_per_segment=1,
         chunk_size=5,
     )
-    indices = [idx_arr for idx_arr, _, _ in generator][0]
-    num_segments = len(np.where(np.array(indices).sum(axis=1) > 0)[0])
+    masks, num_segments = _count_segments(generator)
     assert num_segments == 1
-    assert np.array_equal(np.where(indices[0])[0], np.arange(10))
+    assert np.array_equal(np.where(masks[0])[0], np.arange(10))
 
 
 def test_that_get_segment_masks_works_as_expected_with_nans():
@@ -41,12 +45,11 @@ def test_that_get_segment_masks_works_as_expected_with_nans():
         min_samples_per_segment=1,
         chunk_size=5,
     )
-    indices = [idx_arr for idx_arr, _, _ in generator][0]
-    number_of_segments = len(np.where(np.array(indices).sum(axis=1) > 0)[0])
-    assert number_of_segments == 4  # one for full data, one for NA, a, b each
-    assert np.array_equal(np.where(indices[1])[0], np.array([0]))
-    assert np.array_equal(np.where(indices[2])[0], np.array([1, 3]))
-    assert np.array_equal(np.where(indices[3])[0], np.array([2]))
+    masks, num_segments = _count_segments(generator)
+    assert num_segments == 4  # one for full data, one for NA, a, b each
+    assert np.array_equal(np.where(masks[1])[0], np.array([0]))
+    assert np.array_equal(np.where(masks[2])[0], np.array([1, 3]))
+    assert np.array_equal(np.where(masks[3])[0], np.array([2]))
 
 
 def test_that_get_segment_masks_works_with_single_segment_feature():
@@ -65,12 +68,9 @@ def test_that_get_segment_masks_works_with_single_segment_feature():
         min_samples_per_segment=1,
         chunk_size=10,
     )
-    indices = [idx_arr for idx_arr, _, _ in generator][0]
-    number_of_segments = len(np.where(np.array(indices).sum(axis=1) > 0)[0])
-
-    assert (
-        number_of_segments == (max_values_per_segment_feature + 1)
-    )  # max_values_per_segment_feature + 1 because we have the full data as the first segment
+    _, num_segments = _count_segments(generator)
+    # max_values_per_segment_feature + 1 because we have the full data as the first segment
+    assert num_segments == (max_values_per_segment_feature + 1)
 
 
 def test_that_get_segment_masks_returns_correct_number_of_segments_when_using_min_depth():
@@ -83,11 +83,10 @@ def test_that_get_segment_masks_returns_correct_number_of_segments_when_using_mi
         min_samples_per_segment=1,
         chunk_size=5,
     )
-    indices = [idx_arr for idx_arr, _, _ in generator][0]
-    number_of_segments = len(np.where(np.array(indices).sum(axis=1) > 0)[0])
-    assert number_of_segments == 2  # one for a, b each
-    assert np.array_equal(np.where(indices[0])[0], np.array([0]))
-    assert np.array_equal(np.where(indices[1])[0], np.array([1]))
+    masks, num_segments = _count_segments(generator)
+    assert num_segments == 2  # one for a, b each
+    assert np.array_equal(np.where(masks[0])[0], np.array([0]))
+    assert np.array_equal(np.where(masks[1])[0], np.array([1]))
 
 
 def test_that_get_segment_masks_returns_whole_dataset_if_no_features_are_specified():
@@ -95,11 +94,9 @@ def test_that_get_segment_masks_returns_whole_dataset_if_no_features_are_specifi
     generator = segmentation.get_segment_masks(
         test_df, min_samples_per_segment=1, chunk_size=5
     )
-
-    indices = [idx_arr for idx_arr, _, _ in generator][0]
-    number_of_segments = len(np.where(np.array(indices).sum(axis=1) > 0)[0])
-    assert number_of_segments == 1  # one for a, b each
-    assert np.array_equal(np.where(indices[0])[0], np.array([0, 1]))
+    masks, num_segments = _count_segments(generator)
+    assert num_segments == 1  # whole dataset as single segment
+    assert np.array_equal(np.where(masks[0])[0], np.array([0, 1]))
 
 
 def test_that_get_segment_masks_works_as_expected_with_nans_in_numerical_feature():
@@ -113,15 +110,13 @@ def test_that_get_segment_masks_works_as_expected_with_nans_in_numerical_feature
         max_values_per_segment_feature=2,
         chunk_size=10,
     )
-    indices = [idx_arr for idx_arr, _, _ in generator][0]
-    number_of_segments = len(np.where(np.array(indices).sum(axis=1) > 0)[0])
-    assert (
-        number_of_segments == 4
-    )  # one for root segment and one for the two allowed values + one for the nans
-    assert np.array_equal(np.where(indices[0])[0], np.array([0, 1, 2, 3, 4, 5, 6]))
-    assert np.array_equal(np.where(indices[1])[0], np.array([0, 2, 4]))
-    assert np.array_equal(np.where(indices[2])[0], np.array([1, 3]))
-    assert np.array_equal(np.where(indices[3])[0], np.array([5, 6]))
+    masks, num_segments = _count_segments(generator)
+    # one for root segment and one for the two allowed values + one for the nans
+    assert num_segments == 4
+    assert np.array_equal(np.where(masks[0])[0], np.array([0, 1, 2, 3, 4, 5, 6]))
+    assert np.array_equal(np.where(masks[1])[0], np.array([0, 2, 4]))
+    assert np.array_equal(np.where(masks[2])[0], np.array([1, 3]))
+    assert np.array_equal(np.where(masks[3])[0], np.array([5, 6]))
 
 
 def test_that_get_segment_masks_collapses_numerical_feature_correctly():
@@ -133,13 +128,11 @@ def test_that_get_segment_masks_collapses_numerical_feature_correctly():
         min_samples_per_segment=1,
         chunk_size=5,
     )
-
-    indices = [idx_arr for idx_arr, _, _ in generator][0]
-    number_of_segments = len(np.where(np.array(indices).sum(axis=1) > 0)[0])
-    assert number_of_segments == 3  # one for the root and one for the two bins each
-    assert np.array_equal(np.where(indices[0])[0], np.array([0, 1, 2, 3, 4, 5]))
-    assert np.array_equal(np.where(indices[1])[0], np.array([0, 1, 2]))
-    assert np.array_equal(np.where(indices[2])[0], np.array([3, 4, 5]))
+    masks, num_segments = _count_segments(generator)
+    assert num_segments == 3  # one for the root and one for the two bins each
+    assert np.array_equal(np.where(masks[0])[0], np.array([0, 1, 2, 3, 4, 5]))
+    assert np.array_equal(np.where(masks[1])[0], np.array([0, 1, 2]))
+    assert np.array_equal(np.where(masks[2])[0], np.array([3, 4, 5]))
 
 
 def test_that_get_segment_masks_collapses_categorical_feature_correctly():
@@ -151,18 +144,13 @@ def test_that_get_segment_masks_collapses_categorical_feature_correctly():
         min_samples_per_segment=1,
         chunk_size=5,
     )
-
-    indices = [idx_arr for idx_arr, _, _ in generator][0]
-    number_of_segments = len(np.where(np.array(indices).sum(axis=1) > 0)[0])
-    assert (
-        number_of_segments == 4
-    )  # one for the root and one for 'a', 'b', 'other' ('c' + 'd') respectively
-    assert np.array_equal(
-        np.where(indices[0])[0], np.array([0, 1, 2, 3, 4, 5])
-    )  # full data
-    assert np.array_equal(np.where(indices[1])[0], np.array([0, 1]))
-    assert np.array_equal(np.where(indices[2])[0], np.array([2, 3]))
-    assert np.array_equal(np.where(indices[3])[0], np.array([4, 5]))
+    masks, num_segments = _count_segments(generator)
+    # one for the root and one for 'a', 'b', 'other' ('c' + 'd') respectively
+    assert num_segments == 4
+    assert np.array_equal(np.where(masks[0])[0], np.array([0, 1, 2, 3, 4, 5]))  # full
+    assert np.array_equal(np.where(masks[1])[0], np.array([0, 1]))
+    assert np.array_equal(np.where(masks[2])[0], np.array([2, 3]))
+    assert np.array_equal(np.where(masks[3])[0], np.array([4, 5]))
 
 
 def test_that_get_segment_masks_collapses_categorical_feature_correctly_when_missing_values_exist():
@@ -174,16 +162,13 @@ def test_that_get_segment_masks_collapses_categorical_feature_correctly_when_mis
         min_samples_per_segment=1,
         chunk_size=10,
     )
-
-    indices = [idx_arr for idx_arr, _, _ in generator][0]
-    number_of_segments = len(np.where(np.array(indices).sum(axis=1) > 0)[0])
-    assert (
-        number_of_segments == 4
-    )  # one for the root and one for 'a', None, 'other' ('c' + 'd') respectively
-    assert np.array_equal(np.where(indices[0])[0], np.array([0, 1, 2, 3, 4, 5]))
-    assert np.array_equal(np.where(indices[1])[0], np.array([0, 1]))
-    assert np.array_equal(np.where(indices[2])[0], np.array([2, 3]))
-    assert np.array_equal(np.where(indices[3])[0], np.array([4, 5]))
+    masks, num_segments = _count_segments(generator)
+    # one for the root and one for 'a', None, 'other' ('c' + 'd') respectively
+    assert num_segments == 4
+    assert np.array_equal(np.where(masks[0])[0], np.array([0, 1, 2, 3, 4, 5]))
+    assert np.array_equal(np.where(masks[1])[0], np.array([0, 1]))
+    assert np.array_equal(np.where(masks[2])[0], np.array([2, 3]))
+    assert np.array_equal(np.where(masks[3])[0], np.array([4, 5]))
 
 
 def test_that_get_segment_masks_returns_correct_number_of_segments():
@@ -203,11 +188,9 @@ def test_that_get_segment_masks_returns_correct_number_of_segments():
         min_samples_per_segment=1,
         chunk_size=25,
     )
-    n_segments = 1 + 12 + 8
-
-    indices = [idx_arr for idx_arr, _, _ in generator][0]
-    number_of_segments = len(np.where(np.array(indices).sum(axis=1) > 0)[0])
-    assert number_of_segments == n_segments
+    expected_n_segments = 1 + 12 + 8
+    _, num_segments = _count_segments(generator)
+    assert num_segments == expected_n_segments
 
 
 def test_that_collapse_infrequent_values_is_identity_when_unique_values_lt_max_values():
@@ -219,17 +202,8 @@ def test_that_collapse_infrequent_values_is_identity_when_unique_values_lt_max_v
 def test_that_collapse_infrequent_values_collapses_all_values_to_collapse_value_if_max_unique_is_1():
     test_array = pd.Series(["a", "a", "b", "c"])
     results = segmentation.collapse_infrequent_values(test_array, max_unique_values=1)
-    assert np.array_equal(
-        results,
-        np.array(
-            [
-                segmentation.CATEGORICAL_COLLAPSE_VALUE,
-                segmentation.CATEGORICAL_COLLAPSE_VALUE,
-                segmentation.CATEGORICAL_COLLAPSE_VALUE,
-                segmentation.CATEGORICAL_COLLAPSE_VALUE,
-            ]
-        ),
-    )
+    expected = np.array([segmentation.CATEGORICAL_COLLAPSE_VALUE] * 4)
+    assert np.array_equal(results, expected)
 
 
 @pytest.mark.parametrize(
@@ -335,17 +309,13 @@ def test_that_get_segment_masks_works_with_arbitrary_input_index():
         min_samples_per_segment=1,
         chunk_size=10,
     )
-
-    indices = [idx_arr for idx_arr, _, _ in generator][0]
-    number_of_segments = len(np.where(np.array(indices).sum(axis=1) > 0)[0])
-    assert number_of_segments == 5
-    assert np.array_equal(
-        np.where(indices[0])[0], np.array([0, 1, 2, 3, 4, 5])
-    )  # full data
-    assert np.array_equal(np.where(indices[1])[0], np.array([0, 1]))  # segment_A = 'a'
-    assert np.array_equal(np.where(indices[2])[0], np.array([2, 3]))  # segment_A = 'b'
-    assert np.array_equal(np.where(indices[3])[0], np.array([4]))  # segment_A = 'c'
-    assert np.array_equal(np.where(indices[4])[0], np.array([5]))  # segment_A = 'd'
+    masks, num_segments = _count_segments(generator)
+    assert num_segments == 5
+    assert np.array_equal(np.where(masks[0])[0], np.array([0, 1, 2, 3, 4, 5]))  # full
+    assert np.array_equal(np.where(masks[1])[0], np.array([0, 1]))  # segment_A = 'a'
+    assert np.array_equal(np.where(masks[2])[0], np.array([2, 3]))  # segment_A = 'b'
+    assert np.array_equal(np.where(masks[3])[0], np.array([4]))  # segment_A = 'c'
+    assert np.array_equal(np.where(masks[4])[0], np.array([5]))  # segment_A = 'd'
 
 
 def test_that_get_segment_masks_works_with_arbitrary_input_index_when_missing_values_exist():
@@ -359,17 +329,13 @@ def test_that_get_segment_masks_works_with_arbitrary_input_index_when_missing_va
         min_samples_per_segment=1,
         chunk_size=10,
     )
-
-    indices = [idx_arr for idx_arr, _, _ in generator][0]
-    number_of_segments = len(np.where(np.array(indices).sum(axis=1) > 0)[0])
-    assert number_of_segments == 5
-    assert np.array_equal(
-        np.where(indices[0])[0], np.array([0, 1, 2, 3, 4, 5])
-    )  # full data
-    assert np.array_equal(np.where(indices[1])[0], np.array([0, 1]))  # segment_A = 'a'
-    assert np.array_equal(np.where(indices[2])[0], np.array([2, 3]))  # segment_A = None
-    assert np.array_equal(np.where(indices[3])[0], np.array([4]))  # segment_A = 'c'
-    assert np.array_equal(np.where(indices[4])[0], np.array([5]))  # segment_A = 'd'
+    masks, num_segments = _count_segments(generator)
+    assert num_segments == 5
+    assert np.array_equal(np.where(masks[0])[0], np.array([0, 1, 2, 3, 4, 5]))  # full
+    assert np.array_equal(np.where(masks[1])[0], np.array([0, 1]))  # segment_A = 'a'
+    assert np.array_equal(np.where(masks[2])[0], np.array([2, 3]))  # segment_A = None
+    assert np.array_equal(np.where(masks[3])[0], np.array([4]))  # segment_A = 'c'
+    assert np.array_equal(np.where(masks[4])[0], np.array([5]))  # segment_A = 'd'
 
 
 def test_extract_masks_returns_empty_mask_when_key_not_found():

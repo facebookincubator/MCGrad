@@ -17,6 +17,8 @@ from pandas.api.types import is_numeric_dtype
 logger: logging.Logger = logging.getLogger(__name__)
 
 CATEGORICAL_COLLAPSE_VALUE: str = "__OTHER"
+NA_SEGMENT_VALUE_CATEGORICAL: str = "__NA"
+NA_SEGMENT_VALUE_NUMERICAL: float = np.nan
 
 
 def _concat_feature_values(feature_values_list: list[pd.DataFrame]) -> pd.DataFrame:
@@ -25,10 +27,6 @@ def _concat_feature_values(feature_values_list: list[pd.DataFrame]) -> pd.DataFr
     if non_empty_dfs:
         return pd.concat(non_empty_dfs, ignore_index=True)
     return pd.DataFrame(columns=["segment_column", "value", "idx_segment"])
-
-
-NA_SEGMENT_VALUE_CATEGORICAL: str = "__NA"
-NA_SEGMENT_VALUE_NUMERICAL: float = np.nan
 
 
 def get_segment_masks(
@@ -133,7 +131,7 @@ def get_segment_masks(
 
 
 def _format_segment_feature_values(
-    product: tuple[tuple[str | float | int, str]],
+    product: tuple[tuple[int | float | str, str], ...],
     idx_segment: int,
 ) -> pd.DataFrame:
     df_feature_values = pd.DataFrame(product, columns=["value", "segment_column"])
@@ -164,7 +162,7 @@ def _extract_masks(
         if key not in precomputed_masks:
             return np.zeros(df_length, dtype=np.bool_)
         combined_mask &= precomputed_masks[key]
-    return combined_mask.astype(np.bool_)
+    return combined_mask
 
 
 def collapse_infrequent_values(
