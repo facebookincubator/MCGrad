@@ -21,9 +21,6 @@ import numpy as np
 import pandas as pd
 from multicalibration import utils
 from multicalibration.base import BaseCalibrator
-# @oss-disable[end= ]: from multicalibration.internal.methods import (  # noqa: F401, re-exported
-    # @oss-disable[end= ]: MCNet,
-# @oss-disable[end= ]: )
 from multicalibration.metrics import ScoreFunctionInterface, wrap_sklearn_metric_func
 from numpy import typing as npt
 from sklearn import isotonic, metrics as skmetrics
