@@ -170,6 +170,16 @@ def collapse_infrequent_values(
     max_unique_values: int,
     categorical_collapse_value: str = CATEGORICAL_COLLAPSE_VALUE,
 ) -> pd.Series:
+    """Collapse infrequent categorical values into a single category.
+
+    Retains the ``max_unique_values - 1`` most frequent values and replaces
+    all other values with ``categorical_collapse_value``.
+
+    :param values: Series of categorical values.
+    :param max_unique_values: Maximum number of unique values to retain.
+    :param categorical_collapse_value: The value to use for collapsed categories.
+    :return: Series with infrequent values replaced.
+    """
     n_unique = values.nunique()
     if n_unique <= max_unique_values:
         return values
@@ -188,6 +198,16 @@ def collapse_numeric_values(
     values: pd.Series,
     max_unique_values: int,
 ) -> pd.Series:
+    """Bin numerical values into quantile-based bins.
+
+    If the number of unique values exceeds ``max_unique_values``, bins the
+    values into ``max_unique_values`` quantile-based bins using :func:`pd.cut`.
+
+    :param values: Series of numerical values.
+    :param max_unique_values: Maximum number of bins to create.
+    :return: Series with bin labels (integers) or original values if already
+        within the limit.
+    """
     if values.nunique() <= max_unique_values:
         return values
 
@@ -208,6 +228,16 @@ def replace_missing_values(
     categorical_segment_columns: list[str],
     numerical_segment_columns: list[str],
 ) -> pd.DataFrame:
+    """Replace missing values in segment columns with sentinel values.
+
+    Categorical columns receive :const:`NA_SEGMENT_VALUE_CATEGORICAL` and
+    numerical columns receive :const:`NA_SEGMENT_VALUE_NUMERICAL`.
+
+    :param df: DataFrame containing the segment columns.
+    :param categorical_segment_columns: List of categorical column names.
+    :param numerical_segment_columns: List of numerical column names.
+    :return: DataFrame subset with only segment columns and missing values replaced.
+    """
     df_subset = df[categorical_segment_columns + numerical_segment_columns]
     if df_subset.isnull().values.any():
         # At this point df_subset is a reference to df. To avoid modifying the original df,
