@@ -4,104 +4,114 @@ sidebar_position: 5
 
 # Methodology
 
-This page provides an overview of how MCGrad works under the hood. For full theoretical details, see the [research paper](https://arxiv.org/abs/2509.19884).
+This page explains how MCGrad works, from the mathematical foundations of multicalibration to the specific algorithm design that makes it scalable and safe for production.
+For additional information, please check the full paper [1].
 
-## The Multicalibration Problem
+## 1. Introduction: Beyond Global Calibration
 
-Traditional calibration ensures that predictions match outcomes globally:
-```
-E[Y | f(X) = p] = p
-```
+A machine learning model is **calibrated** if its predicted probabilities match the true frequency of outcomes. If a model predicts 80% confidence for a set of events, exactly 80% of those events should actually occur.
 
-Multicalibration extends this to all segments defined by group membership functions:
-```
-E[Y | f(X) ∈ I, h(X) = 1] = E[f(X) | f(X) ∈ I, h(X) = 1]
-```
+However, global calibration is often insufficient. A model can be calibrated on average while being systematically miscalibrated for specific segments (e.g., overestimating risk for one demographic while underestimating it for another). These local miscalibrations cancel each other out in the global average, hiding the problem.
 
-Where `I` is any score interval and `h(X)` is any group membership function (e.g., "user is in country X and content type is Y").
+**Multicalibration** solves this by requiring the model to be calibrated not just globally, but simultaneously across all meaningful segments (e.g., defined by `age`, `region`, `device`, etc.). Multicalibration has several application areas, including matchings [2].
 
-## The Key Insight
+## 2. Formal Definitions
 
-MCGrad's core insight is that **gradient boosted decision trees (GBDT) naturally achieve multicalibration** when the feature space is augmented with the base model's predictions.
+Let $X$ be the input features and $Y \in \{0,1\}$ be the binary target. A predictor $f_0(x)$ estimates $P(Y=1|X=x)$. We use the capital $F_0(x)$ to denote the **logit** of $f_0(x)$, i.e. $F_0(x) = \log(f_0(x) / (1-f_0(x)))$.
 
-When we train a GBDT with features `(X, f₀(X))` — the original features plus the base model's predictions — the decision trees can split on both:
-- **Feature values** (e.g., `country = US`)
-- **Score intervals** (e.g., `f₀(X) ∈ [0.7, 0.8]`)
+### Calibration
+A predictor $f_0$ is perfectly calibrated if:
 
-This means the GBDT automatically identifies regions defined by the intersection of groups and score intervals — exactly what multicalibration requires.
+$$ \mathbb{P}(Y=1 \mid f_0(X)=p) = p $$
 
-## The Algorithm
+Practically, we measure miscalibration using metrics like **ECCE (Estimated Cumulative Calibration Error)**, which quantifies the deviation between predictions and outcomes without relying on arbitrary binning.
 
-MCGrad runs multiple rounds to achieve convergence:
+### Multicalibration
+We define a collection of segments $\mathcal{H}$ (e.g., "users in US", "users on Android"). A predictor $f_0$ is **multicalibrated** with respect to $\mathcal{H}$ if it is calibrated on every segment $h \in \mathcal{H}$.
 
-```
-1. Start with base predictor f₀
-2. For each round t:
-   a. Train GBDT on features (X, f_{t-1}(X)) to predict Y
-   b. Rescale logits to compensate for shrinkage
-   c. Update: f_t = σ(θ_t · (F_{t-1} + h_t))
-3. Stop when validation loss stops improving
-4. Retrain final model on full data with optimal T rounds
-```
+Formally, for all segments $h \in \mathcal{H}$ and all $u \in [0,1]$, the average prediction should match the average outcome:
 
-**Why multiple rounds?** Correcting predictions in some regions may introduce miscalibration in others. Each round refines the previous round's output until convergence.
+$$ \mathbb{E}[Y - f_0(X) \mid h(X)=1, f_0(X) = p] \approx 0 $$
 
-## Design Choices for Scale and Safety
+Existing algorithms often require you to manually specify $\mathcal{H}$ (the "protected groups"). MCGrad relaxes this: you only need to provide the features, and MCGrad implicitly calibrates across all segments definable by decision trees on those features.
 
-### 1. Efficient Gradient Boosting
+## 3. The MCGrad Algorithm
 
-MCGrad delegates compute-intensive operations to LightGBM, a highly optimized GBDT implementation. This makes it orders of magnitude faster than alternatives that iterate over groups explicitly.
+MCGrad achieves multicalibration by iteratively training a **Gradient Boosted Decision Tree (GBDT)** model. The core innovation follows three simple key insights.
 
-### 2. Logit Rescaling
+#### Insight 1: Segments as Decision Trees
+A "segment" (or a group) in data is typically defined by intersections of attributes (e.g., "People aged 35-50 in the UK").
+*   **Categorical attributes** are simple equivalences: `country == 'UK'`.
+*   **Numerical attributes** are intervals, i.e. intersections of inequalities: `35 <= age <= 50`, equivalent to `age >= 35 AND age <= 50`.
 
-GBDTs use shrinkage (step size < 1) for regularization, which can require many trees to achieve the optimal scale. MCGrad applies a simple rescaling after each round:
+This structure corresponds exactly to a **leaf in a Decision Tree**. Any meaningful segment of the data can be represented (or approximated) by a leaf in a sufficiently deep tree.
 
-```
-θ_t = argmin_θ E[L(θ · (F_{t-1} + h_t), Y)]
-```
+**Implication:** We can replace the abstract space of all possible segments $\mathcal{H}$ with the space of **Decision Trees**. Instead of iterating over infinite segments, we just need to search for decision trees.
 
-This reduces the number of trees needed while preserving regularization benefits.
+#### Insight 2: Augmenting the Feature Space
+Multicalibration requires checking calibration for every segment *and* every prediction (e.g., "Prediction equals 0.8"). Without losing on generality, we can relax the definition to intervals: "Prediction is in the range [0.7, 0.9]". In this way, instead of treating "prediction intervals" as a separate constraint, we can treat the **prediction itself as a feature**.
 
-### 3. Early Stopping on Rounds
+**Implication:** By training trees on the augmented features $(X, f_0(X))$, the tree learning algorithm naturally finds splits like:
+`if country='UK' AND prediction >= 0.7 AND prediction <= 0.9:`
+This split automatically isolates a specific *segment* in a specific *prediction range*. We don't need special logic for "intervals"; the decision tree handles it natively.
 
-While multiple rounds are needed for convergence, they also increase model capacity. MCGrad uses early stopping on the number of rounds to prevent overfitting:
+#### Insight 3: Transformation to Regression
+With the first two insights, we have a target (the residual $Y - f_0(X)$) and a feature space $(X, f_0(X))$. The goal is to train a model $h$ that finds regions in this space where the residual is non-zero.
 
-```
-T = last round before validation loss increases
-```
+How do we do this efficiently? This is where Gradient Boosting comes in.
+Gradient Boosted Decision Trees (GBDTs) work by iteratively training trees to predict the **negative gradient** of a loss function.
+For binary classification using **Log-Loss** $\mathcal{L}$, the negative gradient is mathematically identical to the residual:
 
-**Safe by design**: If the first round hurts performance, MCGrad returns T=0 (the original predictions unchanged).
+$$ - \nabla \mathcal{L} = Y - f_0(X) $$
 
-### 4. Min-Hessian Regularization
+**Implication:** This means we don't need a specialized "multicalibration algorithm." We can simply train a standard GBDT to minimize Log-Loss on our augmented features.
+*   The GBDT automatically searches for trees that predict the residual $Y - f_0(X)$.
+*   If it finds a tree with a non-zero prediction, it has found a miscalibrated segment.
+*   The boosting update then corrects the model in that exact direction.
+*   When the boosting algorithm can no longer find trees that improve the loss, it means no efficiently discoverable segments are miscalibrated.
 
-Augmenting features with predictions creates regions prone to overfitting (e.g., the tail where `f(x) < 0.01` contains only negative labels). MCGrad uses LightGBM's min-sum-Hessian constraint to prevent splits in these regions.
+### Iterative Process
+Correcting calibration in one region can create other regions with miscalibration. This happens because the post-processed model has different predictions and conditioning on intervals over its predictions is not the same as conditioning on intervals over $f_0(x)$. Therefore, MCGrad proceeds in rounds:
 
-## Comparison with Alternatives
+**Algorithm:**
+1.  **Initialize**: Start with the base model's logits $F_0(x)$.
+2.  **Iterate**: For round $t = 1, \dots, T$:
+    *   Train a GBDT $h_t$ to predict the residual $Y - f_{t-1}(X)$ using features $(X, f_{t-1}(X))$.
+    *   Update the model: $F_t(x) = F_{t-1}(x) + \eta \cdot h_t(x, f_{t-1}(x))$.
+    *   Update predictions: $f_t(x) = \text{sigmoid}(F_t(x))$.
+3.  **Converge**: Stop when performance on a validation set no longer improves.
 
-| Method | Global Calibration | Multicalibration | Data Efficiency | Speed |
-|--------|-------------------|-------------------|-----------------|-------|
-| **MCGrad** | ✓ | ✓✓✓ | ✓✓✓ | ✓✓✓ |
-| Isotonic Regression | ✓ | ✗ | ✓✓ | ✓✓✓ |
-| Platt Scaling | ✓ | ✗ | ✓✓✓ | ✓✓✓ |
-| Temperature Scaling | ✓ | ✗ | ✓✓✓ | ✓✓✓ |
-| Beta Calibration | ✓ | ✗ | ✓✓ | ✓✓✓ |
-| Separate Calibration per Segment | ✓ | ✓ | ✗ | ✓ |
+This recursive structure ensures that we progressively eliminate calibration errors until the model is multicalibrated.
 
-## Research Paper
+## 4. Scalability & Safety Design
 
-For a detailed theoretical analysis and experimental results, see our paper:
+MCGrad is designed for production systems serving millions of predictions. It includes several optimizations:
 
-**Perini, L., Haimovich, D., Linder, F., Tax, N., Karamshuk, D., Vojnovic, M., Okati, N., & Apostolopoulos, P. A. (2025).** [MCGrad: Multicalibration at Web Scale](https://arxiv.org/abs/2509.19884). arXiv:2509.19884. To appear in KDD 2026.
+### Efficient Implementation
+Instead of custom boosting logic, MCGrad delegates the heavy lifting to **LightGBM**, a highly optimized GBDT library. This ensures:
+*   **Speed**: Training and inference are extremely fast.
+*   **Scalability**: Handles large datasets and high-dimensional feature spaces efficiently.
 
-### Related Work
+### Logit Rescaling
+GBDTs use "shrinkage" (small learning rate) to prevent overfitting, but this can result in under-confident updates that require many trees to fix.
+MCGrad adds a **rescaling step** after each round: it learns a single scalar multiplier $\theta_t$ to perfectly scale the update.
 
-For more on multicalibration theory and applications:
+$$ F_t(x) = \theta_t \cdot (F_{t-1}(x) + h_t(\dots)) $$
 
-- **Measuring Multi-Calibration:** Guy, I., Haimovich, D., Linder, F., Okati, N., Perini, L., Tax, N., & Tygert, M. (2025). [Measuring multi-calibration](https://arxiv.org/abs/2506.11251). arXiv:2506.11251.
+This drastically reduces the number of rounds needed for convergence.
 
-- **Multicalibration Applications:** Baldeschi, R. C., Di Gregorio, S., Fioravanti, S., Fusco, F., Guy, I., Haimovich, D., Leonardi, S., et al. (2025). [Multicalibration yields better matchings](https://arxiv.org/abs/2511.11413). arXiv:2511.11413.
+### Safety Guardrails
+Post-processing methods risk overfitting, potentially harming the base model. MCGrad prevents this via:
+1.  **Early Stopping**: We track validation loss after every round. We stop immediately when loss stops improving. If the first round hurts performance, MCGrad returns the original model ($T=0$).
+2.  **Min-Hessian Regularization**: In the augmented feature space $(X, f_0(X))$, some regions (e.g., $f_0(x) \approx 0$) contain almost no signal. Standard split rules can overfit here. MCGrad enforces a minimum "Hessian" (second derivative sum) in leaf nodes, which naturally prevents splits in regions where the model is already confident and correct.
 
-## Next Steps
+---
 
-- [Quick Start](quickstart.md) - Start using MCGrad
-- [API Reference](api/methods.md) - Explore the implementation
+### References
+
+[1] **Tax, N., Perini, L., Linder, F., Haimovich, D., Karamshuk, D., Okati, N., Vojnovic, M., & Apostolopoulos, P. A.**
+[MCGrad: Multicalibration at Web Scale](https://arxiv.org/abs/2509.19884).
+*Proceedings of the 32nd ACM SIGKDD Conference on Knowledge Discovery and Data Mining, 2026.*
+
+[2] **Baldeschi, R. C., Di Gregorio, S., Fioravanti, S., Fusco, F., Guy, I., Haimovich, D., Leonardi, S., Linder, F., Perini, L., Russo, M., & Tax, N.** [Multicalibration yields better matchings](https://arxiv.org/abs/2511.11413).
+*ArXiv preprint, 2025.*

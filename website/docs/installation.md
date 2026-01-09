@@ -4,11 +4,11 @@ sidebar_position: 3
 
 # Installation
 
-## Requirements
+### Requirements
 
 MCGrad requires Python 3.10 or later.
 
-## From Source
+### From Source
 
 To install from source:
 
@@ -18,7 +18,7 @@ cd MCGrad
 pip install .
 ```
 
-## Development Installation
+### Development Installation
 
 For development, install with development dependencies:
 
@@ -27,23 +27,10 @@ pip install -e ".[dev]"
 ```
 
 This will install the package in editable mode along with:
-- pytest for running tests
-- flake8 for code linting
+- pytest for running tests;
+- flake8 for code linting.
 
-## Dependencies
-
-MCGrad depends on several core libraries:
-- **numpy** - Numerical computing
-- **pandas** - Data manipulation
-- **scipy** - Scientific computing
-- **scikit-learn** - Machine learning utilities
-- **torch** - PyTorch for deep learning components
-- **lightgbm** - Gradient boosting framework (core for MCGrad)
-- **plotly** - Interactive visualizations
-
-All dependencies will be automatically installed when you install MCGrad.
-
-## Verification
+### Verification
 
 Verify your installation by running a minimal example:
 
@@ -52,12 +39,15 @@ from multicalibration import methods
 import numpy as np
 import pandas as pd
 
-# Create minimal test data
-df = pd.DataFrame({
-    'prediction': np.array([0.2, 0.8]),
-    'label': np.array([0, 1]),
-    'segment': ['a', 'b']
-})
+# Create minimal dataframe
+df = pd.DataFrame(
+        {
+            "device_type": np.array(["mobile", "desktop", "tablet", "tablet", "desktop"]),
+            "market": np.array(["US", "UK", "US", "UK", "US"]),
+            "prediction": np.array([0.1, 0.2, 0.3, 0.4, 0.5]),
+            "label": np.array([0, 1, 0, 1, 0]),
+        }
+    )
 
 # Verify MCGrad can be instantiated and fit
 mcgrad = methods.MCGrad()
@@ -65,11 +55,13 @@ mcgrad.fit(
     df_train=df,
     prediction_column_name='prediction',
     label_column_name='label',
-    categorical_feature_column_names=['segment']
+    categorical_feature_column_names=['device_type', 'market']
 )
 ```
 
-## Next Steps
+---
 
-- [Quick Start](quickstart.md) - Start using MCGrad
-- [API Reference](api/methods.md) - Explore the API
+### Next Steps
+
+- [Quick Start](quickstart.md) - Start using MCGrad.
+- [API Reference](api/methods.md) - Explore the API.
