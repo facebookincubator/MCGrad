@@ -25,3 +25,6 @@ htmlcov/
 coverage.xml
 *.cover
 .pytest_cache/
+
+# Metadata
+**/.DS_Store
