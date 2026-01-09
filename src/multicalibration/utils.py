@@ -13,6 +13,7 @@ import os
 import threading
 import time
 import warnings
+from collections.abc import Iterator
 from typing import Any, Protocol
 
 import numpy as np
@@ -25,7 +26,14 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OrdinalEncoder
 
+
 logger = logging.getLogger(__name__)
+
+# Default epsilon for bin boundary calculations
+BIN_EPSILON: float = 1e-8
+
+# Minimum logit epsilon to avoid extreme values close to float limits
+MIN_LOGIT_EPSILON: float = 1e-304
 
 
 def unshrink(
@@ -51,7 +59,10 @@ def unshrink(
     for rec_warn in recorded_warnings:
         if isinstance(rec_warn.message, LineSearchWarning):
             logger.info(
-                f"Line search warning (unshrink): {str(rec_warn.message)}. Solution is approximately optimal - no ideal step size for the gradient descent update can be found. These warnings are generally harmless."
+                "Line search warning (unshrink): %s. Solution is approximately "
+                "optimal - no ideal step size for the gradient descent update "
+                "can be found. These warnings are generally harmless.",
+                rec_warn.message,
             )
         else:
             logger.debug(rec_warn)
@@ -63,12 +74,15 @@ def unshrink(
                 source=rec_warn.source,
             )
 
-    # Return result if logistic regression with Newton-CG converged to a solution, if no try LBFGS.
+    # Return result if logistic regression with Newton-CG converged to a solution,
+    # if not try LBFGS.
     # pyre-ignore, coef_ is available after `fit()` has been called
     if not np.isnan(primary_solver.coef_).any():
         if primary_solver.coef_[0][0] < 0.95 or primary_solver.coef_[0][0] > 1.05:
             logger.warning(
-                f"Unshrink is not close to 1: {primary_solver.coef_[0][0]}. This may create a problem with the multicalibration of the model."
+                "Unshrink is not close to 1: %s. This may create a problem "
+                "with the multicalibration of the model.",
+                primary_solver.coef_[0][0],
             )
 
         return primary_solver.coef_[0][0]
@@ -80,7 +94,9 @@ def unshrink(
     if not np.isnan(fallback_solver.coef_).any():
         if primary_solver.coef_[0][0] < 0.95 or primary_solver.coef_[0][0] > 1.05:
             logger.warning(
-                f"Unshrink is not close to 1: {primary_solver.coef_[0][0]}. This may create a problem with the multicalibration of the model."
+                "Unshrink is not close to 1: %s. This may create a problem "
+                "with the multicalibration of the model.",
+                primary_solver.coef_[0][0],
             )
         return fallback_solver.coef_[0][0]
 
@@ -99,7 +115,7 @@ def logistic(logits: float) -> float:
 logistic_vectorized = np.vectorize(logistic)
 
 
-def logit(probs: np.ndarray, epsilon=1e-304) -> np.ndarray:
+def logit(probs: np.ndarray, epsilon: float = MIN_LOGIT_EPSILON) -> np.ndarray:
     with np.errstate(invalid="ignore"):
         return np.log((probs + epsilon) / (1 - probs + epsilon))
 
@@ -117,17 +133,16 @@ class BinningMethodInterface(Protocol):
         self,
         predicted_scores: np.ndarray,
         num_bins: int,
-        epsilon: float = 1e-8,
+        epsilon: float = BIN_EPSILON,
     ) -> np.ndarray: ...
 
 
 def make_equispaced_bins(
     predicted_scores: np.ndarray,
     num_bins: int,
-    epsilon: float = 1e-8,
+    epsilon: float = BIN_EPSILON,
     set_range_to_zero_one: bool = True,
 ) -> np.ndarray:
-    lower_bound = min(0, predicted_scores.min())
     upper_bound = max(1, predicted_scores.max())
 
     bins = (
@@ -135,11 +150,7 @@ def make_equispaced_bins(
         if set_range_to_zero_one
         else np.linspace(predicted_scores.min(), predicted_scores.max(), num_bins + 1)
     )
-    bins[0] = (
-        lower_bound - epsilon
-        if set_range_to_zero_one
-        else predicted_scores.min() - epsilon
-    )
+    bins[0] = -epsilon if set_range_to_zero_one else predicted_scores.min() - epsilon
     bins[-1] = (
         upper_bound + epsilon
         if set_range_to_zero_one
@@ -151,8 +162,8 @@ def make_equispaced_bins(
 def make_equisized_bins(
     predicted_scores: np.ndarray,
     num_bins: int,
-    epsilon: float = 1e-8,
-    **kwargs: Any,
+    epsilon: float = BIN_EPSILON,
+    **kwargs: Any,  # noqa: ARG001
 ) -> np.ndarray:
     upper_bound = max(1, predicted_scores.max())
     bins = np.array(
@@ -175,24 +186,33 @@ def positive_label_proportion(
     use_weights_in_sample_size: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
-    Computes the proportion of positive labels in each bin. Additionally, it computes the lower and upper bounds of the Confidence Interval for the proportion
-    using the Clopper-Pearson method (https://en.wikipedia.org/wiki/Binomial_proportion_confidence_interval#Clopper%E2%80%93Pearson_interval).
+    Computes the proportion of positive labels in each bin.
+
+    Additionally, it computes the lower and upper bounds of the Confidence Interval
+    for the proportion using the Clopper-Pearson method
+    (https://en.wikipedia.org/wiki/Binomial_proportion_confidence_interval#Clopper%E2%80%93Pearson_interval).
 
     :param labels: array of labels
     :param predictions: array of predictions
     :param bins: array of bin boundaries
-    :param sample_weight: array of weights for each instance. If None, then all instances are considered to have weight 1
+    :param sample_weight: array of weights for each instance. If None, then all
+        instances are considered to have weight 1
     :param alpha: 1-alpha is the confidence level of the CI
-    :param use_weights_in_sample_size: the effective sample size of this dataset depends on how the weights in this dataset were generated. This
-        should be set to True in the case of Option 1 below and set to False in the case of Option 2 below.
-        Option 1. it could be the case that there once existed a dataset that for example had 10 rows with score 0.6 and label 1 and 100 rows
-        with score 0.1 and label 0 that has been turned into an aggregated dataset with one row with weight 10 and score 0.6 and label 1 with
-        weight 10 and a row with score 0.1 and label 0 with weight 100.
-        Option 2. it could also be the case that weights merely reflects the inverse of the sampling probability of the instance.
-
-    :return: array of proportions
+    :param use_weights_in_sample_size: the effective sample size of this dataset
+        depends on how the weights in this dataset were generated. This should be
+        set to True in the case of Option 1 below and set to False in the case of
+        Option 2 below.
+        Option 1. it could be the case that there once existed a dataset that for
+        example had 10 rows with score 0.6 and label 1 and 100 rows with score 0.1
+        and label 0 that has been turned into an aggregated dataset with one row
+        with weight 10 and score 0.6 and label 1 with weight 10 and a row with
+        score 0.1 and label 0 with weight 100.
+        Option 2. it could also be the case that weights merely reflects the inverse
+        of the sampling probability of the instance.
+    :return: tuple of (label_proportion, lower, upper, score_average) arrays
     """
-    assert not np.any(np.isnan(predictions)), "predictions must not contain NaNs"
+    if np.any(np.isnan(predictions)):
+        raise ValueError("predictions must not contain NaNs")
     sample_weight = sample_weight if sample_weight is not None else np.ones_like(labels)
 
     label_binned_preds = pd.DataFrame(
@@ -276,7 +296,7 @@ def geometric_mean(x: np.ndarray) -> float:
         return np.exp(np.log(x).mean())
 
 
-def make_unjoined(x: np.ndarray, y: np.ndarray) -> tuple[Any, Any]:
+def make_unjoined(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
     Converts a regular dataset to 'unjoined' format. In the unjoined format, there is always
     a row with a negative label and there will be a second row with a positive label added to
@@ -290,7 +310,8 @@ def make_unjoined(x: np.ndarray, y: np.ndarray) -> tuple[Any, Any]:
     :param y: array of labels
     :return: tuple of arrays (x_unjoined, y_unjoined)
     """
-    assert x.shape[0] == y.shape[0], "x and y must have the same number of instances"
+    if x.shape[0] != y.shape[0]:
+        raise ValueError("x and y must have the same number of instances")
     # Find the indices where y is positive, create duplicates for those instances
     positive_indices = np.where(y == 1)[0]
     unjoined_x = np.concatenate([x, x[positive_indices]])
@@ -311,20 +332,23 @@ class OrdinalEncoderWithUnknownSupport(OrdinalEncoder):
     OrdinalEncoder supports unknown categories using the handle_unknown and unknown_value arguments.
     """
 
-    def __init__(self, categories="auto", dtype=np.float64):
+    def __init__(self, categories: str = "auto", dtype: type = np.float64) -> None:
         super().__init__(categories=categories, dtype=dtype)
         self._category_map = {}
 
-    def fit(self, X, y=None):
+    def fit(
+        self, X: np.ndarray | pd.DataFrame, y: Any = None
+    ) -> "OrdinalEncoderWithUnknownSupport":
         X = X.values if isinstance(X, pd.DataFrame) else X
         super().fit(X, y)
+        # pyre-ignore[16]: categories_ is set by parent class fit()
         for i, category in enumerate(self.categories_):
             self._category_map[i] = {
                 value: index for index, value in enumerate(category)
             }
         return self
 
-    def transform(self, X):
+    def transform(self, X: np.ndarray | pd.DataFrame) -> np.ndarray:
         X = X.values if isinstance(X, pd.DataFrame) else X
         if not self._category_map:
             raise ValueError("The fit method should be called before transform.")
@@ -342,7 +366,7 @@ class OrdinalEncoderWithUnknownSupport(OrdinalEncoder):
         return str(self._category_map)
 
     @classmethod
-    def deserialize(cls, encoder_str) -> "OrdinalEncoderWithUnknownSupport":
+    def deserialize(cls, encoder_str: str) -> "OrdinalEncoderWithUnknownSupport":
         enc = cls()
         enc._category_map = ast.literal_eval(encoder_str)
         return enc
@@ -403,7 +427,9 @@ class TrainTestSplitWrapper:
         self.random_state = random_state
         self.stratify = stratify
 
-    def split(self, X, y, groups=None):
+    def split(
+        self, X: np.ndarray, y: np.ndarray, groups: Any = None
+    ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         train_idx, val_idx = train_test_split(
             np.arange(len(y)),
             test_size=self.test_size,
@@ -422,7 +448,7 @@ class NoopSplitterWrapper:
         This splitter returns the training set as it is and an empty test set.
         """
 
-    def split(self, X, y, groups=None):
+    def split(self, X: np.ndarray, y: np.ndarray, groups: Any = None) -> Any:
         yield np.arange(len(y)), []  # train_idx, val_idx
 
 
@@ -433,8 +459,8 @@ def convert_arrow_columns_to_numpy(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# Check if the values in the columns are within the valid range
-def check_range(series, precision_type):
+def check_range(series: pd.Series, precision_type: str) -> bool:
+    """Check if the values in the series are within the valid range for the precision type."""
     precision_limits = {
         "float16": (np.finfo(np.float16).min, np.finfo(np.float16).max),
         "float32": (np.finfo(np.float32).min, np.finfo(np.float32).max),
@@ -449,7 +475,7 @@ def check_range(series, precision_type):
     )
 
 
-def log_peak_rss(samples_per_second=10.0):
+def log_peak_rss(samples_per_second: float = 10.0):
     """
     Decorator factory to log peak RSS while a function runs.
 
@@ -458,7 +484,7 @@ def log_peak_rss(samples_per_second=10.0):
         @log_peak_rss(2.0)     # 2 samples per second
     """
     if samples_per_second <= 0:
-        raise ValueError("samples_per_second must be > 0")
+        raise ValueError("samples_per_second must be >0")
 
     sample_interval = 1.0 / samples_per_second
 

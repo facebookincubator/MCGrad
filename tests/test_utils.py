@@ -81,8 +81,7 @@ def test_make_equispaced_bins_gives_similar_results_for_data_with_similar_range_
         (np.array([0, 1, 0, 1, 1]), np.array([0.1, 0.2, 0.3, 0.4, 0.5]), 2.8354),
     ],
 )
-def test_unshrink(labels: list[int], predictions: list[float], expected_result: float):
-    # pyre-fixme
+def test_unshrink(labels, predictions, expected_result):
     assert pytest.approx(utils.unshrink(labels, predictions), 0.0001) == expected_result
 
 
