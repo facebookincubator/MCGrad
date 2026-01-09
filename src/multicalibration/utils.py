@@ -2,7 +2,7 @@
 #
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
-# pyre-unsafe
+# pyre-strict
 
 import ast
 import functools
@@ -13,10 +13,11 @@ import os
 import threading
 import time
 import warnings
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import Any, Protocol
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 
 import psutil
@@ -27,7 +28,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OrdinalEncoder
 
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 # Default epsilon for bin boundary calculations
 BIN_EPSILON: float = 1e-8
@@ -37,9 +38,9 @@ MIN_LOGIT_EPSILON: float = 1e-304
 
 
 def unshrink(
-    y: np.ndarray,
-    logits: np.ndarray,
-    w: np.ndarray | None = None,
+    y: npt.NDArray[Any],
+    logits: npt.NDArray[Any],
+    w: npt.NDArray[Any] | None = None,
     logit_epsilon: float | None = 10,
 ) -> float:
     if w is None:
@@ -115,34 +116,40 @@ def logistic(logits: float) -> float:
 logistic_vectorized = np.vectorize(logistic)
 
 
-def logit(probs: np.ndarray, epsilon: float = MIN_LOGIT_EPSILON) -> np.ndarray:
+def logit(
+    probs: npt.NDArray[Any], epsilon: float = MIN_LOGIT_EPSILON
+) -> npt.NDArray[Any]:
     with np.errstate(invalid="ignore"):
         return np.log((probs + epsilon) / (1 - probs + epsilon))
 
 
-def absolute_error(estimate: np.ndarray, reference: np.ndarray) -> np.ndarray:
+def absolute_error(
+    estimate: npt.NDArray[Any], reference: npt.NDArray[Any]
+) -> npt.NDArray[Any]:
     return np.abs(estimate - reference)
 
 
-def proportional_error(estimate: np.ndarray, reference: np.ndarray) -> np.ndarray:
+def proportional_error(
+    estimate: npt.NDArray[Any], reference: npt.NDArray[Any]
+) -> npt.NDArray[Any]:
     return np.abs(estimate - reference) / reference
 
 
 class BinningMethodInterface(Protocol):
     def __call__(
         self,
-        predicted_scores: np.ndarray,
+        predicted_scores: npt.NDArray[Any],
         num_bins: int,
         epsilon: float = BIN_EPSILON,
-    ) -> np.ndarray: ...
+    ) -> npt.NDArray[Any]: ...
 
 
 def make_equispaced_bins(
-    predicted_scores: np.ndarray,
+    predicted_scores: npt.NDArray[Any],
     num_bins: int,
     epsilon: float = BIN_EPSILON,
     set_range_to_zero_one: bool = True,
-) -> np.ndarray:
+) -> npt.NDArray[Any]:
     upper_bound = max(1, predicted_scores.max())
 
     bins = (
@@ -160,11 +167,11 @@ def make_equispaced_bins(
 
 
 def make_equisized_bins(
-    predicted_scores: np.ndarray,
+    predicted_scores: npt.NDArray[Any],
     num_bins: int,
     epsilon: float = BIN_EPSILON,
     **kwargs: Any,  # noqa: ARG001
-) -> np.ndarray:
+) -> npt.NDArray[Any]:
     upper_bound = max(1, predicted_scores.max())
     bins = np.array(
         sorted(
@@ -178,13 +185,13 @@ def make_equisized_bins(
 
 
 def positive_label_proportion(
-    labels: np.ndarray,
-    predictions: np.ndarray,
-    bins: np.ndarray,
-    sample_weight: np.ndarray | None = None,
+    labels: npt.NDArray[Any],
+    predictions: npt.NDArray[Any],
+    bins: npt.NDArray[Any],
+    sample_weight: npt.NDArray[Any] | None = None,
     alpha: float = 0.05,
     use_weights_in_sample_size: bool = False,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[npt.NDArray[Any], npt.NDArray[Any], npt.NDArray[Any], npt.NDArray[Any]]:
     """
     Computes the proportion of positive labels in each bin.
 
@@ -250,7 +257,7 @@ def positive_label_proportion(
     )
 
     # Compute confidence intervals
-    def _row_ci(row):
+    def _row_ci(row: pd.Series) -> pd.Series:
         if use_weights_in_sample_size:
             n_positive = row["label_weighted"]
             n = row["n_sample_weighted"]
@@ -284,7 +291,7 @@ def positive_label_proportion(
     )
 
 
-def geometric_mean(x: np.ndarray) -> float:
+def geometric_mean(x: npt.NDArray[Any]) -> float:
     """
     Computes the geometric mean of an array of numbers. If any of the numbers are 0, then the geometric mean is 0.
     The exp-log trick is used to avoid underflow/overflow problems when computing the product of many numbers.
@@ -296,7 +303,9 @@ def geometric_mean(x: np.ndarray) -> float:
         return np.exp(np.log(x).mean())
 
 
-def make_unjoined(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def make_unjoined(
+    x: npt.NDArray[Any], y: npt.NDArray[Any]
+) -> tuple[npt.NDArray[Any], npt.NDArray[Any]]:
     """
     Converts a regular dataset to 'unjoined' format. In the unjoined format, there is always
     a row with a negative label and there will be a second row with a positive label added to
@@ -332,23 +341,26 @@ class OrdinalEncoderWithUnknownSupport(OrdinalEncoder):
     OrdinalEncoder supports unknown categories using the handle_unknown and unknown_value arguments.
     """
 
-    def __init__(self, categories: str = "auto", dtype: type = np.float64) -> None:
+    _category_map: dict[int, dict[Any, int]]
+    categories_: list[npt.NDArray[Any]]
+
+    def __init__(self, categories: str = "auto", dtype: type[Any] = np.float64) -> None:
         super().__init__(categories=categories, dtype=dtype)
         self._category_map = {}
+        self.categories_ = []
 
     def fit(
-        self, X: np.ndarray | pd.DataFrame, y: Any = None
+        self, X: npt.NDArray[Any] | pd.DataFrame, y: Any = None
     ) -> "OrdinalEncoderWithUnknownSupport":
         X = X.values if isinstance(X, pd.DataFrame) else X
         super().fit(X, y)
-        # pyre-ignore[16]: categories_ is set by parent class fit()
         for i, category in enumerate(self.categories_):
             self._category_map[i] = {
                 value: index for index, value in enumerate(category)
             }
         return self
 
-    def transform(self, X: np.ndarray | pd.DataFrame) -> np.ndarray:
+    def transform(self, X: npt.NDArray[Any] | pd.DataFrame) -> npt.NDArray[Any]:
         X = X.values if isinstance(X, pd.DataFrame) else X
         if not self._category_map:
             raise ValueError("The fit method should be called before transform.")
@@ -384,7 +396,7 @@ def hash_categorical_feature(categorical_feature: str) -> int:
     return int(last_four_hex_chars, 16)
 
 
-def rank_log_discount(n_samples: int, log_base: int = 2) -> np.ndarray:
+def rank_log_discount(n_samples: int, log_base: int = 2) -> npt.NDArray[Any]:
     """
     Rank log discount function used for the rank metrics DCG and NDCG.
     More information about the function here: https://en.wikipedia.org/wiki/Discounted_cumulative_gain#Discounted_Cumulative_Gain.
@@ -396,7 +408,7 @@ def rank_log_discount(n_samples: int, log_base: int = 2) -> np.ndarray:
     return 1 / (np.log(np.arange(n_samples) + 2) / np.log(log_base))
 
 
-def rank_no_discount(num_samples: int) -> np.ndarray:
+def rank_no_discount(num_samples: int) -> npt.NDArray[Any]:
     """
     Rank discount function used for the rank metrics DCG and NDCG.
     Returns uniform discount factor of 1 for all samples.
@@ -428,8 +440,8 @@ class TrainTestSplitWrapper:
         self.stratify = stratify
 
     def split(
-        self, X: np.ndarray, y: np.ndarray, groups: Any = None
-    ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
+        self, X: npt.NDArray[Any], y: npt.NDArray[Any], groups: Any = None
+    ) -> Iterator[tuple[npt.NDArray[Any], npt.NDArray[Any]]]:
         train_idx, val_idx = train_test_split(
             np.arange(len(y)),
             test_size=self.test_size,
@@ -448,7 +460,9 @@ class NoopSplitterWrapper:
         This splitter returns the training set as it is and an empty test set.
         """
 
-    def split(self, X: np.ndarray, y: np.ndarray, groups: Any = None) -> Any:
+    def split(
+        self, X: npt.NDArray[Any], y: npt.NDArray[Any], groups: Any = None
+    ) -> Any:
         yield np.arange(len(y)), []  # train_idx, val_idx
 
 
@@ -475,7 +489,9 @@ def check_range(series: pd.Series, precision_type: str) -> bool:
     )
 
 
-def log_peak_rss(samples_per_second: float = 10.0):
+def log_peak_rss(
+    samples_per_second: float = 10.0,
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """
     Decorator factory to log peak RSS while a function runs.
 
@@ -486,21 +502,22 @@ def log_peak_rss(samples_per_second: float = 10.0):
     if samples_per_second <= 0:
         raise ValueError("samples_per_second must be >0")
 
-    sample_interval = 1.0 / samples_per_second
+    sample_interval: float = 1.0 / samples_per_second
 
-    def decorator(func):
-        log = logging.getLogger(func.__module__)
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        log: logging.Logger = logging.getLogger(func.__module__)
+        func_name: str = func.__name__
 
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             # Construct process object per call (cheap and fork-safe)
-            process = psutil.Process(os.getpid())
+            process: psutil.Process = psutil.Process(os.getpid())
 
             start_rss = process.memory_info().rss
             peak_rss = start_rss
-            stop_event = threading.Event()
+            stop_event: threading.Event = threading.Event()
 
-            def sampler():
+            def sampler() -> None:
                 nonlocal peak_rss
                 while not stop_event.is_set():
                     rss = process.memory_info().rss
@@ -520,7 +537,7 @@ def log_peak_rss(samples_per_second: float = 10.0):
                 log.info(
                     "%s: rss_start=%.1f MB, rss_end=%.1f MB, peak_observed=%.1f MB, "
                     "duration=%.2fs",
-                    func.__name__,
+                    func_name,
                     start_rss / 1024**2,
                     end_rss / 1024**2,
                     peak_rss / 1024**2,
