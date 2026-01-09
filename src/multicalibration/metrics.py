@@ -115,6 +115,17 @@ def expected_calibration_error(
     adjust_unjoined: bool = False,
     **kwargs: Any,
 ) -> float:
+    """
+    Calculate the Expected Calibration Error (ECE).
+
+    :param labels: Array of true labels.
+    :param predicted_scores: Array of predicted probability scores.
+    :param sample_weight: Optional array of sample weights.
+    :param num_bins: Number of bins to use for bucketing predictions.
+    :param epsilon: Small value to avoid numerical issues at bin boundaries.
+    :param adjust_unjoined: Whether to adjust for unjoined data.
+    :return: The expected calibration error.
+    """
     bins = utils.make_equispaced_bins(predicted_scores, num_bins, epsilon)
     return _calibration_error(
         labels,
@@ -134,6 +145,19 @@ def proportional_expected_calibration_error(
     adjust_unjoined: bool = False,
     **kwargs: Any,
 ) -> float:
+    """
+    Calculate the Proportional Expected Calibration Error.
+
+    Uses proportional error instead of absolute error for bin error calculation.
+
+    :param labels: Array of true labels.
+    :param predicted_scores: Array of predicted probability scores.
+    :param sample_weight: Optional array of sample weights.
+    :param num_bins: Number of bins to use for bucketing predictions.
+    :param epsilon: Small value to avoid numerical issues at bin boundaries.
+    :param adjust_unjoined: Whether to adjust for unjoined data.
+    :return: The proportional expected calibration error.
+    """
     bins = utils.make_equispaced_bins(predicted_scores, num_bins, epsilon)
     return _calibration_error(
         labels,
@@ -154,6 +178,19 @@ def adaptive_calibration_error(
     adjust_unjoined: bool = False,
     **kwargs: Any,
 ) -> float:
+    """
+    Calculate the Adaptive Calibration Error (ACE).
+
+    Unlike ECE which uses equispaced bins, ACE uses bins with equal numbers of samples.
+
+    :param labels: Array of true labels.
+    :param predicted_scores: Array of predicted probability scores.
+    :param sample_weight: Optional array of sample weights.
+    :param num_bins: Number of bins to use for bucketing predictions.
+    :param epsilon: Small value to avoid numerical issues at bin boundaries.
+    :param adjust_unjoined: Whether to adjust for unjoined data.
+    :return: The adaptive calibration error.
+    """
     bins = utils.make_equisized_bins(predicted_scores, num_bins, epsilon)
     return _calibration_error(
         labels,
@@ -173,6 +210,19 @@ def proportional_adaptive_calibration_error(
     adjust_unjoined: bool = False,
     **kwargs: Any,
 ) -> float:
+    """
+    Calculate the Proportional Adaptive Calibration Error.
+
+    Combines adaptive binning with proportional error calculation.
+
+    :param labels: Array of true labels.
+    :param predicted_scores: Array of predicted probability scores.
+    :param sample_weight: Optional array of sample weights.
+    :param num_bins: Number of bins to use for bucketing predictions.
+    :param epsilon: Small value to avoid numerical issues at bin boundaries.
+    :param adjust_unjoined: Whether to adjust for unjoined data.
+    :return: The proportional adaptive calibration error.
+    """
     bins = utils.make_equisized_bins(predicted_scores, num_bins, epsilon)
     return _calibration_error(
         labels,
@@ -191,6 +241,17 @@ def calibration_ratio(
     adjust_unjoined: bool = False,
     **kwargs: Any,
 ) -> float:
+    """
+    Calculate the calibration ratio (sum of predictions / sum of labels).
+
+    A value of 1.0 indicates perfect calibration on aggregate.
+
+    :param labels: Array of true labels.
+    :param predicted_scores: Array of predicted probability scores.
+    :param sample_weight: Optional array of sample weights.
+    :param adjust_unjoined: Whether to adjust for unjoined data.
+    :return: The calibration ratio.
+    """
     # equal weighting if no weights given
     if sample_weight is None:
         sample_weight = np.ones_like(predicted_scores)
@@ -213,6 +274,14 @@ def recall(
     sample_weight: npt.NDArray | None = None,
     **kwargs: Any,
 ) -> float:
+    """
+    Calculate recall (true positive rate).
+
+    :param labels: Array of true binary labels.
+    :param predicted_labels: Array of predicted binary labels.
+    :param sample_weight: Optional array of sample weights.
+    :return: The recall score.
+    """
     return skmetrics.recall_score(
         y_true=labels.astype(int),
         y_pred=predicted_labels.astype(int),
@@ -226,6 +295,14 @@ def precision(
     precision_weight: npt.NDArray | None = None,
     **kwargs: Any,
 ) -> float:
+    """
+    Calculate precision (positive predictive value).
+
+    :param labels: Array of true binary labels.
+    :param predicted_labels: Array of predicted binary labels.
+    :param precision_weight: Optional array of sample weights for precision calculation.
+    :return: The precision score.
+    """
     return skmetrics.precision_score(
         y_true=labels.astype(int),
         y_pred=predicted_labels.astype(int),
@@ -239,6 +316,14 @@ def fpr(
     sample_weight: npt.NDArray | None = None,
     **kwargs: Any,
 ) -> float:
+    """
+    Calculate the false positive rate (FPR).
+
+    :param labels: Array of true binary labels.
+    :param predicted_labels: Array of predicted binary labels.
+    :param sample_weight: Optional array of sample weights.
+    :return: The false positive rate.
+    """
     if len(labels) == 0:
         return 0.0
     cm = skmetrics.confusion_matrix(
@@ -260,6 +345,22 @@ def fpr_with_mask(
     sample_weight: npt.NDArray,
     denominator: float,
 ) -> float | None:
+    """
+    Calculate the false positive rate with a mask applied.
+
+    Only samples where `y_mask` is True are considered when counting false positives.
+    This is useful for computing FPR within a specific segment or subpopulation
+    while using a shared denominator across segments.
+
+    :param y_true: Array of true binary labels.
+    :param y_pred: Array of predicted binary labels.
+    :param y_mask: Boolean mask array indicating which samples to include in the
+        false positive count. Only samples where mask is True contribute to the numerator.
+    :param sample_weight: Array of sample weights.
+    :param denominator: The denominator to use for FPR calculation (typically the
+        weighted count of true negatives, possibly computed over a broader population).
+    :return: The false positive rate, or None if denominator is zero.
+    """
     if denominator == 0:
         return None
     fp_sr_idx = (y_pred & ~y_true & y_mask).astype(int) * sample_weight
@@ -365,14 +466,15 @@ def ndcg_score(
     sample_weight: npt.NDArray | None = None,
 ) -> float:
     """
-    Calculates the NDCG score: https://en.wikipedia.org/wiki/Discounted_cumulative_gain#Discounted_Cumulative_Gain.
+    Calculates the Normalized Discounted Cumulative Gain (NDCG)
 
     :param labels: Array of true labels.
     :param predicted_labels: Array of predicted labels.
     :param rank_discount: Function that takes the number of samples as input and returns an array of size n_samples
-        with the discount factor for each sample
+        with the discount factor for each sample.
     :param k: If not None, the NDCG score is calculated only based on the top k samples.
         k cannot be smaller than 1 and cannot be larger than the number of samples.
+    :param sample_weight: Optional array of sample weights. Currently unused but included for API consistency.
     :return: the NDCG score as a float in [0,1].
     """
     if min(labels) < 0:
@@ -396,6 +498,15 @@ def recall_at_precision(
     precision_target: float = 0.95,
     sample_weight: npt.ArrayLike | None = None,
 ) -> float:
+    """
+    Calculate the maximum recall at a given precision threshold.
+
+    :param y_true: Array of true binary labels.
+    :param y_scores: Array of predicted probability scores.
+    :param precision_target: Minimum precision threshold to achieve.
+    :param sample_weight: Optional array of sample weights.
+    :return: Maximum recall achievable at the precision target, or 0 if unachievable.
+    """
     precisions, recalls, _ = skmetrics.precision_recall_curve(
         y_true, y_scores, sample_weight=sample_weight
     )
@@ -413,6 +524,17 @@ def precision_at_predictive_prevalence(
     predictive_prevalence_target: float = 0.95,
     sample_weight: npt.NDArray | None = None,
 ) -> float:
+    """
+    Calculate precision at a given predictive prevalence threshold.
+
+    Predictive prevalence is the fraction of samples predicted as positive.
+
+    :param y_true: Array of true binary labels.
+    :param y_scores: Array of predicted probability scores.
+    :param predictive_prevalence_target: Target fraction of samples to predict as positive.
+    :param sample_weight: Optional array of sample weights.
+    :return: Maximum precision at the target predictive prevalence.
+    """
     precisions, _, thresholds = skmetrics.precision_recall_curve(
         y_true, y_scores, sample_weight=sample_weight
     )
@@ -436,6 +558,15 @@ def precision_at_recall(
     recall_target: float = 0.95,
     sample_weight: npt.NDArray | None = None,
 ) -> float:
+    """
+    Calculate the maximum precision at a given recall threshold.
+
+    :param y_true: Array of true binary labels.
+    :param y_scores: Array of predicted probability scores.
+    :param recall_target: Minimum recall threshold to achieve.
+    :param sample_weight: Optional array of sample weights.
+    :return: Maximum precision at the recall target, or 0 if unachievable.
+    """
     precisions, recalls, _ = skmetrics.precision_recall_curve(
         y_true, y_scores, sample_weight=sample_weight
     )
@@ -453,6 +584,15 @@ def fpr_at_precision(
     precision_target: float = 0.95,
     sample_weight: npt.NDArray | None = None,
 ) -> float:
+    """
+    Calculate the false positive rate at a given precision threshold.
+
+    :param y_true: Array of true binary labels.
+    :param y_scores: Array of predicted probability scores.
+    :param precision_target: Minimum precision threshold to achieve.
+    :param sample_weight: Optional array of sample weights.
+    :return: False positive rate at the precision target, or NaN if unachievable.
+    """
     negatives = y_scores[y_true == 0].shape[0]
     # if there are no negatives in the data, fpr is undefined
     if negatives == 0:
@@ -485,6 +625,15 @@ def predictions_to_labels(
     thresholds: pd.DataFrame,
     threshold_column: str | None = "threshold",
 ) -> pd.DataFrame:
+    """
+    Convert prediction scores to binary labels using segment-specific thresholds.
+
+    :param data: DataFrame containing predictions and segmentation columns.
+    :param prediction_column: Name of the column containing prediction scores.
+    :param thresholds: DataFrame with threshold values per segment.
+    :param threshold_column: Name of the column in thresholds containing threshold values.
+    :return: DataFrame with an added 'predicted_label' column.
+    """
     segmentation_columns = [c for c in thresholds.columns if c != threshold_column]
     data_w_thresholds = data.copy().merge(
         thresholds, on=segmentation_columns, how="left"
@@ -515,6 +664,20 @@ def multicalibration_error(
     num_bins: int = 40,
     epsilon: float = 0.0000001,
 ) -> float:
+    """
+    Calculate the multicalibration error across multiple segments.
+
+    Computes a weighted average of calibration errors for each segment.
+
+    :param labels: Array of true labels.
+    :param predictions: Array of predicted probability scores.
+    :param segments_df: DataFrame defining the segmentation columns.
+    :param sample_weight: Optional array of sample weights.
+    :param metric: Calibration error metric to use per segment.
+    :param num_bins: Number of bins for the calibration error calculation.
+    :param epsilon: Small value to avoid numerical issues.
+    :return: Weighted average calibration error across all segments.
+    """
     segments_df = segments_df.copy()
     segmentation_cols = list(segments_df.columns)
     segments_df["label"] = labels
@@ -643,6 +806,18 @@ def _calculate_cumulative_differences(
     segments: npt.NDArray | None = None,
     precision_dtype: np.float16 | np.float32 | np.float64 = DEFAULT_PRECISION_DTYPE,
 ) -> npt.NDArray:
+    """
+    Calculate cumulative differences between labels and predictions.
+
+    Used internally by Kuiper calibration functions.
+
+    :param labels: Array of binary labels.
+    :param predicted_scores: Array of predicted probability scores.
+    :param sample_weight: Optional array of sample weights.
+    :param segments: Optional array of segment masks.
+    :param precision_dtype: Data type for precision of computation.
+    :return: Array of cumulative differences.
+    """
     if segments is None:
         segments = np.ones(shape=(1, len(predicted_scores)), dtype=np.bool_)
         sorted_indices = np.argsort(predicted_scores)
@@ -693,6 +868,14 @@ def kuiper_standard_deviation(
     labels: npt.NDArray | None = None,
     sample_weight: npt.NDArray | None = None,
 ) -> float:
+    """
+    Calculate the Kuiper standard deviation for the entire dataset.
+
+    :param predicted_scores: Array of predicted probability scores.
+    :param labels: Optional array of labels (unused in this method).
+    :param sample_weight: Optional array of sample weights.
+    :return: The Kuiper standard deviation as a scalar.
+    """
     return kuiper_standard_deviation_per_segment(
         predicted_scores, labels, sample_weight
     ).item()
@@ -705,6 +888,18 @@ def kuiper_upper_bound_standard_deviation_per_segment(
     segments: npt.NDArray | None = None,
     precision_dtype: np.float16 | np.float32 | np.float64 = DEFAULT_PRECISION_DTYPE,
 ) -> npt.NDArray:
+    """
+    Calculate an upper bound on Kuiper standard deviation per segment.
+
+    Uses a conservative estimate: 1 / (2 * sqrt(n)) for each segment.
+
+    :param predicted_scores: Array of predicted probability scores.
+    :param labels: Optional array of labels (unused in this method).
+    :param sample_weight: Optional array of sample weights.
+    :param segments: Optional array of segment masks.
+    :param precision_dtype: Data type for precision of computation.
+    :return: Array of upper bound standard deviations per segment.
+    """
     if sample_weight is None:
         sample_weight = np.ones_like(predicted_scores)
     if segments is None:
@@ -720,6 +915,14 @@ def kuiper_upper_bound_standard_deviation(
     labels: npt.NDArray | None = None,
     sample_weight: npt.NDArray | None = None,
 ) -> float:
+    """
+    Calculate an upper bound on Kuiper standard deviation for the entire dataset.
+
+    :param predicted_scores: Array of predicted probability scores.
+    :param labels: Optional array of labels (unused in this method).
+    :param sample_weight: Optional array of sample weights.
+    :return: The upper bound standard deviation as a scalar.
+    """
     if sample_weight is None:
         sample_weight = np.ones_like(predicted_scores)
 
@@ -735,6 +938,18 @@ def kuiper_standard_deviation_per_segment(
     segments: npt.NDArray | None = None,
     precision_dtype: np.float16 | np.float32 | np.float64 = DEFAULT_PRECISION_DTYPE,
 ) -> npt.NDArray:
+    """
+    Calculate Kuiper standard deviation per segment.
+
+    Computes the standard deviation based on the variance of predictions.
+
+    :param predicted_scores: Array of predicted probability scores.
+    :param labels: Optional array of labels (unused in this method).
+    :param sample_weight: Optional array of sample weights.
+    :param segments: Optional array of segment masks.
+    :param precision_dtype: Data type for precision of computation.
+    :return: Array of standard deviations per segment.
+    """
     if sample_weight is None:
         sample_weight = np.ones_like(predicted_scores)
     if segments is None:
@@ -772,6 +987,17 @@ def kuiper_label_based_standard_deviation_per_segment(
     segments: npt.NDArray | None = None,
     precision_dtype: np.float16 | np.float32 | np.float64 = DEFAULT_PRECISION_DTYPE,
 ) -> npt.NDArray:
+    """
+    Calculate label-based Kuiper standard deviation per segment.
+
+    Uses differences between labels and predictions to estimate variance.
+
+    :param predicted_scores: Array of predicted probability scores.
+    :param labels: Array of binary labels (required for this method).
+    :param sample_weight: Optional array of sample weights.
+    :param segments: Optional array of segment masks.
+    :param precision_dtype: Data type for precision of computation.
+    """
     if sample_weight is None:
         sample_weight = np.ones_like(predicted_scores)
     if segments is None:
@@ -796,6 +1022,14 @@ def kuiper_label_based_standard_deviation(
     labels: npt.NDArray | None,
     sample_weight: npt.NDArray | None = None,
 ) -> float:
+    """
+    Calculate label-based Kuiper standard deviation for the entire dataset.
+
+    :param predicted_scores: Array of predicted probability scores.
+    :param labels: Array of binary labels (required for this method).
+    :param sample_weight: Optional array of sample weights.
+    :return: The label-based standard deviation as a scalar.
+    """
     if sample_weight is None:
         sample_weight = np.ones_like(predicted_scores)
 
@@ -832,6 +1066,18 @@ def identity_per_segment(
     segments: npt.NDArray | None = None,
     precision_dtype: np.float16 | np.float32 | np.float64 = DEFAULT_PRECISION_DTYPE,
 ) -> npt.NDArray:
+    """
+    Return an array of ones (identity normalization).
+
+    Used when no normalization is desired for Kuiper calibration.
+
+    :param predicted_scores: Array of predicted probability scores (unused).
+    :param labels: Optional array of labels (unused).
+    :param sample_weight: Optional array of sample weights (unused).
+    :param segments: Optional array of segment masks.
+    :param precision_dtype: Data type for precision of computation (unused).
+    :return: Array of ones with length equal to number of segments.
+    """
     if segments is None:
         return np.ones(1)
     return np.ones(segments.shape[0])
@@ -907,11 +1153,12 @@ def kuiper_calibration(
     https://doi.org/10.5281/zenodo.10481097
 
     :param labels: Array of binary labels (0 or 1)
-    :param predicted_scores: Array of predicted probability scores. (floats between 0 and 1)
+    :param predicted_scores: Array of predicted probability scores (floats between 0 and 1)
     :param sample_weight: Optional array of sample weights (non-negative floats)
-    :param normalization_method: Optional function to calculate a normalization constant.
-            See for example kuiper_sd or inverse_sqrt_sample_size, methods need to follow the same interface.
+    :param normalization_method: Optional method name for calculating a normalization constant.
+        See kuiper_standard_deviation_per_segment or kuiper_upper_bound_standard_deviation_per_segment.
     :param segments: Optional array of segments to parallelize the computation of the kuiper calibration distance.
+    :param precision_dtype: Data type for precision of computation. Defaults to np.float64.
     :return: Kuiper calibration distance
     """
 
@@ -1014,6 +1261,14 @@ def kuiper_statistic(
     predicted_scores: npt.NDArray,
     sample_weight: npt.NDArray | None = None,
 ) -> float:
+    """
+    Calculate the Kuiper test statistic.
+
+    :param labels: Array of true binary labels.
+    :param predicted_scores: Array of predicted probability scores.
+    :param sample_weight: Optional array of sample weights.
+    :return: The Kuiper statistic.
+    """
     return kuiper_test(
         labels,
         predicted_scores,
@@ -1026,6 +1281,14 @@ def kuiper_pvalue(
     predicted_scores: npt.NDArray,
     sample_weight: npt.NDArray | None = None,
 ) -> float:
+    """
+    Calculate the Kuiper test p-value.
+
+    :param labels: Array of true binary labels.
+    :param predicted_scores: Array of predicted probability scores.
+    :param sample_weight: Optional array of sample weights.
+    :return: The p-value from the Kuiper test.
+    """
     return kuiper_test(
         labels,
         predicted_scores,
@@ -1042,6 +1305,18 @@ def kuiper_func_per_segment(
     sample_weight: npt.NDArray | None = None,
     min_segment_size: int = 2,
 ) -> pd.Series:
+    """
+    Apply a function to each segment and return results as a Series.
+
+    :param labels: Array of true binary labels.
+    :param predictions: Array of predicted probability scores.
+    :param segments_df: DataFrame defining the segmentation columns.
+    :param func: Function to apply to each segment's DataFrame.
+    :param output_series_name: Name for the resulting Series.
+    :param sample_weight: Optional array of sample weights.
+    :param min_segment_size: Minimum samples required per segment.
+    :return: Series with function results indexed by segment.
+    """
     segments_df = segments_df.copy()
     segmentation_cols = list(segments_df.columns)
     segments_df["label"] = labels
@@ -1068,6 +1343,17 @@ def kuiper_pvalue_per_segment(
     sample_weight: npt.NDArray | None = None,
     min_segment_size: int = 2,
 ) -> pd.Series:
+    """
+    Calculate Kuiper p-values for each segment.
+
+    :param labels: Array of true binary labels.
+    :param predictions: Array of predicted probability scores.
+    :param segments_df: DataFrame defining the segmentation columns.
+    :param sample_weight: Optional array of sample weights.
+    :param min_segment_size: Minimum samples required per segment.
+    :return: Series of p-values indexed by segment.
+    """
+
     def _group_kuiper_p_value(group: pd.DataFrame) -> float | None:
         if len(group) < min_segment_size:
             return None
@@ -1139,6 +1425,16 @@ def multi_segment_pvalue_geometric_mean(
     sample_weight: npt.NDArray | None = None,
     min_segment_size: int = 2,
 ) -> float:
+    """
+    Calculate the geometric mean of Kuiper p-values across segments.
+
+    :param labels: Array of true binary labels.
+    :param predictions: Array of predicted probability scores.
+    :param segments_df: DataFrame defining the segmentation columns.
+    :param sample_weight: Optional array of sample weights.
+    :param min_segment_size: Minimum samples required per segment.
+    :return: Geometric mean of segment p-values.
+    """
     segment_p_values = kuiper_pvalue_per_segment(
         labels=labels,
         predictions=predictions,
@@ -1157,6 +1453,16 @@ def multi_segment_inverse_sqrt_normalized_statistic_max(
     sample_weight: npt.NDArray | None = None,
     min_segment_size: int = 2,
 ) -> float:
+    """
+    Calculate the max Kuiper statistic across segments with inverse-sqrt normalization.
+
+    :param labels: Array of true binary labels.
+    :param predictions: Array of predicted probability scores.
+    :param segments_df: DataFrame defining the segmentation columns.
+    :param sample_weight: Optional array of sample weights.
+    :param min_segment_size: Minimum samples required per segment.
+    :return: Maximum normalized Kuiper statistic across all segments.
+    """
     segment_statistics = kuiper_statistic_per_segment(
         labels=labels,
         predictions=predictions,
@@ -1178,6 +1484,18 @@ def multi_segment_kuiper_test(
     combination_method: str = "poisson",
     min_segment_size: int = 2,
 ) -> dict[str, float]:
+    """
+    Perform a combined Kuiper test across multiple segments.
+
+    :param labels: Array of true binary labels.
+    :param predictions: Array of predicted probability scores.
+    :param segments_df: DataFrame defining the segmentation columns.
+    :param sample_weight: Optional array of sample weights.
+    :param alpha: Significance level for the test.
+    :param combination_method: Method to combine p-values ('poisson' or scipy methods).
+    :param min_segment_size: Minimum samples required per segment.
+    :return: Dictionary with n_segments, statistic, p_value, and segment_p_values.
+    """
     segment_p_values = kuiper_pvalue_per_segment(
         labels=labels,
         predictions=predictions,
@@ -1416,7 +1734,10 @@ def calibration_free_normalized_entropy(
 
     :param labels: Ground truth (correct) labels for n_samples samples.
     :param predicted_scores: Predicted probabilities, as returned by a classifier's predict_proba method.
-    :returns: the calibration-free NE.
+    :param sample_weight: Optional array of sample weights for each instance.
+    :param tolerance: Convergence tolerance for the iterative calibration adjustment. Defaults to 1e-5.
+    :param max_iter: Maximum number of iterations for the calibration adjustment. Defaults to 10000.
+    :return: the calibration-free NE.
     """
     if len(labels.shape) != 1:
         raise ValueError("y_pred must be the predicted probability for class 1 only.")
@@ -1744,6 +2065,13 @@ class ScoreFunctionInterface(Protocol):
 def wrap_sklearn_metric_func(
     func: Callable[..., float],
 ) -> ScoreFunctionInterface:
+    """
+    Wrap an sklearn-style metric function for use with the evaluation framework.
+
+    :param func: A function with signature (y_true, y_pred, sample_weight=None) -> float.
+    :return: A ScoreFunctionInterface-compatible wrapper.
+    """
+
     class WrappedFuncSkLearn(ScoreFunctionInterface):
         name = func.__name__
 
@@ -1772,6 +2100,19 @@ def wrap_multicalibration_error_metric(
     max_n_segments: int | None = DEFAULT_MULTI_KUIPER_N_SEGMENTS,
     metric_version: str = "mce",
 ) -> ScoreFunctionInterface:
+    """
+    Create a wrapped MulticalibrationError metric for use with the evaluation framework.
+
+    :param categorical_segment_columns: Columns to use for categorical segmentation.
+    :param numerical_segment_columns: Columns to use for numerical segmentation.
+    :param max_depth: Maximum depth for segment generation.
+    :param max_values_per_segment_feature: Max unique values per segment feature.
+    :param min_samples_per_segment: Minimum samples required per segment.
+    :param sigma_estimation_method: Method for sigma estimation.
+    :param max_n_segments: Maximum number of segments to generate.
+    :param metric_version: Which metric to return ('mce', 'mce_sigma_scale', 'mce_absolute', 'p_value').
+    :return: A ScoreFunctionInterface-compatible wrapper.
+    """
     if categorical_segment_columns is None and numerical_segment_columns is None:
         raise ValueError(
             "No segment columns provided. Please provide either "
