@@ -344,9 +344,18 @@ def test_warm_starting_trials_produces_the_right_number_of_sobol_and_bayesian_tr
         )
 
     value_counter = trial_results["generation_node"].value_counts().to_dict()
-    sobol_count = value_counter["GenerationStep_0"]
-    botorch_count = value_counter["GenerationStep_1"]
-
+    sobol_key = (
+        "GenerationStep_0_Sobol"
+        if "GenerationStep_0_Sobol" in value_counter
+        else "GenerationStep_0"
+    )
+    sobol_count = value_counter[sobol_key]
+    botorch_key = (
+        "GenerationStep_1_BoTorch"
+        if "GenerationStep_1_BoTorch" in value_counter
+        else "GenerationStep_1"
+    )
+    botorch_count = value_counter[botorch_key]
     expected_botorch = total_trials - n_warmup_random_trials - 1
     assert (
         len(trial_results) == total_trials
