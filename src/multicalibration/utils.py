@@ -43,6 +43,20 @@ def unshrink(
     w: npt.NDArray[Any] | None = None,
     logit_epsilon: float | None = 10,
 ) -> float:
+    """
+    Compute an unshrinkage coefficient using logistic regression.
+
+    Fits a logistic regression model without intercept to find a scaling coefficient
+    that adjusts for shrinkage in the logits. Uses Newton-CG solver primarily, with
+    LBFGS as fallback if Newton-CG fails to converge.
+
+    :param y: Array of binary labels (0 or 1).
+    :param logits: Array of logit values (log-odds) to unshrink.
+    :param w: Optional array of sample weights. If None, uniform weights are used.
+    :param logit_epsilon: Clipping bound for logits to avoid extreme coefficients.
+        Set to None to disable clipping.
+    :return: The unshrinkage coefficient. Returns 1 if both solvers fail.
+    """
     if w is None:
         w = np.ones_like(y)
     logits = logits.reshape(-1, 1)
@@ -106,7 +120,15 @@ def unshrink(
 
 
 def logistic(logits: float) -> float:
-    # Numerically stable sigmoid - Computational trick to avoid overflow/underflow
+    """
+    Compute the logistic (sigmoid) function in a numerically stable way.
+
+    Uses a computational trick to avoid overflow/underflow by choosing
+    different formulations based on the sign of the input.
+
+    :param logits: Input value in log-odds space.
+    :return: Probability value in (0, 1).
+    """
     if logits >= 0:
         return 1.0 / (1.0 + math.exp(-logits))
     else:
@@ -119,6 +141,13 @@ logistic_vectorized = np.vectorize(logistic)
 def logit(
     probs: npt.NDArray[Any], epsilon: float = MIN_LOGIT_EPSILON
 ) -> npt.NDArray[Any]:
+    """
+    Compute the logit (log-odds) of probabilities.
+
+    :param probs: Array of probability values.
+    :param epsilon: Small constant to avoid division by zero and log(0).
+    :return: Array of logit values.
+    """
     with np.errstate(invalid="ignore"):
         return np.log((probs + epsilon) / (1 - probs + epsilon))
 
@@ -126,16 +155,36 @@ def logit(
 def absolute_error(
     estimate: npt.NDArray[Any], reference: npt.NDArray[Any]
 ) -> npt.NDArray[Any]:
+    """
+    Compute element-wise absolute error between estimate and reference.
+
+    :param estimate: Array of estimated values.
+    :param reference: Array of reference (ground truth) values.
+    :return: Array of absolute errors.
+    """
     return np.abs(estimate - reference)
 
 
 def proportional_error(
     estimate: npt.NDArray[Any], reference: npt.NDArray[Any]
 ) -> npt.NDArray[Any]:
+    """
+    Compute element-wise proportional (relative) error between estimate and reference.
+
+    :param estimate: Array of estimated values.
+    :param reference: Array of reference (ground truth) values.
+    :return: Array of proportional errors (absolute error divided by reference).
+    """
     return np.abs(estimate - reference) / reference
 
 
 class BinningMethodInterface(Protocol):
+    """
+    Protocol defining the interface for binning methods.
+
+    Implementations should partition predicted scores into bins and return bin boundaries.
+    """
+
     def __call__(
         self,
         predicted_scores: npt.NDArray[Any],
@@ -150,6 +199,19 @@ def make_equispaced_bins(
     epsilon: float = BIN_EPSILON,
     set_range_to_zero_one: bool = True,
 ) -> npt.NDArray[Any]:
+    """
+    Create bins with equal width (equispaced) for predicted scores.
+
+    For example, with num_bins=5 and set_range_to_zero_one=True, the bins would be
+    approximately [0.0, 0.2, 0.4, 0.6, 0.8, 1.0] (before epsilon adjustments).
+
+    :param predicted_scores: Array of predicted probability scores.
+    :param num_bins: Number of bins to create.
+    :param epsilon: Small offset applied to bin edges to ensure all values are captured.
+    :param set_range_to_zero_one: If True, bins span [0, 1]; otherwise, bins span
+        the min/max of predicted_scores.
+    :return: Array of bin boundaries with length num_bins + 1.
+    """
     upper_bound = max(1, predicted_scores.max())
 
     bins = (
@@ -172,6 +234,16 @@ def make_equisized_bins(
     epsilon: float = BIN_EPSILON,
     **kwargs: Any,  # noqa: ARG001
 ) -> npt.NDArray[Any]:
+    """
+    Create bins with approximately equal number of samples (quantile-based).
+
+    :param predicted_scores: Array of predicted probability scores.
+    :param num_bins: Target number of bins. Actual number may be fewer if there
+        are many duplicate values.
+    :param epsilon: Small offset applied to the upper bin edge.
+    :param kwargs: Additional arguments (unused, for interface compatibility).
+    :return: Array of bin boundaries.
+    """
     upper_bound = max(1, predicted_scores.max())
     bins = np.array(
         sorted(
@@ -216,7 +288,11 @@ def positive_label_proportion(
         score 0.1 and label 0 with weight 100.
         Option 2. it could also be the case that weights merely reflects the inverse
         of the sampling probability of the instance.
-    :return: tuple of (label_proportion, lower, upper, score_average) arrays
+    :return: Tuple of four arrays:
+        - label_proportion: Proportion of positive labels in each bin.
+        - lower: Lower bound of the confidence interval.
+        - upper: Upper bound of the confidence interval.
+        - score_average: Average predicted score in each bin.
     """
     if np.any(np.isnan(predictions)):
         raise ValueError("predictions must not contain NaNs")
@@ -345,6 +421,10 @@ class OrdinalEncoderWithUnknownSupport(OrdinalEncoder):
     categories_: list[npt.NDArray[Any]]
 
     def __init__(self, categories: str = "auto", dtype: type[Any] = np.float64) -> None:
+        """
+        :param categories: Categories per feature. See sklearn.OrdinalEncoder.
+        :param dtype: Desired dtype of output.
+        """
         super().__init__(categories=categories, dtype=dtype)
         self._category_map = {}
         self.categories_ = []
@@ -352,6 +432,13 @@ class OrdinalEncoderWithUnknownSupport(OrdinalEncoder):
     def fit(
         self, X: npt.NDArray[Any] | pd.DataFrame, y: Any = None
     ) -> "OrdinalEncoderWithUnknownSupport":
+        """
+        Fit the encoder to the given data.
+
+        :param X: Array-like of shape (n_samples, n_features).
+        :param y: Ignored, present for API compatibility.
+        :return: Self.
+        """
         X = X.values if isinstance(X, pd.DataFrame) else X
         super().fit(X, y)
         for i, category in enumerate(self.categories_):
@@ -361,6 +448,15 @@ class OrdinalEncoderWithUnknownSupport(OrdinalEncoder):
         return self
 
     def transform(self, X: npt.NDArray[Any] | pd.DataFrame) -> npt.NDArray[Any]:
+        """
+        Transform categorical features to ordinal integers.
+
+        Unknown categories are encoded as -1.
+
+        :param X: Array-like of shape (n_samples, n_features).
+        :return: Transformed array with integer codes.
+        :raises ValueError: If fit has not been called.
+        """
         X = X.values if isinstance(X, pd.DataFrame) else X
         if not self._category_map:
             raise ValueError("The fit method should be called before transform.")
@@ -375,10 +471,21 @@ class OrdinalEncoderWithUnknownSupport(OrdinalEncoder):
         return X_transformed
 
     def serialize(self) -> str:
+        """
+        Serialize the encoder's category mapping to a string.
+
+        :return: String representation of the category mapping.
+        """
         return str(self._category_map)
 
     @classmethod
     def deserialize(cls, encoder_str: str) -> "OrdinalEncoderWithUnknownSupport":
+        """
+        Deserialize an encoder from a string.
+
+        :param encoder_str: String representation of the category mapping.
+        :return: Reconstructed encoder instance.
+        """
         enc = cls()
         enc._category_map = ast.literal_eval(encoder_str)
         return enc
@@ -430,9 +537,11 @@ class TrainTestSplitWrapper:
         """
         Customized train-test split class that allows to specify the test size (fraction).
         This is useful for the case where we want to have a single split with given test size, rather than doing k-fold crossvalidation.
-        :param test_size: size of the test set as a fraction of the total size of the dataset.
-        :param shuffle: whether to shuffle the data before splitting;
-        :param random_state: random state;
+
+        :param test_size: Size of the test set as a fraction of the total dataset size.
+        :param shuffle: Whether to shuffle the data before splitting.
+        :param random_state: Random state for reproducibility.
+        :param stratify: Whether to stratify the split based on labels.
         """
         self.test_size = test_size
         self.shuffle = shuffle
@@ -442,6 +551,14 @@ class TrainTestSplitWrapper:
     def split(
         self, X: npt.NDArray[Any], y: npt.NDArray[Any], groups: Any = None
     ) -> Iterator[tuple[npt.NDArray[Any], npt.NDArray[Any]]]:
+        """
+        Generate a single train/validation split.
+
+        :param X: Feature matrix (used only for determining array length).
+        :param y: Label array used for stratification if enabled.
+        :param groups: Ignored, included for API compatibility.
+        :yields: Tuple of (train_indices, validation_indices).
+        """
         train_idx, val_idx = train_test_split(
             np.arange(len(y)),
             test_size=self.test_size,
@@ -463,10 +580,24 @@ class NoopSplitterWrapper:
     def split(
         self, X: npt.NDArray[Any], y: npt.NDArray[Any], groups: Any = None
     ) -> Any:
+        """
+        Return all data as training set with empty validation set.
+
+        :param X: Feature matrix (unused).
+        :param y: Label array used to determine dataset size.
+        :param groups: Ignored, included for API compatibility.
+        :yields: Tuple of (all indices, empty list).
+        """
         yield np.arange(len(y)), []  # train_idx, val_idx
 
 
 def convert_arrow_columns_to_numpy(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Convert Arrow-backed columns in a DataFrame to NumPy arrays.
+
+    :param df: DataFrame potentially containing Arrow extension arrays.
+    :return: DataFrame with all Arrow columns converted to NumPy.
+    """
     for col in df.columns:
         if isinstance(df[col].values, pd.core.arrays.ArrowExtensionArray):
             df[col] = df[col].to_numpy()
@@ -474,7 +605,16 @@ def convert_arrow_columns_to_numpy(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def check_range(series: pd.Series, precision_type: str) -> bool:
-    """Check if the values in the series are within the valid range for the precision type."""
+    """
+    Check if values in a series are within the valid range for a floating-point precision type.
+
+    Also checks that the sum does not exceed the square root of the max value to avoid
+    overflow during aggregation operations.
+
+    :param series: Pandas Series of numeric values.
+    :param precision_type: One of 'float16', 'float32', or 'float64'.
+    :return: True if all values are within range, False otherwise.
+    """
     precision_limits = {
         "float16": (np.finfo(np.float16).min, np.finfo(np.float16).max),
         "float32": (np.finfo(np.float32).min, np.finfo(np.float32).max),
@@ -493,11 +633,25 @@ def log_peak_rss(
     samples_per_second: float = 10.0,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """
-    Decorator factory to log peak RSS while a function runs.
+    Decorator factory to log peak RSS (Resident Set Size) while a function runs.
 
-    samples_per_second: how often to sample memory, e.g.
-        @log_peak_rss()        # 10 samples per second (default)
-        @log_peak_rss(2.0)     # 2 samples per second
+    Spawns a background thread that periodically samples memory usage and logs
+    the peak observed value along with start/end memory and duration.
+
+    :param samples_per_second: Sampling frequency for memory monitoring.
+        E.g., 10.0 samples 10 times per second, 2.0 samples twice per second.
+    :return: Decorator that wraps functions with memory logging.
+    :raises ValueError: If samples_per_second is not positive.
+
+    Example usage::
+
+        @log_peak_rss()
+        def memory_intensive_function():
+            ...
+
+        @log_peak_rss(2.0)
+        def another_function():
+            ...
     """
     if samples_per_second <= 0:
         raise ValueError("samples_per_second must be >0")
