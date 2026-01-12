@@ -39,13 +39,15 @@ from multicalibration import methods
 import numpy as np
 import pandas as pd
 
-# Create minimal dataframe
+# Create sample dataframe with 100 rows
+rng = np.random.default_rng(42)
+n_samples = 100
 df = pd.DataFrame(
         {
-            "device_type": np.array(["mobile", "desktop", "tablet", "tablet", "desktop"]),
-            "market": np.array(["US", "UK", "US", "UK", "US"]),
-            "prediction": np.array([0.1, 0.2, 0.3, 0.4, 0.5]),
-            "label": np.array([0, 1, 0, 1, 0]),
+            "device_type": rng.choice(["mobile", "desktop", "tablet"], size=n_samples),
+            "market": rng.choice(["US", "UK"], size=n_samples),
+            "prediction": rng.uniform(0, 1, size=n_samples),
+            "label": rng.integers(0, 2, size=n_samples),
         }
     )
 
