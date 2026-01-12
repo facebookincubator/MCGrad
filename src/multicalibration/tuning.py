@@ -228,7 +228,6 @@ def tune_mcgrad_params(
             # pyre-ignore[6] we assert above that df_val is not None
             df=df_val,
             prediction_column_name=prediction_column_name,
-            label_column_name=label_column_name,
             categorical_feature_column_names=categorical_feature_column_names,
             numerical_feature_column_names=numerical_feature_column_names,
         )
