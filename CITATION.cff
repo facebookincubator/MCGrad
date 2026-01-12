@@ -13,26 +13,34 @@ repository-code: https://github.com/facebookincubator/MCGrad
 license: MIT
 version: 0.1.0
 preferred-citation:
-  type: article
+  type: conference-paper
   title: "MCGrad: Multicalibration at Web Scale"
   authors:
-    - family-names: Perini
-      given-names: Lorenzo
-    - family-names: Haimovich
-      given-names: Daniel
-    - family-names: Linder
-      given-names: Fridolin
     - family-names: Tax
       given-names: Niek
+    - family-names: Perini
+      given-names: Lorenzo
+    - family-names: Linder
+      given-names: Fridolin
+    - family-names: Haimovich
+      given-names: Daniel
     - family-names: Karamshuk
       given-names: Dima
-    - family-names: Vojnovic
-      given-names: Milan
     - family-names: Okati
       given-names: Nastaran
+    - family-names: Vojnovic
+      given-names: Milan
     - family-names: Apostolopoulos
       given-names: Pavlos Athanasios
-  journal: "arXiv preprint arXiv:2509.19884"
+  collection-title: "Proceedings of the 32nd ACM SIGKDD Conference on Knowledge Discovery and Data Mining V.1 (KDD 2026)"
+  collection-type: proceedings
+  conference:
+    name: "KDD 2026"
+    city: "Jeju Island"
+    country: "Republic of Korea"
+    date-start: 2026-08-09
+    date-end: 2026-08-13
   year: 2026
+  doi: "10.1145/3770854.3783954"
+  isbn: "979-8-4007-2258-5"
   url: "https://arxiv.org/abs/2509.19884"
-  notes: "To appear in KDD 2026"

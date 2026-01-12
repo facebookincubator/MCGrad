@@ -111,7 +111,7 @@ Post-processing methods risk overfitting, potentially harming the base model. MC
 
 [1] **Tax, N., Perini, L., Linder, F., Haimovich, D., Karamshuk, D., Okati, N., Vojnovic, M., & Apostolopoulos, P. A.**
 [MCGrad: Multicalibration at Web Scale](https://arxiv.org/abs/2509.19884).
-*Proceedings of the 32nd ACM SIGKDD Conference on Knowledge Discovery and Data Mining, 2026.*
+*Proceedings of the 32nd ACM SIGKDD Conference on Knowledge Discovery and Data Mining V.1 (KDD 2026).* DOI: 10.1145/3770854.3783954
 
 [2] **Baldeschi, R. C., Di Gregorio, S., Fioravanti, S., Fusco, F., Guy, I., Haimovich, D., Leonardi, S., Linder, F., Perini, L., Russo, M., & Tax, N.** [Multicalibration yields better matchings](https://arxiv.org/abs/2511.11413).
 *ArXiv preprint, 2025.*

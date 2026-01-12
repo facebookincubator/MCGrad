@@ -62,10 +62,11 @@ If you use MCGrad in academic work, please cite:
 
 ```bibtex
 @inproceedings{tax2026mcgrad,
-  title={MCGrad: Multicalibration at Web Scale},
+  title={{MCGrad: Multicalibration at Web Scale}},
   author={Tax, Niek and Perini, Lorenzo and Linder, Fridolin and Haimovich, Daniel and Karamshuk, Dima and Okati, Nastaran and Vojnovic, Milan and Apostolopoulos, Pavlos Athanasios},
-  booktitle={Proceedings of the 32nd ACM SIGKDD Conference on Knowledge Discovery and Data Mining},
-  year={2026}
+  booktitle={Proceedings of the 32nd ACM SIGKDD Conference on Knowledge Discovery and Data Mining V.1 (KDD 2026)},
+  year={2026},
+  doi={10.1145/3770854.3783954}
 }
 ```
 
