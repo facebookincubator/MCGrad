@@ -7,12 +7,10 @@
 from unittest.mock import Mock
 
 import numpy as np
-
 import pandas as pd
 import pytest
 import scipy
 import sklearn.metrics as skmetrics
-
 from multicalibration import methods, utils
 from multicalibration.metrics import (
     wrap_multicalibration_error_metric,
@@ -323,9 +321,9 @@ def test_fit_transform_with_train_col_identical_to_fit_then_predict(
     calibrator.fit(df[df.is_train_set], "prediction", "label")
     result_fit_predict = calibrator.predict(df[~df.is_train_set], "prediction")
 
-    assert np.allclose(
-        result_fit_transform[~df.is_train_set], result_fit_predict
-    ), "fit_transform does not give the same result as fit followed by predict"
+    assert np.allclose(result_fit_transform[~df.is_train_set], result_fit_predict), (
+        "fit_transform does not give the same result as fit followed by predict"
+    )
 
 
 @pytest.mark.parametrize(
@@ -392,9 +390,9 @@ def test_fit_transform_no_train_col_identical_to_fit_then_predict(
     calibrator.fit(df, "prediction", "label")
     result_fit_predict = calibrator.predict(df, "prediction")
 
-    assert np.allclose(
-        result_fit_transform, result_fit_predict
-    ), "fit_transform does not give the same result as fit followed by predict"
+    assert np.allclose(result_fit_transform, result_fit_predict), (
+        "fit_transform does not give the same result as fit followed by predict"
+    )
 
 
 def test_segmentwise_calibrator_raises_when_incompatible_calibrator_kwargs_are_passed():
@@ -1007,9 +1005,9 @@ def test_mcgrad_reproducibility_with_same_random_state(calibrator_class):
 
     next_seed1 = model1._next_seed()
     next_seed2 = model2._next_seed()
-    assert (
-        next_seed1 == next_seed2
-    ), "Same random_state should produce same seed sequence"
+    assert next_seed1 == next_seed2, (
+        "Same random_state should produce same seed sequence"
+    )
 
 
 @pytest.mark.parametrize(
@@ -1440,9 +1438,9 @@ def test_fit_with_provided_df_val_runs_without_errors(calibrator_class, rng):
         numerical_feature_column_names=["feature1"],
     )
 
-    assert (
-        len(predictions_val) > 0
-    ), f"Predictions should not be empty, but got {len(predictions_val)}"
+    assert len(predictions_val) > 0, (
+        f"Predictions should not be empty, but got {len(predictions_val)}"
+    )
 
 
 @pytest.mark.parametrize(
@@ -1480,9 +1478,9 @@ def test_mce_correctly_setup_in_mcgrad(calibrator_class, rng):
         numerical_feature_column_names=["feature2"],
     )
 
-    assert (
-        "Multicalibration Error" in mcgrad.early_stopping_score_func.name
-    ), "Name of the MCE metric does not contain Multicalibration Error or is not properly set up."
+    assert "Multicalibration Error" in mcgrad.early_stopping_score_func.name, (
+        "Name of the MCE metric does not contain Multicalibration Error or is not properly set up."
+    )
 
 
 @pytest.mark.parametrize(
@@ -1533,9 +1531,9 @@ def test_mce_parameters_correctly_setup_in_mcgrad(calibrator_class, rng):
 
     # Check if the MCE's parameters are correctly set in the MCGrad object
     for param, expected_value in expected_params.items():
-        assert (
-            getattr(mcgrad.early_stopping_score_func, param) == expected_value
-        ), f"Parameter {param} not set correctly"
+        assert getattr(mcgrad.early_stopping_score_func, param) == expected_value, (
+            f"Parameter {param} not set correctly"
+        )
 
 
 @pytest.mark.parametrize(
@@ -1668,7 +1666,9 @@ def test_performance_metrics_dictionary_size_matches_number_of_rounds(
             ]
         )
         == 1 + len(mcgrad.mr) + extra_evaluation_due_to_early_stopping
-    ), f"The (validation) performance metrics dictionary should have {1 + len(mcgrad.mr)+extra_evaluation_due_to_early_stopping} elements"
+    ), (
+        f"The (validation) performance metrics dictionary should have {1 + len(mcgrad.mr) + extra_evaluation_due_to_early_stopping} elements"
+    )
     assert (
         len(
             mcgrad._performance_metrics[
@@ -1676,7 +1676,9 @@ def test_performance_metrics_dictionary_size_matches_number_of_rounds(
             ]
         )
         == 1 + len(mcgrad.mr) + extra_evaluation_due_to_early_stopping
-    ), f"The (training) performance metrics dictionary should have {1 + len(mcgrad.mr)+extra_evaluation_due_to_early_stopping} elements"
+    ), (
+        f"The (training) performance metrics dictionary should have {1 + len(mcgrad.mr) + extra_evaluation_due_to_early_stopping} elements"
+    )
 
 
 def test_categorical_features_used_correctly_in_mcgrad_regressor():
@@ -1864,12 +1866,12 @@ def test_mcgrad_predict_with_num_rounds_0(calibrator_class, rng):
     )
 
     # Check that the predictions are the same as the original prediction column in both cases
-    assert np.allclose(
-        predictions_all_rounds, df_train["prediction"]
-    ), "Predictions with 'return_all_rounds' = True do not match the original prediction column."
-    assert np.allclose(
-        predictions_final_round, df_train["prediction"]
-    ), "Predictions with 'return_all_rounds' = False do not match the original prediction column."
+    assert np.allclose(predictions_all_rounds, df_train["prediction"]), (
+        "Predictions with 'return_all_rounds' = True do not match the original prediction column."
+    )
+    assert np.allclose(predictions_final_round, df_train["prediction"]), (
+        "Predictions with 'return_all_rounds' = False do not match the original prediction column."
+    )
 
 
 @pytest.mark.parametrize(
@@ -1907,9 +1909,9 @@ def test_mcgrad_number_rounds_after_fitting_with_0_rounds(calibrator_class, rng)
         numerical_feature_column_names=["feature2"],
     )
 
-    assert (
-        len(mcgrad.mr) == 0
-    ), "MCGrad's number of rounds should be 0 after setting num_rounds to 0."
+    assert len(mcgrad.mr) == 0, (
+        "MCGrad's number of rounds should be 0 after setting num_rounds to 0."
+    )
 
 
 @pytest.mark.parametrize("calibrator_class", [methods.MCGrad, methods.RegressionMCGrad])
@@ -1920,9 +1922,13 @@ def test_that_default_early_stopping_score_func_minimization_adheres_to_scikitle
     if mcb.early_stopping_score_func.name.endswith(
         "_loss"
     ) or mcb.early_stopping_score_func.name.endswith("_error"):
-        assert mcb.early_stopping_minimize_score, 'For loss functions that end with "_loss" or "_error" the minimization should be True. If you are sure this is correct, please change the test.'
+        assert mcb.early_stopping_minimize_score, (
+            'For loss functions that end with "_loss" or "_error" the minimization should be True. If you are sure this is correct, please change the test.'
+        )
     elif mcb.early_stopping_score_func.name.endswith("_score"):
-        assert not mcb.early_stopping_minimize_score, 'For score functions that end with "_score" the minimization should be False. If you are sure this is correct, please change the test.'
+        assert not mcb.early_stopping_minimize_score, (
+            'For score functions that end with "_score" the minimization should be False. If you are sure this is correct, please change the test.'
+        )
     else:
         raise ValueError(
             f"Default early stopping score function {mcb.early_stopping_score_func.name} does not adhere to scikit learn naming convention (suffix '_loss' -> lower is better, suffix '_score' -> higher is better). Make sure to set early_stopping_minimize_score correctly and adapt this test."
@@ -1974,16 +1980,20 @@ def test_mce_below_initial_and_mce_below_strong_evidence_threshold_are_false_whe
         categorical_feature_column_names=["feature1"],
         numerical_feature_column_names=["feature2"],
     )
-    assert (
-        not mcgrad.mce_below_initial and mcgrad.mce_below_initial is not None
-    ), "MCE is equal to the initial value. Thus, mce_below_initial must be False."
+    assert not mcgrad.mce_below_initial and mcgrad.mce_below_initial is not None, (
+        "MCE is equal to the initial value. Thus, mce_below_initial must be False."
+    )
     assert (
         not mcgrad.mce_below_strong_evidence_threshold
         and mcgrad.mce_below_strong_evidence_threshold is not None
-    ), f"MCE is greater than {mcgrad.MCE_STRONG_EVIDENCE_THRESHOLD}. Thus, mce_below_strong_evidence_threshold must be False."
+    ), (
+        f"MCE is greater than {mcgrad.MCE_STRONG_EVIDENCE_THRESHOLD}. Thus, mce_below_strong_evidence_threshold must be False."
+    )
     assert (
         not mcgrad._mce_is_satisfactory and mcgrad._mce_is_satisfactory is not None
-    ), "MCE is neither below the initial value nor below strong evidence threshold. Thus, mce_is_satisfactory must be False."
+    ), (
+        "MCE is neither below the initial value nor below strong evidence threshold. Thus, mce_is_satisfactory must be False."
+    )
 
 
 @pytest.mark.parametrize(
@@ -2537,7 +2547,9 @@ def test_mcgrad_internal_state_reset_when_fitting_again(calibrator_class, rng):
         - 1
         == len(mcgrad._performance_metrics["avg_train_performance_dummy_score_func"])
         - 1
-    ), "The internal state - including number of Boosters & evaluations of MCGrad - should be reset when fitting MCGrad multiple times."
+    ), (
+        "The internal state - including number of Boosters & evaluations of MCGrad - should be reset when fitting MCGrad multiple times."
+    )
 
 
 @pytest.mark.parametrize(
@@ -2682,22 +2694,22 @@ def test_determine_train_test_splitter_returns_correct_splitter(
     # Assert: Verify the correct splitter type is returned
     if expected_splitter_type == "cv":
         # For cross-validation, it should be either KFold or StratifiedKFold
-        assert isinstance(
-            splitter, (StratifiedKFold, KFold)
-        ), "Expected cross-validation splitter"
+        assert isinstance(splitter, (StratifiedKFold, KFold)), (
+            "Expected cross-validation splitter"
+        )
     elif expected_splitter_type == "holdout":
         # For holdout, it should be TrainTestSplitWrapper with positive test_size
-        assert isinstance(
-            splitter, utils.TrainTestSplitWrapper
-        ), "Expected TrainTestSplitWrapper"
-        assert (
-            splitter.test_size > 0.0
-        ), "Expected positive test_size for regular holdout"
+        assert isinstance(splitter, utils.TrainTestSplitWrapper), (
+            "Expected TrainTestSplitWrapper"
+        )
+        assert splitter.test_size > 0.0, (
+            "Expected positive test_size for regular holdout"
+        )
     elif expected_splitter_type == "noop splitter":
         # For provided holdout, it should be TrainTestSplitWrapper with zero test_size
-        assert isinstance(
-            splitter, utils.NoopSplitterWrapper
-        ), "Expected NoopSplitterWrapper"
+        assert isinstance(splitter, utils.NoopSplitterWrapper), (
+            "Expected NoopSplitterWrapper"
+        )
 
 
 @pytest.mark.parametrize(
@@ -2749,9 +2761,9 @@ def test_determine_train_test_splitter_noop_splitter_returned(
         has_custom_validation_set=True,
     )
 
-    assert isinstance(
-        splitter, utils.NoopSplitterWrapper
-    ), "Expected NoopSplitterWrapper"
+    assert isinstance(splitter, utils.NoopSplitterWrapper), (
+        "Expected NoopSplitterWrapper"
+    )
 
 
 @pytest.mark.parametrize(

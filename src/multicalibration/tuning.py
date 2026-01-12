@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from typing import Any, Generator, List
 
 import pandas as pd
-
 from ax.service.ax_client import AxClient, ObjectiveProperties
 from multicalibration import methods
 from multicalibration.metrics import normalized_entropy

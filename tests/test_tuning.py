@@ -10,7 +10,6 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pandas as pd
 import pytest
-
 from multicalibration import methods
 from multicalibration.tuning import (
     default_parameter_configurations,
@@ -293,21 +292,21 @@ def test_mcgrad_and_lightgbm_default_hyperparams_are_within_bounds_for_tuning(
         if param_name in lightgbm_params:
             default_value = lightgbm_params[param_name]
             original_value = ORIGINAL_LIGHTGBM_PARAMS[param_name]
-            assert (
-                bounds[0] <= default_value <= bounds[1]
-            ), f"Default {param_name} ({default_value}) is outside of bounds ({bounds})"
-            assert (
-                bounds[0] <= original_value <= bounds[1]
-            ), f"Original {param_name} ({original_value}) is outside of bounds ({bounds})"
+            assert bounds[0] <= default_value <= bounds[1], (
+                f"Default {param_name} ({default_value}) is outside of bounds ({bounds})"
+            )
+            assert bounds[0] <= original_value <= bounds[1], (
+                f"Original {param_name} ({original_value}) is outside of bounds ({bounds})"
+            )
             # Check value type
             if config.value_type == "int":
-                assert isinstance(
-                    default_value, int
-                ), f"Default {param_name} ({default_value}) should be an integer"
+                assert isinstance(default_value, int), (
+                    f"Default {param_name} ({default_value}) should be an integer"
+                )
             elif config.value_type == "float":
-                assert isinstance(
-                    default_value, float
-                ), f"Default {param_name} ({default_value}) should be a float"
+                assert isinstance(default_value, float), (
+                    f"Default {param_name} ({default_value}) should be a float"
+                )
 
 
 @pytest.mark.arm64_incompatible
@@ -348,15 +347,15 @@ def test_warm_starting_trials_produces_the_right_number_of_sobol_and_bayesian_tr
     botorch_count = value_counter["GenerationStep_1"]
 
     expected_botorch = total_trials - n_warmup_random_trials - 1
-    assert (
-        len(trial_results) == total_trials
-    ), f"Expected {total_trials} trials, got {len(trial_results)}."
-    assert (
-        sobol_count == n_warmup_random_trials
-    ), f"Expected {n_warmup_random_trials} Sobol trials, got {sobol_count}."
-    assert (
-        botorch_count == expected_botorch
-    ), f"Expected {expected_botorch} BoTorch trials, got {botorch_count}."
+    assert len(trial_results) == total_trials, (
+        f"Expected {total_trials} trials, got {len(trial_results)}."
+    )
+    assert sobol_count == n_warmup_random_trials, (
+        f"Expected {n_warmup_random_trials} Sobol trials, got {sobol_count}."
+    )
+    assert botorch_count == expected_botorch, (
+        f"Expected {expected_botorch} BoTorch trials, got {botorch_count}."
+    )
 
 
 # Tests for ParameterConfig class

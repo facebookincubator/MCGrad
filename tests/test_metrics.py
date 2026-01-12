@@ -9,12 +9,10 @@ from collections.abc import Callable
 from functools import partial
 
 import numpy as np
-
 import pandas as pd
 import pytest
 import scipy
 import sklearn.metrics as skmetrics
-
 from multicalibration import metrics, utils
 from multicalibration.metrics import (
     fpr,
@@ -1104,7 +1102,9 @@ def test_mce_wrapper_with_variant_mce_sigma_scale_has_the_right_name():
             metric_version="mce_sigma_scale",
         ).name
         == "Multicalibration Error<br>(mce_sigma_scale)"
-    ), "The name of the mce_sigma_scale variant should be Multicalibration Error<br>(mce_sigma_scale)."
+    ), (
+        "The name of the mce_sigma_scale variant should be Multicalibration Error<br>(mce_sigma_scale)."
+    )
 
 
 def test_mce_can_deal_with_infrequent_values_in_int_categorical_columns(rng):
@@ -1428,9 +1428,9 @@ def test_segment_feature_values_has_the_correct_features_used_for_segment_genera
     _, segment_feature_values = mce.segments
 
     # Verify the structure of the segment_feature_values dataframe
-    assert isinstance(
-        segment_feature_values, pd.DataFrame
-    ), "segment_feature_values should be a pandas DataFrame"
+    assert isinstance(segment_feature_values, pd.DataFrame), (
+        "segment_feature_values should be a pandas DataFrame"
+    )
     assert set(segment_feature_values.columns) == {
         "segment_column",
         "value",
@@ -1443,9 +1443,9 @@ def test_segment_feature_values_has_the_correct_features_used_for_segment_genera
     # For depth=2: 2 (categorical) * 2 (numerical) = 4 segments
     # Total: 4 + 4 = 8 segments
     unique_segment_indices = segment_feature_values["idx_segment"].unique()
-    assert (
-        len(unique_segment_indices) == 8
-    ), f"Expected 8 segments, got {len(unique_segment_indices)}"
+    assert len(unique_segment_indices) == 8, (
+        f"Expected 8 segments, got {len(unique_segment_indices)}"
+    )
 
     # Check that the segment_feature_values dataframe contains the expected values
     # For categorical feature, we should have values "A" and "B"
@@ -1461,14 +1461,16 @@ def test_segment_feature_values_has_the_correct_features_used_for_segment_genera
     numerical_values = segment_feature_values[
         segment_feature_values["segment_column"] == "numerical_feature"
     ]["value"].unique()
-    assert (
-        len(numerical_values) == 2
-    ), f"Expected 2 unique numerical values, got {len(numerical_values)}"
+    assert len(numerical_values) == 2, (
+        f"Expected 2 unique numerical values, got {len(numerical_values)}"
+    )
 
     # Test that idx 0 results in the empty dataframe
     assert (
         len(segment_feature_values[segment_feature_values["idx_segment"] == 0]) == 0
-    ), f"Expected an empty dataframe for index 0, got {segment_feature_values[segment_feature_values['idx_segment']== 0]}"
+    ), (
+        f"Expected an empty dataframe for index 0, got {segment_feature_values[segment_feature_values['idx_segment'] == 0]}"
+    )
 
     # Get the actual numerical values for use in the next check
     numerical_values_list = sorted(numerical_values)
@@ -1493,15 +1495,15 @@ def test_segment_feature_values_has_the_correct_features_used_for_segment_genera
             common_segments = set(cat_segments).intersection(set(num_segments))
 
             # There should be exactly one segment with this combination
-            assert (
-                len(common_segments) == 1
-            ), f"Expected 1 segment for combination {cat_val}/{num_val}, got {len(common_segments)}"
+            assert len(common_segments) == 1, (
+                f"Expected 1 segment for combination {cat_val}/{num_val}, got {len(common_segments)}"
+            )
             depth_2_segments.extend(common_segments)
 
     # Ensure we found all 4 depth=2 segments
-    assert (
-        len(depth_2_segments) == 4
-    ), f"Expected 4 depth = 2 segments, got {len(depth_2_segments)}"
+    assert len(depth_2_segments) == 4, (
+        f"Expected 4 depth = 2 segments, got {len(depth_2_segments)}"
+    )
 
 
 def test_precision_dtype_is_maintained_in_multicalibration_error_methods(rng):

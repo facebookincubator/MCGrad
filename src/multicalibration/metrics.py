@@ -8,7 +8,6 @@ import functools
 import logging
 import math
 import sys
-
 from collections.abc import Callable
 from typing import Any, Protocol
 
@@ -18,7 +17,6 @@ from multicalibration import utils
 from multicalibration.segmentation import get_segment_masks
 from numpy import typing as npt
 from scipy import stats
-
 from sklearn import metrics as skmetrics
 
 

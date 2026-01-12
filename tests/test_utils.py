@@ -8,11 +8,9 @@ import math
 import warnings
 
 import numpy as np
-
 import pandas as pd
 import pyarrow as pa
 import pytest
-
 from multicalibration import utils
 from pandas.core.arrays import ArrowExtensionArray
 
@@ -281,12 +279,12 @@ def test_weighted_unshrink_gives_expected_result():
 )
 def test_make_unjoined_gives_expected_result(x, y, expected_x, expected_y):
     unjoined_x, unjoined_y = utils.make_unjoined(x, y)
-    assert np.array_equal(
-        unjoined_x, expected_x
-    ), "The unjoined features are not as expected."
-    assert np.array_equal(
-        unjoined_y, expected_y
-    ), "The unjoined labels are not as expected."
+    assert np.array_equal(unjoined_x, expected_x), (
+        "The unjoined features are not as expected."
+    )
+    assert np.array_equal(unjoined_y, expected_y), (
+        "The unjoined labels are not as expected."
+    )
 
 
 @pytest.mark.parametrize(

@@ -19,7 +19,6 @@ from typing import Any, Protocol
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-
 import psutil
 from scipy import stats
 from scipy.optimize._linesearch import LineSearchWarning

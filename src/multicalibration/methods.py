@@ -7,13 +7,11 @@
 import json
 import logging
 import time
-
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from functools import partial
-
 from typing import Any, cast, Dict, Generic, TypeVar
 
 import lightgbm as lgb
