@@ -8,11 +8,11 @@ import copy
 import logging
 import uuid
 from contextlib import contextmanager
-from dataclasses import dataclass
-from typing import Any, Generator, List
+from typing import Any, Generator
 
 import pandas as pd
-from ax.service.ax_client import AxClient, ObjectiveProperties
+from ax.api.client import Client
+from ax.api.configs import RangeParameterConfig
 from multicalibration import methods
 from multicalibration.metrics import normalized_entropy
 from sklearn.model_selection import train_test_split
@@ -20,96 +20,54 @@ from sklearn.model_selection import train_test_split
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-@dataclass
-class ParameterConfig:
-    """
-    Configuration for a single hyperparameter to be tuned.
-
-    This dataclass defines the search space for a hyperparameter during
-    Ax-based Bayesian optimization.
-
-    :param name: The name of the hyperparameter (e.g., "learning_rate").
-    :param bounds: The lower and upper bounds for the parameter search space.
-    :param value_type: The type of the parameter value ("float" or "int").
-    :param log_scale: Whether to search in log space. Useful for parameters
-        like learning rate where orders of magnitude matter.
-    :param config_type: The Ax parameter type (typically "range" for continuous parameters).
-        See https://ax.readthedocs.io/en/stable/service.html#ax.service.ax_client.AxClient.create_experiment for available options.
-    """
-
-    name: str
-    bounds: List[float | int]
-    value_type: str
-    log_scale: bool
-    config_type: str
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert the parameter configuration to an Ax-compatible dictionary."""
-        return {
-            "name": self.name,
-            "bounds": self.bounds,
-            "value_type": self.value_type,
-            "log_scale": self.log_scale,
-            "type": self.config_type,
-        }
-
-
-default_parameter_configurations: list[ParameterConfig] = [
-    ParameterConfig(
+default_parameter_configurations: list[RangeParameterConfig] = [
+    RangeParameterConfig(
         name="learning_rate",
-        bounds=[0.002, 0.2],
-        value_type="float",
-        log_scale=True,
-        config_type="range",
+        bounds=(0.002, 0.2),
+        parameter_type="float",
+        scaling="log",
     ),
-    ParameterConfig(
+    RangeParameterConfig(
         name="min_child_samples",
-        bounds=[5, 201],
-        value_type="int",
-        log_scale=False,
-        config_type="range",
+        bounds=(5.0, 201.0),
+        parameter_type="int",
+        scaling="linear",
     ),
-    ParameterConfig(
+    RangeParameterConfig(
         name="num_leaves",
-        bounds=[2, 44],
-        value_type="int",
-        log_scale=False,
-        config_type="range",
+        bounds=(2.0, 44.0),
+        parameter_type="int",
+        scaling="linear",
     ),
-    ParameterConfig(
+    RangeParameterConfig(
         name="n_estimators",
-        bounds=[10, 500],
-        value_type="int",
-        log_scale=False,
-        config_type="range",
+        bounds=(10.0, 500.0),
+        parameter_type="int",
+        scaling="linear",
     ),
-    ParameterConfig(
+    RangeParameterConfig(
         name="lambda_l2",
-        bounds=[0.0, 100.0],
-        value_type="float",
-        log_scale=False,
-        config_type="range",
+        bounds=(0.0, 100.0),
+        parameter_type="float",
+        scaling="linear",
     ),
-    ParameterConfig(
+    RangeParameterConfig(
         name="min_gain_to_split",
-        bounds=[0.0, 0.2],
-        value_type="float",
-        log_scale=False,
-        config_type="range",
+        bounds=(0.0, 0.2),
+        parameter_type="float",
+        scaling="linear",
     ),
-    ParameterConfig(
+    RangeParameterConfig(
         name="max_depth",
-        bounds=[2, 15],
-        value_type="int",
-        log_scale=True,
-        config_type="range",
+        bounds=(2.0, 15.0),
+        parameter_type="int",
+        scaling="log",
     ),
-    ParameterConfig(
+    RangeParameterConfig(
         name="min_sum_hessian_in_leaf",
-        bounds=[1e-3, 1200],
-        value_type="float",
-        log_scale=True,
-        config_type="range",
+        bounds=(1e-3, 1200.0),
+        parameter_type="float",
+        scaling="log",
     ),
 ]
 
@@ -149,7 +107,7 @@ def tune_mcgrad_params(
     numerical_feature_column_names: list[str] | None = None,
     n_trials: int = 20,
     n_warmup_random_trials: int | None = None,
-    parameter_configurations: list[ParameterConfig] | None = None,
+    parameter_configurations: list[RangeParameterConfig] | None = None,
     pass_df_val_into_tuning: bool = False,
     pass_df_val_into_final_fit: bool = False,
 ) -> tuple[methods.MCGrad | None, pd.DataFrame]:
@@ -240,25 +198,28 @@ def tune_mcgrad_params(
             sample_weight=sample_weight,
         )
 
-    ax_client = AxClient()
-    ax_client.create_experiment(
+    ax_client = Client()
+
+    ax_client.configure_experiment(
         name=f"lightgbm_autotuning_{uuid.uuid4().hex[:8]}",
-        parameters=[config.to_dict() for config in parameter_configurations],
-        objectives={"normalized_entropy": ObjectiveProperties(minimize=True)},
-        # If num_initialization_trials is None, the number of warm starting trials is automatically determined
-        choose_generation_strategy_kwargs={
-            "num_trials": n_trials
-            - 1,  # -1 is because we add an initial trial with default parameters
-            # +1 to account for the manually added trial with default parameters.
-            "num_initialization_trials": n_warmup_random_trials + 1
-            if n_warmup_random_trials is not None
-            else None,
-        },
+        parameters=list(parameter_configurations),
     )
 
-    # Construct a set of parameters for the first trial which contains the defaults for every parameter that is tuned. If a default is not available
-    # use the Lightgbm default
-    initial_trial_parameters = {}
+    ax_client.configure_optimization(objective="normalized_entropy")
+
+    # Configure generation strategy with initialization budget
+    # -1 is because we add an initial trial with default parameters
+    # +1 to account for the manually added trial with default parameters.
+    initialization_budget = (
+        n_warmup_random_trials + 1 if n_warmup_random_trials is not None else None
+    )
+    ax_client.configure_generation_strategy(
+        initialization_budget=initialization_budget,
+    )
+
+    # Construct a set of parameters for the first trial which contains the defaults for every parameter that is tuned.
+    # If a default is not available use the LightGBM default
+    initial_trial_parameters: dict[str, float | int] = {}
     mcgrad_defaults = methods.MCGrad.DEFAULT_HYPERPARAMS["lightgbm_params"]
     for config in parameter_configurations:
         if config.name in mcgrad_defaults:
@@ -273,33 +234,40 @@ def tune_mcgrad_params(
     )
 
     with _suppress_logger(methods.logger):
-        # Attach and complete the initial trial with default hyperparameters. Note that we're only using the defaults for the parameters that are being tuned.
+        # Attach and complete the initial trial with default hyperparameters.
+        # Note that we're only using the defaults for the parameters that are being tuned.
         # That is, this configuration does not necessarily correspond to the out-of-the-box defaults.
-        _, initial_trial_index = ax_client.attach_trial(
+        initial_trial_index = ax_client.attach_trial(
             parameters=initial_trial_parameters
         )
         initial_score = _train_evaluate(initial_trial_parameters)
         ax_client.complete_trial(
-            trial_index=initial_trial_index, raw_data=initial_score
+            trial_index=initial_trial_index,
+            raw_data={"normalized_entropy": initial_score},
         )
         logger.info(f"Initial trial completed with score: {initial_score}")
 
         for _ in range(n_trials - 1):
-            parameters, trial_index = ax_client.get_next_trial()
-            ax_client.complete_trial(
-                trial_index=trial_index, raw_data=_train_evaluate(parameters)
-            )
+            # get_next_trials returns dict[int, TParameterization]
+            trials = ax_client.get_next_trials(max_trials=1)
+            for trial_index, parameters in trials.items():
+                score = _train_evaluate(dict(parameters))
+                ax_client.complete_trial(
+                    trial_index=trial_index,
+                    raw_data={"normalized_entropy": score},
+                )
 
-    trial_results = ax_client.get_trials_data_frame().sort_values("normalized_entropy")
-    best_params = ax_client.get_best_parameters()
-    if best_params is not None:
-        best_params = best_params[0]
+    # Get trial results using summarize()
+    trial_results = ax_client.summarize().sort_values("normalized_entropy")
+
+    # get_best_parameterization returns (params, outcome, trial_idx, arm_name)
+    best_params, _, _, _ = ax_client.get_best_parameterization()
 
     logger.info(f"Best parameters: {best_params}")
     logger.info("Fitting model with best parameters")
 
     with _suppress_logger(methods.logger):
-        model._set_lightgbm_params(best_params)
+        model._set_lightgbm_params(dict(best_params))
 
     df_final_val: pd.DataFrame | None = None
     if pass_df_val_into_final_fit:

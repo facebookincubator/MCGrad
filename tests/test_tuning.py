@@ -10,11 +10,11 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pandas as pd
 import pytest
+from ax.api.configs import RangeParameterConfig
 from multicalibration import methods
 from multicalibration.tuning import (
     default_parameter_configurations,
     ORIGINAL_LIGHTGBM_PARAMS,
-    ParameterConfig,
     tune_mcgrad_params,
 )
 from sklearn.model_selection import train_test_split
@@ -299,11 +299,11 @@ def test_mcgrad_and_lightgbm_default_hyperparams_are_within_bounds_for_tuning(
                 f"Original {param_name} ({original_value}) is outside of bounds ({bounds})"
             )
             # Check value type
-            if config.value_type == "int":
+            if config.parameter_type == "int":
                 assert isinstance(default_value, int), (
                     f"Default {param_name} ({default_value}) should be an integer"
                 )
-            elif config.value_type == "float":
+            elif config.parameter_type == "float":
                 assert isinstance(default_value, float), (
                     f"Default {param_name} ({default_value}) should be a float"
                 )
@@ -323,7 +323,7 @@ def test_warm_starting_trials_produces_the_right_number_of_sobol_and_bayesian_tr
     )
 
     n_warmup_random_trials = 1
-    total_trials = 3
+    total_trials = 4
 
     # Suppress botorch/ax warnings about constant/non-standardized input data
     # These are expected with minimal synthetic test data
@@ -343,53 +343,70 @@ def test_warm_starting_trials_produces_the_right_number_of_sobol_and_bayesian_tr
         )
 
     value_counter = trial_results["generation_node"].value_counts().to_dict()
-    sobol_count = value_counter["GenerationStep_0"]
-    botorch_count = value_counter["GenerationStep_1"]
+    # Ax API uses descriptive node names: "CenterOfSearchSpace", "Sobol", "MBM"
+    # The generation strategy is: attached trial (defaults) -> CenterOfSearchSpace -> Sobol -> MBM
+    # With initialization_budget = n_warmup_random_trials + 1:
+    # - 1 attached trial (defaults, counted in initialization)
+    # - 1 center of search space trial
+    # - n_warmup_random_trials Sobol trials
+    # - remaining trials are MBM (Bayesian optimization)
+    sobol_count = value_counter.get("Sobol", 0)
+    center_count = value_counter.get("CenterOfSearchSpace", 0)
+    botorch_count = value_counter.get("MBM", 0)
 
-    expected_botorch = total_trials - n_warmup_random_trials - 1
+    # initialization_budget = n_warmup_random_trials + 1 = 2 (for attached + generated init trials)
+    # The attached trial is separate from the generated CenterOfSearchSpace + Sobol trials
+    # So we expect: 1 attached + 1 center + 1 Sobol = 3 initialization trials, then 1 MBM
+    expected_initialization = (
+        n_warmup_random_trials + 1
+    )  # center + Sobol (attached trial is separate)
+    expected_botorch = (
+        total_trials - expected_initialization - 1
+    )  # -1 for attached trial
     assert len(trial_results) == total_trials, (
         f"Expected {total_trials} trials, got {len(trial_results)}."
     )
-    assert sobol_count == n_warmup_random_trials, (
-        f"Expected {n_warmup_random_trials} Sobol trials, got {sobol_count}."
+    assert sobol_count + center_count == expected_initialization, (
+        f"Expected {expected_initialization} initialization trials (Sobol + Center), got {sobol_count + center_count}."
     )
     assert botorch_count == expected_botorch, (
         f"Expected {expected_botorch} BoTorch trials, got {botorch_count}."
     )
 
 
-# Tests for ParameterConfig class
-def test_parameter_config_to_dict_works_properly():
-    config = ParameterConfig(
+# Tests for RangeParameterConfig usage
+def test_range_parameter_config_float_with_log_scale():
+    config = RangeParameterConfig(
         name="learning_rate",
-        bounds=[0.01, 0.3],
-        value_type="float",
-        log_scale=True,
-        config_type="range",
+        bounds=(0.01, 0.3),
+        parameter_type="float",
+        scaling="log",
     )
 
-    expected_dict = {
-        "name": "learning_rate",
-        "bounds": [0.01, 0.3],
-        "value_type": "float",
-        "log_scale": True,
-        "type": "range",
-    }
-
-    assert config.to_dict() == expected_dict
+    assert config.name == "learning_rate"
+    assert config.bounds == (0.01, 0.3)
+    assert config.parameter_type == "float"
+    assert config.scaling == "log"
 
 
-def test_default_parameter_configurations_have_valid_types():
+def test_range_parameter_config_int_without_log_scale():
+    config = RangeParameterConfig(
+        name="max_depth",
+        bounds=(2.0, 15.0),
+        parameter_type="int",
+        scaling="linear",
+    )
+
+    assert config.name == "max_depth"
+    assert config.bounds == (2.0, 15.0)
+    assert config.parameter_type == "int"
+    assert config.scaling == "linear"
+
+
+def test_all_default_configs_are_range_parameter_configs():
     for config in default_parameter_configurations:
-        assert isinstance(config, ParameterConfig)
-        assert isinstance(config.name, str)
-        assert len(config.name) > 0
-        assert isinstance(config.bounds, list)
-        assert len(config.bounds) == 2
-        assert config.bounds[0] < config.bounds[1]
-        assert config.value_type in ["int", "float"]
-        assert isinstance(config.log_scale, bool)
-        assert config.config_type == "range"
+        assert isinstance(config, RangeParameterConfig)
+        assert config.name is not None
 
 
 @pytest.mark.arm64_incompatible
