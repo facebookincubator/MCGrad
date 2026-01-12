@@ -99,8 +99,6 @@ def plot_global_calibration_curve(
     """
     binning_fun = _get_binning_function(binning_method)
 
-    # TODO: Make confidence interval calculation for calibration curve with
-    # sample_weights more correct by calculating the effective sample size
     curves = _compute_calibration_curve(
         data,
         score_col=score_col,
