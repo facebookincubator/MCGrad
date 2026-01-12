@@ -225,12 +225,12 @@ def plot_calibration_curve_by_segment(
     curves["error_minus"] = curves.label_prop_positive - curves.lower
     curves["error_plus"] = curves.upper - curves.label_prop_positive
 
-    groups = curves[group_var].unique()
-    if isinstance(groups, np.ndarray):
-        groups = [str(g) for g in groups.tolist()]
+    groups = list(curves[group_var].unique())
 
     num_rows = max(math.ceil(len(groups) / n_cols), 1)
-    fig = make_subplots(rows=num_rows, cols=n_cols, subplot_titles=groups)
+    fig = make_subplots(
+        rows=num_rows, cols=n_cols, subplot_titles=[str(g) for g in groups]
+    )
 
     for i, group in enumerate(groups):
         row = i // n_cols + 1
