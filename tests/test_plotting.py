@@ -6,6 +6,7 @@
 
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
 import pytest
 from multicalibration import methods, metrics, plotting
 
@@ -250,3 +251,47 @@ def test_plot_calibration_curve_by_segment_does_not_modify_input_dataframe(sampl
     )
 
     pd.testing.assert_frame_equal(sample_df, df_original)
+
+
+def test_plot_calibration_curve_by_segment_with_integer_groups(rng):
+    n_samples = 100
+    expected_groups = [1, 2, 3]
+
+    df = pd.DataFrame(
+        {
+            "group": rng.choice(expected_groups, n_samples),
+            "score": rng.rand(n_samples),
+            "label": rng.randint(0, 2, n_samples),
+        }
+    )
+
+    fig = plotting.plot_calibration_curve_by_segment(
+        data=df,
+        group_var="group",
+        score_col="score",
+        label_col="label",
+        num_bins=5,
+    )
+
+    assert fig is not None
+
+    # Verify that each group's subplot contains data points
+    # If group filtering failed (due to string/int type mismatch), subplots would be empty
+    scatter_data = [trace for trace in fig.data if isinstance(trace, go.Scatter)]
+
+    # Each group should have calibrated and/or miscalibrated points
+    # Extract group labels from scatter names (format: "group_value (calibrated/miscalibrated)")
+    groups_with_data = set()
+    for trace in scatter_data:
+        if trace.name and len(trace.x) > 0:
+            # Extract group value from name like "1 (calibrated)" -> "1"
+            group_str = trace.name.split(" (")[0]
+            groups_with_data.add(group_str)
+
+    # Verify all expected groups have data in their subplots
+    expected_group_strs = {str(g) for g in expected_groups}
+    assert groups_with_data == expected_group_strs, (
+        f"Expected all groups {expected_group_strs} to have data, "
+        f"but only {groups_with_data} had data points. "
+        "This suggests group filtering failed due to type mismatch."
+    )
