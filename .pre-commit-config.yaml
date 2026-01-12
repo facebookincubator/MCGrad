@@ -1,0 +1,18 @@
+repos:
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.3.0
+    hooks:
+      - id: flake8
+        additional_dependencies:
+          - flake8-bugbear>=24.0.0
+
+  # Run tests on push (not every commit)
+  - repo: local
+    hooks:
+      - id: pytest
+        name: Run pytest
+        entry: pytest
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

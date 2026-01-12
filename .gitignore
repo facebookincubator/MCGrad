@@ -1,0 +1,30 @@
+# Byte-compiled
+*.py[cod]
+
+# Distribution / packaging
+*.egg-info/
+
+# Node modules
+node_modules/
+
+# Docusaurus build
+website/build/
+website/.docusaurus/
+website/node_modules/
+
+# Sphinx build and artifacts
+sphinx/build/
+sphinx/source/_build/
+*.doctrees
+.buildinfo
+
+# Test coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.pytest_cache/
+
+# Metadata
+**/.DS_Store
