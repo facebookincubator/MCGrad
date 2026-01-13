@@ -13,7 +13,27 @@ from typing_extensions import Self
 
 
 class BaseCalibrator(ABC):
-    """Abstract base class for calibration methods."""
+    """Abstract base class for calibration methods.
+
+    A calibrator adjusts predicted probabilities so that they are well-calibrated,
+    meaning the predicted probabilities accurately reflect true outcome frequencies.
+    For example, among all predictions of 0.7, approximately 70% should be positive.
+
+    Calibrators follow a fit/predict pattern similar to scikit-learn estimators:
+
+    1. Call :meth:`fit` with training data containing predictions and ground truth labels
+    2. Call :meth:`predict` to obtain calibrated predictions for new data
+
+    Alternatively, use :meth:`fit_transform` to fit and transform in a single call.
+
+    Subclasses must implement:
+
+    - :meth:`fit`: Learn the calibration mapping from training data
+    - :meth:`predict`: Apply the learned calibration to new predictions
+
+    Some calibrators (multicalibrators) also accept categorical and numerical feature
+    columns to achieve calibration across different subpopulations (segments) of the data.
+    """
 
     @abstractmethod
     def fit(
