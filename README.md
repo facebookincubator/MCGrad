@@ -117,12 +117,12 @@ We welcome contributions! See [Contributing Guide](https://facebookincubator.git
 If you use MCGrad in your research, please cite:
 
 ```bibtex
-@article{perini2025mcgrad,
+@inproceedings{tax2026mcgrad,
   title={{MCGrad: Multicalibration at Web Scale}},
-  author={Perini, Lorenzo and Haimovich, Daniel and Linder, Fridolin and Tax, Niek and Karamshuk, Dima and Vojnovic, Milan and Okati, Nastaran and Apostolopoulos, Pavlos Athanasios},
-  journal={arXiv preprint arXiv:2509.19884},
-  year={2025},
-  note={To appear in KDD 2026}
+  author={Tax, Niek and Perini, Lorenzo and Linder, Fridolin and Haimovich, Daniel and Karamshuk, Dima and Okati, Nastaran and Vojnovic, Milan and Apostolopoulos, Pavlos Athanasios},
+  booktitle={Proceedings of the 32nd ACM SIGKDD Conference on Knowledge Discovery and Data Mining V.1 (KDD 2026)},
+  year={2026},
+  doi={10.1145/3770854.3783954}
 }
 ```
 

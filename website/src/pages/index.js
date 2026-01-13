@@ -101,12 +101,12 @@ const QuickStart = () => (
 
 const papertitle = `MCGrad: Multicalibration at Web Scale`;
 const paper_bibtex = `
-@article{perini2026mcgrad,
+@inproceedings{tax2026mcgrad,
   title = {{MCGrad: Multicalibration at Web Scale}},
-  author = {Perini, Lorenzo and Haimovich, Daniel and Linder, Fridolin and Tax, Niek and Karamshuk, Dima and Vojnovic, Milan and Okati, Nastaran and Apostolopoulos, Pavlos Athanasios},
-  journal = {arXiv preprint arXiv:2509.19884},
+  author = {Tax, Niek and Perini, Lorenzo and Linder, Fridolin and Haimovich, Daniel and Karamshuk, Dima and Okati, Nastaran and Vojnovic, Milan and Apostolopoulos, Pavlos Athanasios},
+  booktitle = {Proceedings of the 32nd ACM SIGKDD Conference on Knowledge Discovery and Data Mining V.1 (KDD 2026)},
   year = {2026},
-  note = {To appear in KDD 2026}
+  doi = {10.1145/3770854.3783954}
 }`;
 
 const Reference = () => (
@@ -116,7 +116,7 @@ const Reference = () => (
     <h2 className='text--center'>Citing MCGrad</h2>
     <p className='text--center'>If you use MCGrad in academic work, please cite:</p>
     <div>
-      <a href={`https://arxiv.org/pdf/2509.19884`}>{papertitle}</a>
+      <a href={`https://arxiv.org/abs/2509.19884`}>{papertitle}</a>
       <CodeBlock className='margin-vert--md'>{paper_bibtex}</CodeBlock>
     </div>
   </div>
