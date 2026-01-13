@@ -1,36 +1,61 @@
-# MCGrad
+<p align="center">
+  <img src="website/static/img/logo.png" alt="MCGrad: Production-ready multicalibration for machine learning" width="120" />
+</p>
 
-Production-ready multicalibration for machine learning.
+<h1 align="center">MCGrad</h1>
 
-**MCGrad** is a scalable and easy-to-use tool for multicalibration. It ensures your ML model predictions are well-calibrated not just globally (across all data), but also across virtually any segment defined by your features (e.g., by country, content type, or any combination).
+<p align="center">
+  <strong>Production-ready multicalibration for machine learning</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/facebookincubator/MCGrad/actions/workflows/main.yaml"><img src="https://github.com/facebookincubator/MCGrad/actions/workflows/main.yaml/badge.svg" alt="CI"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+"></a>
+  <a href="https://mcgrad.dev/"><img src="https://img.shields.io/badge/docs-mcgrad.dev-blue.svg" alt="Documentation"></a>
+</p>
+
+---
+
+## What is MCGrad?
+
+**MCGrad** is a scalable and easy-to-use tool for **multicalibration**. It ensures your ML model predictions are well-calibrated not just globally (across all data), but also across virtually any segment defined by your features (e.g., by country, content type, or any combination).
+
+Traditional calibration methods, like Isotonic Regression or Platt Scaling, only ensure global calibration—meaning predicted probabilities match observed outcomes *on average* across all data—but your model can still be systematically overconfident or underconfident for specific groups. MCGrad automatically identifies and corrects these hidden calibration gaps without requiring you to manually specify protected groups.
+
+<p align="center">
+  <img src="website/static/img/global_calibration.png" alt="Global calibration curve showing well-calibrated predictions on average" width="45%" />
+  <img src="website/static/img/local_miscalibration.png" alt="Segment-level calibration curves revealing hidden miscalibration in specific groups" width="45%" />
+</p>
+<p align="center">
+  <em>Left: A globally well-calibrated model. Right: The same model showing hidden miscalibration when broken down by segment. MCGrad fixes this.</em>
+</p>
 
 ## 🌟 Key Features
 
-- **Powerful Multicalibration** - Calibrates across unlimited segments without pre-specification
-- **Data Efficient** - Borrows information like modern ML models
-- **Lightweight & Fast** - Orders of magnitude faster than NN-based calibration
-- **Improved Performance** - Likelihood-improving with significant PRAUC gains
+- **Powerful Multicalibration** — Calibrates across unlimited segments without pre-specification
+- **Data Efficient** — Like modern ML methods
+- **Lightweight & Fast** — Adds limited latency at training and inference time
+- **Improved Performance** — Likelihood-improving with significant PRAUC gains
+- **Safe by Design** — Cannot harm base model performance on training data
 
-## 📚 Documentation
+## 🏭 Production Proven
 
-Full documentation is available at: https://facebookincubator.github.io/MCGrad/
+MCGrad has been deployed at **Meta** on hundreds of production models. See the [research paper](https://arxiv.org/abs/2509.19884) for detailed experimental results.
 
-- [Why MCGrad?](https://facebookincubator.github.io/MCGrad/docs/why-mcgrad) - Learn about the benefits
-- [Quick Start](https://facebookincubator.github.io/MCGrad/docs/quickstart) - Get started quickly
-- [API Reference](https://mcgrad.readthedocs.io/) - Auto-generated API documentation from Python docstrings
+## 📦 Installation
 
-### Two Documentation Systems
+**Requirements:** Python 3.10+
 
-This project uses a dual documentation approach:
+Stable release:
+```bash
+pip install mcgrad
+```
 
-1. **User Guide (Docusaurus)** - Available at https://facebookincubator.github.io/MCGrad/
-   - Getting started guides, tutorials, and conceptual documentation
-   - Built from the `website/` directory
-
-2. **API Reference (Sphinx)** - Available at https://multicalibration.readthedocs.io/
-   - Auto-generated from Python docstrings
-   - Detailed API documentation for all classes and functions
-   - Built from the `sphinx/` directory
+Latest development version:
+```bash
+pip install git+https://github.com/facebookincubator/MCGrad.git
+```
 
 ## 🚀 Quick Start
 
@@ -43,8 +68,8 @@ import pandas as pd
 df = pd.DataFrame({
     'prediction': np.array([0.1, 0.3, 0.7, 0.9, 0.5, 0.2]),  # Your model's predictions
     'label': np.array([0, 0, 1, 1, 1, 0]),  # Ground truth labels
-    'country': ['US', 'UK', 'US', 'UK', 'US', 'UK'],  # Categorical features
-    'content_type': ['photo', 'video', 'photo', 'video', 'photo', 'video'],  # defining segments
+    'country': ['US', 'UK', 'US', 'UK', 'US', 'UK'],  # Categorical feature
+    'content_type': ['photo', 'video', 'photo', 'video', 'photo', 'video'],  # Categorical feature
 })
 
 # Apply MCGrad
@@ -62,59 +87,25 @@ calibrated_predictions = mcgrad.predict(
     prediction_column_name='prediction',
     categorical_feature_column_names=['country', 'content_type']
 )
+# Returns: numpy array of calibrated probabilities, e.g., [0.12, 0.28, 0.72, ...]
 ```
 
-## 📦 Installation
+## 📚 Documentation
 
-```bash
-pip install git+https://github.com/facebookincubator/MCGrad.git
-```
+- **Website & Guides:** [mcgrad.dev](https://mcgrad.dev/)
+  - [Why MCGrad?](https://mcgrad.dev/docs/why-mcgrad) — Learn about the challenges MCGrad solves
+  - [Quick Start](https://mcgrad.dev/docs/quickstart) — Get started quickly
+  - [Methodology](https://mcgrad.dev/docs/methodology) — Deep dive into how MCGrad works
+  - [API Reference](https://mcgrad.readthedocs.io/en/latest/) — Full API documentation
 
-For development:
+## 💬 Community & Support
 
-```bash
-git clone https://github.com/facebookincubator/MCGrad.git
-cd MCGrad
-pip install -e ".[dev]"
-```
-
-## 🔧 Development
-
-### Pre-commit Hooks
-
-This project uses pre-commit hooks for code quality:
-
-```bash
-pip install pre-commit
-pre-commit install
-pre-commit install --hook-type pre-push
-```
-
-**What runs:**
-- **On commit:** `flake8` checks your code
-- **On push:** `pytest` runs the test suite
-
-### Building Documentation
-
-```bash
-cd website
-npm install
-npm start
-```
-
-Open http://localhost:3000 to view the docs locally.
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) for details.
-
-## 🤝 Contributing
-
-We welcome contributions! See [Contributing Guide](https://facebookincubator.github.io/MCGrad/docs/contributing) for details.
+- **Questions & Bugs:** Open an issue on [GitHub Issues](https://github.com/facebookincubator/MCGrad/issues)
+- **Contributing:** See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute to MCGrad
 
 ## 📖 Citation
 
-If you use MCGrad in your research, please cite:
+If you use MCGrad in your research, please cite [our paper](https://arxiv.org/abs/2509.19884).
 
 ```bibtex
 @inproceedings{tax2026mcgrad,
@@ -126,16 +117,10 @@ If you use MCGrad in your research, please cite:
 }
 ```
 
-**Paper:** [MCGrad: Multicalibration at Web Scale](https://arxiv.org/abs/2509.19884) (KDD 2026)
-
 ### Related Publications
 
-For more on multicalibration theory and applications:
+Some of our team's other work on multicalibration:
 
-- **Measuring Multi-Calibration:** Guy, I., Haimovich, D., Linder, F., Okati, N., Perini, L., Tax, N., & Tygert, M. (2025). [Measuring multi-calibration](https://arxiv.org/abs/2506.11251). arXiv:2506.11251.
+- **A New Metric to Measure Multicalibration:** Guy, I., Haimovich, D., Linder, F., Okati, N., Perini, L., Tax, N., & Tygert, M. (2025). [Measuring multi-calibration](https://arxiv.org/abs/2506.11251). arXiv:2506.11251.
 
-- **Multicalibration Applications:** Baldeschi, R. C., Di Gregorio, S., Fioravanti, S., Fusco, F., Guy, I., Haimovich, D., Leonardi, S., et al. (2025). [Multicalibration yields better matchings](https://arxiv.org/abs/2511.11413). arXiv:2511.11413.
-
-## 📊 CI Status
-
-[![CI](https://github.com/facebookincubator/MCGrad/actions/workflows/main.yaml/badge.svg)](https://github.com/facebookincubator/MCGrad/actions/workflows/main.yaml)
+- **Theoretical Results on Value of Multicalibration:** Baldeschi, R. C., Di Gregorio, S., Fioravanti, S., Fusco, F., Guy, I., Haimovich, D., Leonardi, S., et al. (2025). [Multicalibration yields better matchings](https://arxiv.org/abs/2511.11413). arXiv:2511.11413.
