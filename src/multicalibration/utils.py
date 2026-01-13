@@ -134,7 +134,9 @@ def logistic(logits: float) -> float:
         return math.exp(logits) / (1.0 + math.exp(logits))
 
 
-logistic_vectorized = np.vectorize(logistic)
+logistic_vectorized: Callable[[npt.NDArray[Any]], npt.NDArray[Any]] = np.vectorize(
+    logistic
+)
 
 
 def logit(
@@ -438,11 +440,17 @@ class OrdinalEncoderWithUnknownSupport(OrdinalEncoder):
         :param y: Ignored, present for API compatibility.
         :return: Self.
         """
+
+        def convert_to_native(obj: Any) -> Any:
+            if hasattr(obj, "item"):
+                return obj.item()
+            return obj
+
         X = X.values if isinstance(X, pd.DataFrame) else X
         super().fit(X, y)
         for i, category in enumerate(self.categories_):
             self._category_map[i] = {
-                value: index for index, value in enumerate(category)
+                convert_to_native(value): index for index, value in enumerate(category)
             }
         return self
 
@@ -511,7 +519,7 @@ def rank_log_discount(n_samples: int, log_base: int = 2) -> npt.NDArray[Any]:
     :param log_base: base of the logarithm
     :return: array of size n_samples with the discount factor for each sample
     """
-    return 1 / (np.log(np.arange(n_samples) + 2) / np.log(log_base))
+    return np.asarray(1 / (np.log(np.arange(n_samples) + 2) / np.log(log_base)))
 
 
 def rank_no_discount(num_samples: int) -> npt.NDArray[Any]:

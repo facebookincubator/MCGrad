@@ -802,7 +802,9 @@ def _calculate_cumulative_differences(
     predicted_scores: npt.NDArray,
     sample_weight: npt.NDArray | None = None,
     segments: npt.NDArray | None = None,
-    precision_dtype: np.float16 | np.float32 | np.float64 = DEFAULT_PRECISION_DTYPE,
+    precision_dtype: type[np.float16]
+    | type[np.float32]
+    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
 ) -> npt.NDArray:
     """
     Calculate cumulative differences between labels and predictions.
@@ -857,7 +859,7 @@ class KuiperNormalizationInterface(Protocol):
         labels: npt.NDArray | None,
         sample_weight: npt.NDArray | None,
         segments: npt.NDArray | None,
-        precision_dtype: np.float16 | np.float32 | np.float64,
+        precision_dtype: type[np.float16] | type[np.float32] | type[np.float64],
     ) -> npt.NDArray: ...
 
 
@@ -884,7 +886,9 @@ def kuiper_upper_bound_standard_deviation_per_segment(
     labels: npt.NDArray | None = None,
     sample_weight: npt.NDArray | None = None,
     segments: npt.NDArray | None = None,
-    precision_dtype: np.float16 | np.float32 | np.float64 = DEFAULT_PRECISION_DTYPE,
+    precision_dtype: type[np.float16]
+    | type[np.float32]
+    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
 ) -> npt.NDArray:
     """
     Calculate an upper bound on Kuiper standard deviation per segment.
@@ -934,7 +938,9 @@ def kuiper_standard_deviation_per_segment(
     labels: npt.NDArray | None = None,
     sample_weight: npt.NDArray | None = None,
     segments: npt.NDArray | None = None,
-    precision_dtype: np.float16 | np.float32 | np.float64 = DEFAULT_PRECISION_DTYPE,
+    precision_dtype: type[np.float16]
+    | type[np.float32]
+    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
 ) -> npt.NDArray:
     """
     Calculate Kuiper standard deviation per segment.
@@ -983,7 +989,9 @@ def kuiper_label_based_standard_deviation_per_segment(
     labels: npt.NDArray | None,
     sample_weight: npt.NDArray | None = None,
     segments: npt.NDArray | None = None,
-    precision_dtype: np.float16 | np.float32 | np.float64 = DEFAULT_PRECISION_DTYPE,
+    precision_dtype: type[np.float16]
+    | type[np.float32]
+    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
 ) -> npt.NDArray:
     """
     Calculate label-based Kuiper standard deviation per segment.
@@ -1062,7 +1070,9 @@ def identity_per_segment(
     labels: npt.NDArray | None = None,
     sample_weight: npt.NDArray | None = None,
     segments: npt.NDArray | None = None,
-    precision_dtype: np.float16 | np.float32 | np.float64 = DEFAULT_PRECISION_DTYPE,
+    precision_dtype: type[np.float16]
+    | type[np.float32]
+    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
 ) -> npt.NDArray:
     """
     Return an array of ones (identity normalization).
@@ -1087,7 +1097,9 @@ def kuiper_calibration_per_segment(
     sample_weight: npt.NDArray | None = None,
     normalization_method: str | None = None,
     segments: npt.NDArray | None = None,
-    precision_dtype: np.float16 | np.float32 | np.float64 = DEFAULT_PRECISION_DTYPE,
+    precision_dtype: type[np.float16]
+    | type[np.float32]
+    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
 ) -> npt.NDArray:
     """
     Calculates Kuiper calibration distance between responses and scores.
@@ -1139,7 +1151,9 @@ def kuiper_calibration(
     sample_weight: npt.NDArray | None = None,
     normalization_method: str | None = None,
     segments: npt.NDArray | None = None,
-    precision_dtype: np.float16 | np.float32 | np.float64 = DEFAULT_PRECISION_DTYPE,
+    precision_dtype: type[np.float16]
+    | type[np.float32]
+    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
 ) -> float:
     """
     Calculates Kuiper calibration distance between responses and scores.
@@ -1826,8 +1840,8 @@ class MulticalibrationError:
             raise ValueError(
                 f"Invalid precision type: {precision_dtype}. Must be one of ['float16', 'float32', 'float64']."
             )
-        self.precision_dtype: np.float16 | np.float32 | np.float64 = getattr(
-            np, precision_dtype
+        self.precision_dtype: type[np.float16] | type[np.float32] | type[np.float64] = (
+            getattr(np, precision_dtype)
         )
 
         self.df[self.score_column] = self.df[self.score_column].astype(
