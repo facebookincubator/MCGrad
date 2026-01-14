@@ -3186,7 +3186,7 @@ def test_segmentwise_calibrator_with_no_categorical_features_equivalent_to_under
 
     assert len(segmentwise_predictions) == len(df)
     assert isinstance(
-        segmentwise_calibrator.calibrator_per_segment[""], methods.PlattScaling
+        segmentwise_calibrator.calibrator_per_segment["()"], methods.PlattScaling
     )
     np.testing.assert_allclose(segmentwise_predictions, direct_predictions)
 
@@ -3211,14 +3211,14 @@ def test_segmentwise_calibrator_falls_back_to_identity_mapping_for_single_class_
         categorical_feature_column_names=["segment"],
     )
 
-    assert "A" in calibrator.calibrator_per_segment
-    assert "B" in calibrator.calibrator_per_segment
+    assert "('A',)" in calibrator.calibrator_per_segment
+    assert "('B',)" in calibrator.calibrator_per_segment
     # Segment A has only one class (all 0s), so it falls back to IdentityCalibrator
     assert isinstance(
-        calibrator.calibrator_per_segment["A"], methods.IdentityCalibrator
+        calibrator.calibrator_per_segment["('A',)"], methods.IdentityCalibrator
     )
     # Segment B has both classes, so PlattScaling can be fit
-    assert isinstance(calibrator.calibrator_per_segment["B"], methods.PlattScaling)
+    assert isinstance(calibrator.calibrator_per_segment["('B',)"], methods.PlattScaling)
 
 
 def test_segmentwise_calibrator_falls_back_to_identity_mapping_for_unseen_segment(rng):
@@ -3252,9 +3252,9 @@ def test_segmentwise_calibrator_falls_back_to_identity_mapping_for_unseen_segmen
     )
 
     assert len(predictions) == len(df_test)
-    assert "C" in calibrator.calibrator_per_segment
+    assert "('C',)" in calibrator.calibrator_per_segment
     assert isinstance(
-        calibrator.calibrator_per_segment["C"], methods.IdentityCalibrator
+        calibrator.calibrator_per_segment["('C',)"], methods.IdentityCalibrator
     )
     np.testing.assert_array_equal(predictions, df_test["prediction"].values)
 
@@ -3681,3 +3681,33 @@ def test_mcgrad_early_stopping_holdout_does_not_modify_input_dataframe(
 
     pd.testing.assert_frame_equal(df_train, df_train_original)
     pd.testing.assert_frame_equal(df_val, df_val_original)
+
+
+def test_segmentwise_calibrator_ambiguous_segment_keys():
+    """When multiple categorical features are joined with '_', ambiguous keys can occur.
+    For example, features ["A_B", "C"] and ["A", "B_C"] both produce "A_B_C".
+    This test verifies that such cases are handled correctly.
+    """
+    df_train = pd.DataFrame(
+        {
+            "prediction": [0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
+            "label": [0, 0, 1, 1, 0, 1],
+            "feature1": ["A_B", "A_B", "A_B", "A", "A", "A"],
+            "feature2": ["C", "C", "C", "B_C", "B_C", "B_C"],
+        }
+    )
+
+    calibrator = methods.SegmentwiseCalibrator(methods.PlattScaling)
+    calibrator.fit(
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["feature1", "feature2"],
+    )
+
+    num_segments = len(calibrator.calibrator_per_segment)
+    assert num_segments == 2, (
+        f"Expected 2 distinct segments for [('A_B', 'C'), ('A', 'B_C')], "
+        f"but got {num_segments} segment(s): {list(calibrator.calibrator_per_segment.keys())}. "
+        "This suggests segment keys are being incorrectly merged due to string concatenation."
+    )
