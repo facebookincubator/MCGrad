@@ -14,6 +14,7 @@ from typing import Any, Protocol
 import numpy as np
 import pandas as pd
 from multicalibration import utils
+from multicalibration._compat import groupby_apply
 from multicalibration.segmentation import get_segment_masks
 from numpy import typing as npt
 from scipy import stats
@@ -718,8 +719,8 @@ def multicalibration_error(
         )
 
     segment_errors = (
-        segments_df.groupby(grouping_cols)
-        .apply(_group_calibration_error)
+        groupby_apply(segments_df.groupby(grouping_cols), _group_calibration_error)
+        # pyre-ignore[6]: groupby_apply returns Series when func returns scalar; Series.rename(str) is valid
         .rename("error")
         .to_frame()
         .join(samples_per_segment)
@@ -787,8 +788,8 @@ def multi_cg_score(
         )
 
     segment_errors = (
-        segments_df.groupby(grouping_cols)
-        .apply(_group_cg_score)
+        groupby_apply(segments_df.groupby(grouping_cols), _group_cg_score)
+        # pyre-ignore[6]: groupby_apply returns Series when func returns scalar; Series.rename(str) is valid
         .rename("error")
         .to_frame()
         .join(samples_per_segment)
@@ -1342,9 +1343,13 @@ def kuiper_func_per_segment(
     )
 
     segment_p_values = (
-        segments_df.groupby(grouping_cols).apply(func).rename(output_series_name)
-    ).dropna()
+        groupby_apply(segments_df.groupby(grouping_cols), func)
+        # pyre-ignore[6]: groupby_apply returns Series when func returns scalar; Series.rename(str) is valid
+        .rename(output_series_name)
+        .dropna()
+    )
 
+    # pyre-ignore[7]: Return type is Series when func returns scalar
     return segment_p_values
 
 
@@ -1640,8 +1645,8 @@ def rank_multicalibration_error(
         )
 
     segment_RCE = (
-        segments_df.groupby(grouping_cols)
-        .apply(_group_rank_calibration_error)
+        groupby_apply(segments_df.groupby(grouping_cols), _group_rank_calibration_error)
+        # pyre-ignore[6]: groupby_apply returns Series when func returns scalar; Series.rename(str) is valid
         .rename("error")
         .to_frame()
         .join(samples_per_segment)
@@ -1694,8 +1699,8 @@ def _rank_multicalibration_error(
         )
 
     segment_RCE = (
-        segments_df.groupby(grouping_cols)
-        .apply(_group_rank_calibration_error)
+        groupby_apply(segments_df.groupby(grouping_cols), _group_rank_calibration_error)
+        # pyre-ignore[6]: groupby_apply returns Series when func returns scalar; Series.rename(str) is valid
         .rename("error")
         .to_frame()
         .join(samples_per_segment)
