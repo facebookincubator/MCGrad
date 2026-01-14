@@ -13,6 +13,7 @@ import scipy
 import sklearn.metrics as skmetrics
 from multicalibration import methods, utils
 from multicalibration.metrics import (
+    ScoreFunctionInterface,
     wrap_multicalibration_error_metric,
     wrap_sklearn_metric_func,
 )
@@ -3711,3 +3712,141 @@ def test_segmentwise_calibrator_ambiguous_segment_keys():
         f"but got {num_segments} segment(s): {list(calibrator.calibrator_per_segment.keys())}. "
         "This suggests segment keys are being incorrectly merged due to string concatenation."
     )
+
+
+def test_additive_adjustment_fit_does_not_crash_on_zero_sum_weights():
+    df = pd.DataFrame({"prediction": [0.1], "label": [0], "weight": [0]})
+    cal = methods.AdditiveAdjustment()
+    cal.fit(df, "prediction", "label", "weight")
+    assert cal.offset == 0.0
+
+
+def test_platt_scaling_with_features_fit_does_not_crash_on_single_class():
+    df = pd.DataFrame(
+        {"prediction": [0.1, 0.2, 0.3], "label": [0, 0, 0], "cat": ["a", "b", "a"]}
+    )
+    cal = methods.PlattScalingWithFeatures()
+    cal.fit(df, "prediction", "label", categorical_feature_column_names=["cat"])
+    # Should behave like identity or reasonable fallback
+    preds = cal.predict(df, "prediction", categorical_feature_column_names=["cat"])
+    # Since log_reg should be None (identity), preds should equal input predictions
+    np.testing.assert_allclose(preds, df["prediction"].values)
+
+
+def test_segmentwise_calibrator_fit_does_not_crash_on_empty_dataframe():
+    # Bug 3: SegmentwiseCalibrator.predict crashes on empty DataFrame
+    cal = methods.SegmentwiseCalibrator(methods.IdentityCalibrator)
+    df_train = pd.DataFrame({"p": [0.1], "y": [0], "s": ["a"]})
+    cal.fit(df_train, "p", "y", categorical_feature_column_names=["s"])
+
+    df_empty = pd.DataFrame({"p": [], "s": []})
+    preds = cal.predict(df_empty, "p", categorical_feature_column_names=["s"])
+    assert len(preds) == 0
+
+
+def test_mcgrad_subclass_defaults_missing_lightgbm_params():
+    class SubMCGrad(methods.BaseMCGrad):
+        DEFAULT_HYPERPARAMS = {
+            "monotone_t": False,
+            "early_stopping": True,
+            "patience": 0,
+            "n_folds": 5,
+        }
+
+        def _objective(self):
+            return "binary"
+
+        @property
+        def _default_early_stopping_metric(self):
+            m = Mock(spec=ScoreFunctionInterface)
+            m.name = "mock_metric"
+            return m, True
+
+        def _transform_predictions(self, p):
+            return p
+
+        def _inverse_transform_predictions(self, p):
+            return p
+
+        def _compute_unshrink_factor(self, y, p, w):
+            return 1.0
+
+        def _check_predictions(self, df, col):
+            pass
+
+        def _check_labels(self, df, col):
+            pass
+
+        def _predictions_out_of_bounds(self, p):
+            return np.zeros_like(p, dtype=bool)
+
+        @property
+        def _cv_splitter(self):
+            return Mock()
+
+        @property
+        def _holdout_splitter(self):
+            return Mock()
+
+        @property
+        def _noop_splitter(self):
+            return Mock()
+
+    # This should not raise KeyError
+    model = SubMCGrad()
+    assert isinstance(model.lightgbm_params, dict)
+
+
+def test_mcgrad_default_minimization_behavior():
+    class AUCCalibrator(methods.BaseMCGrad):
+        DEFAULT_HYPERPARAMS = {
+            "monotone_t": False,
+            "early_stopping": True,
+            "patience": 0,
+            "n_folds": 5,
+            "lightgbm_params": {},
+        }
+
+        def _objective(self):
+            return "binary"
+
+        @property
+        def _default_early_stopping_metric(self):
+            m = Mock(spec=ScoreFunctionInterface)
+            m.name = "auc"
+            # Return tuple with minimize=False since AUC should be maximized
+            return m, False
+
+        def _transform_predictions(self, p):
+            return p
+
+        def _inverse_transform_predictions(self, p):
+            return p
+
+        def _compute_unshrink_factor(self, y, p, w):
+            return 1.0
+
+        def _check_predictions(self, df, col):
+            pass
+
+        def _check_labels(self, df, col):
+            pass
+
+        def _predictions_out_of_bounds(self, p):
+            return np.zeros_like(p, dtype=bool)
+
+        @property
+        def _cv_splitter(self):
+            return Mock()
+
+        @property
+        def _holdout_splitter(self):
+            return Mock()
+
+        @property
+        def _noop_splitter(self):
+            return Mock()
+
+    # The tuple return type ensures minimize_score is set correctly from the metric
+    cal = AUCCalibrator(early_stopping=True)
+    assert cal.early_stopping_minimize_score is False

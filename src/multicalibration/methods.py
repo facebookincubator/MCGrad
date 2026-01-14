@@ -101,7 +101,13 @@ class BaseMCGrad(
 
     @property
     @abstractmethod
-    def _default_early_stopping_metric(self) -> ScoreFunctionInterface:
+    def _default_early_stopping_metric(self) -> tuple[ScoreFunctionInterface, bool]:
+        """Return the default early stopping metric and whether to minimize it.
+
+        :return: A tuple of (score_function, minimize_score) where minimize_score
+            is True if lower scores are better (e.g., log_loss, MSE) and False
+            if higher scores are better (e.g., AUC, accuracy).
+        """
         pass
 
     @staticmethod
@@ -214,9 +220,9 @@ class BaseMCGrad(
             )
             self.early_stopping_minimize_score: bool = early_stopping_minimize_score
         else:
-            # Note: When changing the default score function, make sure to update the default value of `early_stopping_minimize_score` in the next line accordingly.
-            self.early_stopping_score_func = self._default_early_stopping_metric
-            self.early_stopping_minimize_score: bool = True
+            default_metric, default_minimize = self._default_early_stopping_metric
+            self.early_stopping_score_func = default_metric
+            self.early_stopping_minimize_score: bool = default_minimize
             if early_stopping_minimize_score is not None:
                 raise ValueError(
                     f"`early_stopping_minimize_score` is only relevant when using a "
@@ -351,9 +357,8 @@ class BaseMCGrad(
         except AttributeError:
             pass
 
-        # Start with defaults if the method is used in the constructor for setting the parameters for the first time
         if not hasattr(self, "lightgbm_params"):
-            params_to_set = self.DEFAULT_HYPERPARAMS["lightgbm_params"].copy()
+            params_to_set = self.DEFAULT_HYPERPARAMS.get("lightgbm_params", {}).copy()
         else:
             params_to_set = self.lightgbm_params.copy()
 
@@ -637,10 +642,9 @@ class BaseMCGrad(
                 y=preprocessed_data.labels,
                 prediction=predictions,
                 w=preprocessed_data.weights,
-                categorical_feature_column_names=categorical_feature_column_names,
-                numerical_feature_column_names=numerical_feature_column_names,
+                categorical_feature_column_names=preprocessed_data.categorical_feature_names,
+                numerical_feature_column_names=preprocessed_data.numerical_feature_names,
             )
-
         return self
 
     def _fit_single_round(
@@ -1292,8 +1296,10 @@ class MCGrad(BaseMCGrad):
         return "binary"
 
     @property
-    def _default_early_stopping_metric(self) -> ScoreFunctionInterface:
-        return wrap_sklearn_metric_func(skmetrics.log_loss)
+    def _default_early_stopping_metric(
+        self,
+    ) -> tuple[ScoreFunctionInterface, bool]:
+        return wrap_sklearn_metric_func(skmetrics.log_loss), True
 
     def _check_predictions(
         self, df_train: pd.DataFrame, prediction_column_name: str
@@ -1417,8 +1423,10 @@ class RegressionMCGrad(BaseMCGrad):
         return "regression"
 
     @property
-    def _default_early_stopping_metric(self) -> ScoreFunctionInterface:
-        return wrap_sklearn_metric_func(skmetrics.mean_squared_error)
+    def _default_early_stopping_metric(
+        self,
+    ) -> tuple[ScoreFunctionInterface, bool]:
+        return wrap_sklearn_metric_func(skmetrics.mean_squared_error), True
 
     def _check_predictions(
         self, df_train: pd.DataFrame, prediction_column_name: str
@@ -1508,7 +1516,7 @@ class PlattScaling(BaseCalibrator):
     """
 
     def __init__(self) -> None:
-        self.log_reg = LogisticRegression()
+        self.log_reg: LogisticRegression | None = None
 
     def fit(
         self,
@@ -1536,8 +1544,12 @@ class PlattScaling(BaseCalibrator):
         w = df_train[weight_column_name] if weight_column_name else np.ones_like(y)
 
         logits = utils.logit(y_hat).reshape(-1, 1)
-        self.log_reg = LogisticRegression(penalty=None)
-        self.log_reg.fit(logits, y, sample_weight=w)
+        if len(np.unique(y)) < 2:
+            self.log_reg = None
+        else:
+            log_reg = LogisticRegression(penalty=None)
+            log_reg.fit(logits, y, sample_weight=w)
+            self.log_reg = log_reg
         return self
 
     def predict(
@@ -1561,8 +1573,12 @@ class PlattScaling(BaseCalibrator):
         """
         y_hat = df[prediction_column_name].values.astype(float)
 
+        log_reg = self.log_reg
+        if log_reg is None:
+            return y_hat
+
         logits = utils.logit(y_hat).reshape(-1, 1)
-        return self.log_reg.predict_proba(logits)[:, 1]
+        return log_reg.predict_proba(logits)[:, 1]
 
 
 class IsotonicRegression(BaseCalibrator):
@@ -1752,7 +1768,11 @@ class AdditiveAdjustment(BaseCalibrator):
         )
         total_score = (w * df_train[prediction_column_name]).sum()
         total_positive = (w * df_train[label_column_name]).sum()
-        self.offset = (total_positive - total_score) / w.sum()
+        sum_w = w.sum()
+        if sum_w == 0:
+            self.offset = 0.0
+        else:
+            self.offset = (total_positive - total_score) / sum_w
         return self
 
     def predict(
@@ -1835,7 +1855,7 @@ class PlattScalingWithFeatures(BaseCalibrator):
     """
 
     def __init__(self) -> None:
-        self.log_reg = LogisticRegression()
+        self.log_reg: LogisticRegression | None = None
         self.logits_column_name = "__logits"
         self.ohe: OneHotEncoder | None = None
         self.kbd: KBinsDiscretizer | None = None
@@ -1911,7 +1931,7 @@ class PlattScalingWithFeatures(BaseCalibrator):
         weight_column_name: str | None = None,
         categorical_feature_column_names: list[str] | None = None,
         numerical_feature_column_names: list[str] | None = None,
-    ) -> LogisticRegression:
+    ) -> LogisticRegression | None:
         categorical_feature_column_names = self.ohe_columns or []
         numerical_feature_column_names = self.kbd_columns or []
 
@@ -1928,7 +1948,9 @@ class PlattScalingWithFeatures(BaseCalibrator):
             if weight_column_name
             else np.ones(df.shape[0])
         )
-        w = w.astype(float)
+        if len(np.unique(y)) < 2:
+            self.features = features
+            return None
 
         log_reg = LogisticRegression(C=0.1).fit(df[features], y, sample_weight=w)
         self.features = features
@@ -2009,6 +2031,8 @@ class PlattScalingWithFeatures(BaseCalibrator):
             categorical_feature_column_names=categorical_feature_column_names,
             numerical_feature_column_names=numerical_feature_column_names,
         )
+        if self.log_reg is None:
+            return df[prediction_column_name].values
         return self.log_reg.predict_proba(df[self.features])[:, 1]
 
 
@@ -2122,6 +2146,9 @@ class SegmentwiseCalibrator(Generic[TCalibrator], BaseCalibrator):
         :param kwargs: Additional keyword arguments
         :return: Array of calibrated predictions
         """
+        if df.empty:
+            return np.array([])
+
         if categorical_feature_column_names is None:
             categorical_feature_column_names = []
         if numerical_feature_column_names is None:
