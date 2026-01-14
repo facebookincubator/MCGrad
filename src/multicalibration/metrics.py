@@ -14,7 +14,6 @@ from typing import Any, Protocol
 import numpy as np
 import pandas as pd
 from multicalibration import utils
-from multicalibration._compat import groupby_apply
 from multicalibration.segmentation import get_segment_masks
 from numpy import typing as npt
 from scipy import stats
@@ -719,8 +718,8 @@ def multicalibration_error(
         )
 
     segment_errors = (
-        groupby_apply(segments_df.groupby(grouping_cols), _group_calibration_error)
-        # pyre-ignore[6]: groupby_apply returns Series when func returns scalar; Series.rename(str) is valid
+        segments_df.groupby(grouping_cols)
+        .apply(_group_calibration_error)
         .rename("error")
         .to_frame()
         .join(samples_per_segment)
@@ -788,8 +787,8 @@ def multi_cg_score(
         )
 
     segment_errors = (
-        groupby_apply(segments_df.groupby(grouping_cols), _group_cg_score)
-        # pyre-ignore[6]: groupby_apply returns Series when func returns scalar; Series.rename(str) is valid
+        segments_df.groupby(grouping_cols)
+        .apply(_group_cg_score)
         .rename("error")
         .to_frame()
         .join(samples_per_segment)
@@ -803,9 +802,7 @@ def _calculate_cumulative_differences(
     predicted_scores: npt.NDArray,
     sample_weight: npt.NDArray | None = None,
     segments: npt.NDArray | None = None,
-    precision_dtype: type[np.float16]
-    | type[np.float32]
-    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
+    precision_dtype: np.float16 | np.float32 | np.float64 = DEFAULT_PRECISION_DTYPE,
 ) -> npt.NDArray:
     """
     Calculate cumulative differences between labels and predictions.
@@ -860,7 +857,7 @@ class KuiperNormalizationInterface(Protocol):
         labels: npt.NDArray | None,
         sample_weight: npt.NDArray | None,
         segments: npt.NDArray | None,
-        precision_dtype: type[np.float16] | type[np.float32] | type[np.float64],
+        precision_dtype: np.float16 | np.float32 | np.float64,
     ) -> npt.NDArray: ...
 
 
@@ -887,9 +884,7 @@ def kuiper_upper_bound_standard_deviation_per_segment(
     labels: npt.NDArray | None = None,
     sample_weight: npt.NDArray | None = None,
     segments: npt.NDArray | None = None,
-    precision_dtype: type[np.float16]
-    | type[np.float32]
-    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
+    precision_dtype: np.float16 | np.float32 | np.float64 = DEFAULT_PRECISION_DTYPE,
 ) -> npt.NDArray:
     """
     Calculate an upper bound on Kuiper standard deviation per segment.
@@ -939,9 +934,7 @@ def kuiper_standard_deviation_per_segment(
     labels: npt.NDArray | None = None,
     sample_weight: npt.NDArray | None = None,
     segments: npt.NDArray | None = None,
-    precision_dtype: type[np.float16]
-    | type[np.float32]
-    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
+    precision_dtype: np.float16 | np.float32 | np.float64 = DEFAULT_PRECISION_DTYPE,
 ) -> npt.NDArray:
     """
     Calculate Kuiper standard deviation per segment.
@@ -990,9 +983,7 @@ def kuiper_label_based_standard_deviation_per_segment(
     labels: npt.NDArray | None,
     sample_weight: npt.NDArray | None = None,
     segments: npt.NDArray | None = None,
-    precision_dtype: type[np.float16]
-    | type[np.float32]
-    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
+    precision_dtype: np.float16 | np.float32 | np.float64 = DEFAULT_PRECISION_DTYPE,
 ) -> npt.NDArray:
     """
     Calculate label-based Kuiper standard deviation per segment.
@@ -1071,9 +1062,7 @@ def identity_per_segment(
     labels: npt.NDArray | None = None,
     sample_weight: npt.NDArray | None = None,
     segments: npt.NDArray | None = None,
-    precision_dtype: type[np.float16]
-    | type[np.float32]
-    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
+    precision_dtype: np.float16 | np.float32 | np.float64 = DEFAULT_PRECISION_DTYPE,
 ) -> npt.NDArray:
     """
     Return an array of ones (identity normalization).
@@ -1098,9 +1087,7 @@ def kuiper_calibration_per_segment(
     sample_weight: npt.NDArray | None = None,
     normalization_method: str | None = None,
     segments: npt.NDArray | None = None,
-    precision_dtype: type[np.float16]
-    | type[np.float32]
-    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
+    precision_dtype: np.float16 | np.float32 | np.float64 = DEFAULT_PRECISION_DTYPE,
 ) -> npt.NDArray:
     """
     Calculates Kuiper calibration distance between responses and scores.
@@ -1152,9 +1139,7 @@ def kuiper_calibration(
     sample_weight: npt.NDArray | None = None,
     normalization_method: str | None = None,
     segments: npt.NDArray | None = None,
-    precision_dtype: type[np.float16]
-    | type[np.float32]
-    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
+    precision_dtype: np.float16 | np.float32 | np.float64 = DEFAULT_PRECISION_DTYPE,
 ) -> float:
     """
     Calculates Kuiper calibration distance between responses and scores.
@@ -1343,13 +1328,9 @@ def kuiper_func_per_segment(
     )
 
     segment_p_values = (
-        groupby_apply(segments_df.groupby(grouping_cols), func)
-        # pyre-ignore[6]: groupby_apply returns Series when func returns scalar; Series.rename(str) is valid
-        .rename(output_series_name)
-        .dropna()
-    )
+        segments_df.groupby(grouping_cols).apply(func).rename(output_series_name)
+    ).dropna()
 
-    # pyre-ignore[7]: Return type is Series when func returns scalar
     return segment_p_values
 
 
@@ -1645,8 +1626,8 @@ def rank_multicalibration_error(
         )
 
     segment_RCE = (
-        groupby_apply(segments_df.groupby(grouping_cols), _group_rank_calibration_error)
-        # pyre-ignore[6]: groupby_apply returns Series when func returns scalar; Series.rename(str) is valid
+        segments_df.groupby(grouping_cols)
+        .apply(_group_rank_calibration_error)
         .rename("error")
         .to_frame()
         .join(samples_per_segment)
@@ -1699,8 +1680,8 @@ def _rank_multicalibration_error(
         )
 
     segment_RCE = (
-        groupby_apply(segments_df.groupby(grouping_cols), _group_rank_calibration_error)
-        # pyre-ignore[6]: groupby_apply returns Series when func returns scalar; Series.rename(str) is valid
+        segments_df.groupby(grouping_cols)
+        .apply(_group_rank_calibration_error)
         .rename("error")
         .to_frame()
         .join(samples_per_segment)
@@ -1845,8 +1826,8 @@ class MulticalibrationError:
             raise ValueError(
                 f"Invalid precision type: {precision_dtype}. Must be one of ['float16', 'float32', 'float64']."
             )
-        self.precision_dtype: type[np.float16] | type[np.float32] | type[np.float64] = (
-            getattr(np, precision_dtype)
+        self.precision_dtype: np.float16 | np.float32 | np.float64 = getattr(
+            np, precision_dtype
         )
 
         self.df[self.score_column] = self.df[self.score_column].astype(

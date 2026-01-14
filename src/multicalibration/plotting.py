@@ -12,7 +12,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from multicalibration import methods, metrics, utils
-from multicalibration._compat import groupby_apply
 from multicalibration.utils import BinningMethodInterface
 from plotly.subplots import make_subplots
 
@@ -206,8 +205,7 @@ def plot_calibration_curve_by_segment(
     """
     binning_fun = _get_binning_function(binning_method)
 
-    agg_df = groupby_apply(
-        data.groupby(group_var),
+    agg_df = data.groupby(group_var).apply(
         lambda x: _compute_calibration_curve(
             x,
             score_col=score_col,
@@ -215,7 +213,7 @@ def plot_calibration_curve_by_segment(
             num_bins=num_bins,
             sample_weight_col=sample_weight_col,
             binning_method=binning_fun,
-        ),
+        )
     )
 
     if agg_df.shape[0] == 0:

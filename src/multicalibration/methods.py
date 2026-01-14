@@ -32,8 +32,7 @@ from typing_extensions import Self
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-from multicalibration._compat import groupby_apply
-# @oss-disable[end= ]: from multicalibration.internal._compat import DeprecatedAttributesMixin
+# @oss-disable[end= ]: from multicalibration._compat import DeprecatedAttributesMixin
 
 
 @dataclass(frozen=True, slots=True)
@@ -2098,7 +2097,7 @@ class SegmentwiseCalibrator(Generic[TCalibrator], BaseCalibrator):
             categorical_feature_column_names=categorical_feature_column_names,
             numerical_feature_column_names=numerical_feature_column_names,
         )
-        groupby_apply(df_train.groupby("segment"), fit_segment_func)
+        df_train.groupby("segment").apply(fit_segment_func)
         return self
 
     def predict(
@@ -2140,9 +2139,7 @@ class SegmentwiseCalibrator(Generic[TCalibrator], BaseCalibrator):
             categorical_feature_column_names=categorical_feature_column_names,
             numerical_feature_column_names=numerical_feature_column_names,
         )
-        calibrated_scores_df = groupby_apply(
-            df.groupby("segment"), predict_segment_func
-        )
+        calibrated_scores_df = df.groupby("segment").apply(predict_segment_func)
         return calibrated_scores_df["calibrated_scores"].sort_index(level=-1).values
 
     def _fit_segment(
