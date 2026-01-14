@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from multicalibration import methods
-from multicalibration._compat import DeprecatedAlias, DeprecatedAttributesMixin
+# @oss-disable[end= ]: from multicalibration._compat import DeprecatedAlias, DeprecatedAttributesMixin
 
 
 def test_monotone_t_get_emits_deprecation_warning() -> None:
