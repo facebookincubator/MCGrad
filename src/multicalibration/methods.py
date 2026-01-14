@@ -2084,10 +2084,9 @@ class SegmentwiseCalibrator(Generic[TCalibrator], BaseCalibrator):
         if numerical_feature_column_names is None:
             numerical_feature_column_names = []
 
-        # Create a unique identifier for each segment
         df_train = df_train.copy()
         df_train["segment"] = df_train[categorical_feature_column_names].apply(
-            lambda row: "_".join(row.values.astype(str)), axis=1
+            lambda row: repr(tuple(row.values)), axis=1
         )
 
         fit_segment_func = partial(
@@ -2128,10 +2127,9 @@ class SegmentwiseCalibrator(Generic[TCalibrator], BaseCalibrator):
         if numerical_feature_column_names is None:
             numerical_feature_column_names = []
 
-        # Create a unique identifier for each segment
         df = df.copy()
         df["segment"] = df[categorical_feature_column_names].apply(
-            lambda row: "_".join(row.values.astype(str)), axis=1
+            lambda row: repr(tuple(row.values)), axis=1
         )
 
         predict_segment_func = partial(
