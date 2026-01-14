@@ -2632,3 +2632,44 @@ def test_multicalibration_error_p_value_fallback_when_segment_p_values_not_compu
     # Should return a valid p-value
     assert isinstance(p_value, (float, np.floating))
     assert 0 <= p_value <= 1
+
+
+def test_calibration_ratio_returns_inf_when_labels_zero_but_predictions_positive():
+    labels = np.array([0, 0, 0, 0, 0])
+    predicted_scores = np.array([0.1, 0.2, 0.3, 0.4, 0.5])
+    result = metrics.calibration_ratio(labels, predicted_scores)
+    assert np.isinf(result), (
+        f"Expected inf for positive predictions / zero labels, got {result}"
+    )
+
+
+def test_calibration_ratio_returns_nan_when_both_labels_and_predictions_zero():
+    labels = np.array([0, 0, 0, 0, 0])
+    predicted_scores = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
+    result = metrics.calibration_ratio(labels, predicted_scores)
+    assert np.isnan(result), (
+        f"Expected nan for zero predictions / zero labels, got {result}"
+    )
+
+
+def test_precision_at_predictive_prevalence_returns_nan_when_target_unachievable():
+    y_true = np.array([0, 0, 0, 1, 1])
+    y_scores = np.array([0.1, 0.2, 0.3, 0.8, 0.9])
+    result = metrics.precision_at_predictive_prevalence(
+        y_true, y_scores, predictive_prevalence_target=1.1
+    )
+    assert np.isnan(result), f"Expected NaN for unachievable target, got {result}"
+
+
+def test_dcg_score_returns_nan_on_empty_arrays():
+    labels = np.array([])
+    predicted_labels = np.array([])
+    result = metrics.dcg_score(labels, predicted_labels)
+    assert np.isnan(result), f"Expected NaN for empty arrays, got {result}"
+
+
+def test_ndcg_score_returns_nan_on_empty_arrays():
+    labels = np.array([])
+    predicted_labels = np.array([])
+    result = metrics.ndcg_score(labels, predicted_labels)
+    assert np.isnan(result), f"Expected NaN for empty arrays, got {result}"

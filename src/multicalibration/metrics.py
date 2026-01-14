@@ -249,7 +249,9 @@ def calibration_ratio(
     :param predicted_scores: Array of predicted probability scores.
     :param sample_weight: Optional array of sample weights.
     :param adjust_unjoined: Whether to adjust for unjoined data.
-    :return: The calibration ratio.
+    :return: The calibration ratio. Returns np.inf if labels sum to zero but
+        predictions sum to a positive value. Returns np.nan if both labels
+        and predictions sum to zero.
     """
     # equal weighting if no weights given
     if sample_weight is None:
@@ -416,8 +418,11 @@ def dcg_score(
         with the discount factor for each sample.
     :param k: If not None, the DCG score is calculated only based on the top k samples.
         k cannot be smaller than 1 and cannot be larger than the number of samples.
-    :return: the DCG score as a float.
+    :return: the DCG score as a float, or np.nan if the input arrays are empty.
     """
+    if labels.shape[0] == 0:
+        return np.nan
+
     scores = _dcg_sample_scores(
         labels, predicted_labels, rank_discount=rank_discount, k=k
     )
@@ -474,8 +479,11 @@ def ndcg_score(
     :param k: If not None, the NDCG score is calculated only based on the top k samples.
         k cannot be smaller than 1 and cannot be larger than the number of samples.
     :param sample_weight: Optional array of sample weights. Currently unused but included for API consistency.
-    :return: the NDCG score as a float in [0,1].
+    :return: the NDCG score as a float in [0,1], or np.nan if the input arrays are empty.
     """
+    if labels.shape[0] == 0:
+        return np.nan
+
     if min(labels) < 0:
         raise ValueError("NDCG should not be used with negative label values")
 
@@ -532,7 +540,8 @@ def precision_at_predictive_prevalence(
     :param y_scores: Array of predicted probability scores.
     :param predictive_prevalence_target: Target fraction of samples to predict as positive.
     :param sample_weight: Optional array of sample weights.
-    :return: Maximum precision at the target predictive prevalence.
+    :return: Maximum precision at the target predictive prevalence, or np.nan if
+        no threshold can achieve the target prevalence.
     """
     precisions, _, thresholds = skmetrics.precision_recall_curve(
         y_true, y_scores, sample_weight=sample_weight
@@ -548,6 +557,8 @@ def precision_at_predictive_prevalence(
         )
         if predictive_prevalence >= predictive_prevalence_target
     ]
+    if not precision_at_target:
+        return np.nan
     return max(precision_at_target)
 
 
