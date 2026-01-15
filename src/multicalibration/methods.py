@@ -37,7 +37,7 @@ from multicalibration._compat import groupby_apply
 
 
 @dataclass(frozen=True, slots=True)
-class MCGradProcessedData:
+class _MCGradProcessedData:
     features: npt.NDArray
     predictions: npt.NDArray
     weights: npt.NDArray
@@ -46,8 +46,8 @@ class MCGradProcessedData:
     numerical_feature_names: list[str]
     labels: npt.NDArray | None = None
 
-    def __getitem__(self, index: npt.NDArray) -> "MCGradProcessedData":
-        return MCGradProcessedData(
+    def __getitem__(self, index: npt.NDArray) -> "_MCGradProcessedData":
+        return _MCGradProcessedData(
             features=self.features[index],
             predictions=self.predictions[index],
             weights=self.weights[index],
@@ -58,10 +58,10 @@ class MCGradProcessedData:
         )
 
 
-# @oss-disable[end= ]: MCBoostProcessedData = MCGradProcessedData
+# @oss-disable[end= ]: _MCBoostProcessedData = _MCGradProcessedData
 
 
-class EstimationMethod(Enum):
+class _EstimationMethod(Enum):
     CROSS_VALIDATION = 1
     HOLDOUT = 2
     AUTO = 3
@@ -265,15 +265,15 @@ class BaseMCGrad(
             # Override the timeout when early stopping is disabled
             early_stopping_timeout = None
 
-        self.early_stopping_estimation_method: EstimationMethod
+        self.early_stopping_estimation_method: _EstimationMethod
         if early_stopping_use_crossvalidation is True:
-            self.early_stopping_estimation_method = EstimationMethod.CROSS_VALIDATION
+            self.early_stopping_estimation_method = _EstimationMethod.CROSS_VALIDATION
         elif early_stopping_use_crossvalidation is None:
-            self.early_stopping_estimation_method = EstimationMethod.AUTO
+            self.early_stopping_estimation_method = _EstimationMethod.AUTO
         else:
-            self.early_stopping_estimation_method = EstimationMethod.HOLDOUT
+            self.early_stopping_estimation_method = _EstimationMethod.HOLDOUT
 
-        if self.early_stopping_estimation_method == EstimationMethod.HOLDOUT:
+        if self.early_stopping_estimation_method == _EstimationMethod.HOLDOUT:
             if n_folds is not None:
                 raise ValueError(
                     "`n_folds` must be None when `early_stopping_use_crossvalidation` is disabled."
@@ -295,7 +295,7 @@ class BaseMCGrad(
 
         self.n_folds: int = (
             1  # Because we make a single train/test split when using holdout
-            if (self.early_stopping_estimation_method == EstimationMethod.HOLDOUT)
+            if (self.early_stopping_estimation_method == _EstimationMethod.HOLDOUT)
             else self.DEFAULT_HYPERPARAMS["n_folds"]
             if n_folds is None
             else n_folds
@@ -482,7 +482,7 @@ class BaseMCGrad(
         categorical_feature_column_names: list[str],
         numerical_feature_column_names: list[str],
         is_fit_phase: bool = False,
-    ) -> MCGradProcessedData:
+    ) -> _MCGradProcessedData:
         """
         Prepares processed data representation by extracting features once and computing the presence mask.
 
@@ -527,7 +527,7 @@ class BaseMCGrad(
             numerical_feature_column_names or [],
         )
 
-        return MCGradProcessedData(
+        return _MCGradProcessedData(
             features=x,
             predictions=predictions,
             weights=w,
@@ -863,7 +863,7 @@ class BaseMCGrad(
 
     def _determine_train_test_splitter(
         self,
-        estimation_method: EstimationMethod,
+        estimation_method: _EstimationMethod,
         has_custom_validation_set: bool,
     ) -> (
         KFold
@@ -871,7 +871,7 @@ class BaseMCGrad(
         | utils.TrainTestSplitWrapper
         | utils.NoopSplitterWrapper
     ):
-        if estimation_method == EstimationMethod.CROSS_VALIDATION:
+        if estimation_method == _EstimationMethod.CROSS_VALIDATION:
             if has_custom_validation_set:
                 raise ValueError(
                     "Custom validation set was provided while cross validation was enabled for early stopping. Please set early_stopping_use_crossvalidation to False or remove df_val."
@@ -893,9 +893,9 @@ class BaseMCGrad(
 
     def _determine_n_folds(
         self,
-        estimation_method: EstimationMethod,
+        estimation_method: _EstimationMethod,
     ) -> int:
-        if estimation_method == EstimationMethod.CROSS_VALIDATION:
+        if estimation_method == _EstimationMethod.CROSS_VALIDATION:
             n_folds = self.n_folds
             logger.info(f"Using {n_folds} folds for cross-validation.")
         else:
@@ -904,8 +904,8 @@ class BaseMCGrad(
 
     def _determine_best_num_rounds(
         self,
-        data_train: MCGradProcessedData,
-        data_val: MCGradProcessedData | None = None,
+        data_train: _MCGradProcessedData,
+        data_val: _MCGradProcessedData | None = None,
     ) -> int:
         logger.info("Determining optimal number of rounds")
         if data_train.labels is None:
@@ -1111,7 +1111,7 @@ class BaseMCGrad(
     def _compute_metric_on_internal_data(
         self,
         metric: ScoreFunctionInterface,
-        data: MCGradProcessedData,
+        data: _MCGradProcessedData,
         predictions: npt.NDArray,
     ) -> float:
         """
@@ -1211,20 +1211,20 @@ class BaseMCGrad(
         # Compute the effective sample size using the weights
         return (weights.sum() ** 2) / np.power(weights, 2).sum()
 
-    def _determine_estimation_method(self, weights: npt.NDArray) -> EstimationMethod:
+    def _determine_estimation_method(self, weights: npt.NDArray) -> _EstimationMethod:
         """
         Returns the estimation method to use for early stopping given the arguments and the weights (when relevant).
         This is especially useful for the AUTO option, where we infer the proper estimation method to use based on the effective sample size.
 
         :return: the estimation method to use.
         """
-        if self.early_stopping_estimation_method != EstimationMethod.AUTO:
+        if self.early_stopping_estimation_method != _EstimationMethod.AUTO:
             return self.early_stopping_estimation_method
 
         if self.early_stopping_score_func.name != "log_loss":
             # Automatically infer the estimation method only when using the logistic loss, otherwise use k-fold.
             # This is because we analyzed the effective sample size specifically with log_loss.
-            return EstimationMethod.CROSS_VALIDATION
+            return _EstimationMethod.CROSS_VALIDATION
 
         # We use a rule-of-thumb to determine whether to use cross-validation or holdout for early stopping.
         # Namely, if the effective sample size is less than 2.5M, we use cross-validation, otherwise we use holdout.
@@ -1235,13 +1235,13 @@ class BaseMCGrad(
                 f"Found a relatively small effective sample size ({ess:,}), choosing k-fold for early stopping. "
                 + "You can override this by explicitly setting `early_stopping_use_crossvalidation` to `False`."
             )
-            return EstimationMethod.CROSS_VALIDATION
+            return _EstimationMethod.CROSS_VALIDATION
         else:
             logger.info(
                 f"Found a large enough effective sample size ({ess:,}), choosing holdout for early stopping. "
                 + "You can override this by explicitly setting `early_stopping_use_crossvalidation` to `True`."
             )
-            return EstimationMethod.HOLDOUT
+            return _EstimationMethod.HOLDOUT
 
 
 class MCGrad(BaseMCGrad):

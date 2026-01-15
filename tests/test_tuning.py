@@ -60,7 +60,7 @@ def sample_val_data(rng):
 def mock_mcgrad_model(rng):
     model = Mock(spec=methods.MCGrad)
     model.predict = Mock(return_value=rng.uniform(0.1, 0.9, 80))
-    model.early_stopping_estimation_method = methods.EstimationMethod.HOLDOUT
+    model.early_stopping_estimation_method = methods._EstimationMethod.HOLDOUT
     return model
 
 
