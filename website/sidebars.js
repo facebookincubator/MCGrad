@@ -25,6 +25,7 @@ const sidebars = {
     'why-mcgrad',
     'installation',
     'quickstart',
+    'tutorials',
     'methodology',
     'measuring-multicalibration',
     {

@@ -79,6 +79,11 @@ const config = {
             label: 'Documentation',
           },
           {
+            to: '/docs/tutorials',
+            label: 'Tutorials',
+            position: 'left',
+          },
+          {
             href: 'https://mcgrad.readthedocs.io/',
             label: 'API Reference',
             position: 'left',
