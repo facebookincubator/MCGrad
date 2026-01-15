@@ -33,6 +33,7 @@ dev = [
 tutorials = [
     "jupytext>=1.16.0",
     "notebook>=7.0.0",
+    "jupyterlab>=4.0.0",
 ]
 
 [tool.setuptools.packages.find]
