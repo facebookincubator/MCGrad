@@ -149,7 +149,7 @@ def tune_mcgrad_params(
 
     if (
         model.early_stopping_estimation_method
-        == methods.EstimationMethod.CROSS_VALIDATION
+        == methods._EstimationMethod.CROSS_VALIDATION
         and (pass_df_val_into_tuning or pass_df_val_into_final_fit)
     ):
         raise ValueError(

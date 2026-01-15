@@ -2396,27 +2396,27 @@ def test_mcgrad__check_segment_features_fails_when_expected(
 @pytest.mark.parametrize(
     "early_stopping_use_crossvalidation,weights,scoring_function,expected_method",
     [
-        (False, [1, 1, 1], None, methods.EstimationMethod.HOLDOUT),
-        (True, [1, 1, 1, 1, 1], None, methods.EstimationMethod.CROSS_VALIDATION),
-        (None, [1, 1, 1], None, methods.EstimationMethod.CROSS_VALIDATION),
-        (None, [1, 1, 1, 1, 1], None, methods.EstimationMethod.HOLDOUT),
+        (False, [1, 1, 1], None, methods._EstimationMethod.HOLDOUT),
+        (True, [1, 1, 1, 1, 1], None, methods._EstimationMethod.CROSS_VALIDATION),
+        (None, [1, 1, 1], None, methods._EstimationMethod.CROSS_VALIDATION),
+        (None, [1, 1, 1, 1, 1], None, methods._EstimationMethod.HOLDOUT),
         (
             None,
             [100, 1, 1, 1, 1, 1],
             None,
-            methods.EstimationMethod.CROSS_VALIDATION,
+            methods._EstimationMethod.CROSS_VALIDATION,
         ),
         (
             None,
             [100, 100, 100, 100, 1, 1],
             None,
-            methods.EstimationMethod.HOLDOUT,
+            methods._EstimationMethod.HOLDOUT,
         ),
         (
             None,
             [1, 1, 1, 1, 1],
             skmetrics.average_precision_score,
-            methods.EstimationMethod.CROSS_VALIDATION,
+            methods._EstimationMethod.CROSS_VALIDATION,
         ),
     ],
 )
@@ -2665,10 +2665,10 @@ def test_prepare_mcgrad_processed_data_presence_mask_with_nan_predictions(
 @pytest.mark.parametrize(
     "estimation_method,has_custom_validation_set,expected_splitter_type",
     [
-        (methods.EstimationMethod.CROSS_VALIDATION, False, "cv"),
-        (methods.EstimationMethod.HOLDOUT, False, "holdout"),
+        (methods._EstimationMethod.CROSS_VALIDATION, False, "cv"),
+        (methods._EstimationMethod.HOLDOUT, False, "holdout"),
         (
-            methods.EstimationMethod.HOLDOUT,
+            methods._EstimationMethod.HOLDOUT,
             True,
             "noop splitter",
         ),
@@ -2735,7 +2735,7 @@ def test_determine_train_test_splitter_raises_error_for_cv_with_custom_validatio
         match="Custom validation set was provided while cross validation was enabled for early stopping. Please set early_stopping_use_crossvalidation to False or remove df_val",
     ):
         model._determine_train_test_splitter(
-            estimation_method=methods.EstimationMethod.CROSS_VALIDATION,
+            estimation_method=methods._EstimationMethod.CROSS_VALIDATION,
             has_custom_validation_set=True,
         )
 
@@ -2758,7 +2758,7 @@ def test_determine_train_test_splitter_noop_splitter_returned(
 
     # Execute: Get the provided holdout splitter for custom validation set
     splitter = model._determine_train_test_splitter(
-        estimation_method=methods.EstimationMethod.HOLDOUT,
+        estimation_method=methods._EstimationMethod.HOLDOUT,
         has_custom_validation_set=True,
     )
 
@@ -2777,9 +2777,15 @@ def test_determine_train_test_splitter_noop_splitter_returned(
 @pytest.mark.parametrize(
     "estimation_method,expected_n_folds",
     [
-        (methods.EstimationMethod.CROSS_VALIDATION, 5),  # Assuming N_FOLDS default is 5
-        (methods.EstimationMethod.HOLDOUT, 1),
-        (methods.EstimationMethod.AUTO, 1),  # AUTO should also return 1 in default case
+        (
+            methods._EstimationMethod.CROSS_VALIDATION,
+            5,
+        ),  # Assuming N_FOLDS default is 5
+        (methods._EstimationMethod.HOLDOUT, 1),
+        (
+            methods._EstimationMethod.AUTO,
+            1,
+        ),  # AUTO should also return 1 in default case
     ],
 )
 def test_determine_n_folds_returns_correct_value(
@@ -2798,7 +2804,7 @@ def test_determine_n_folds_returns_correct_value(
 
     # Assert: Verify correct n_folds is returned
     # Special handling for CROSS_VALIDATION since N_FOLDS may be set differently
-    if estimation_method == methods.EstimationMethod.CROSS_VALIDATION:
+    if estimation_method == methods._EstimationMethod.CROSS_VALIDATION:
         assert n_folds == model.n_folds
     else:
         assert n_folds == expected_n_folds
