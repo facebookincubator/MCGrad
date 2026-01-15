@@ -9,7 +9,7 @@ For additional information, please check the full paper [1].
 
 ## 1. Introduction: Beyond Global Calibration
 
-A machine learning model is **calibrated** if its predicted probabilities match the true frequency of outcomes. If a model predicts 80% confidence for a set of events, exactly 80% of those events should actually occur.
+A machine learning model is **calibrated** if its predicted probabilities match the true frequency of outcomes. In other words, if we take all the events for which the model predicts 0.8, then 80% of them should actually occur.
 
 However, global calibration is often insufficient. A model can be calibrated on average while being systematically miscalibrated for specific segments (e.g., overestimating risk for one demographic while underestimating it for another). These local miscalibrations cancel each other out in the global average, hiding the problem.
 
@@ -20,18 +20,24 @@ However, global calibration is often insufficient. A model can be calibrated on 
 Let $X$ be the input features and $Y \in \{0,1\}$ be the binary target. A predictor $f_0(x)$ estimates $P(Y=1|X=x)$. We use the capital $F_0(x)$ to denote the **logit** of $f_0(x)$, i.e. $F_0(x) = \log(f_0(x) / (1-f_0(x)))$.
 
 ### Calibration
-A predictor $f_0$ is perfectly calibrated if:
+A predictor $f_0$ is perfectly calibrated if, for all $p$:
 
-$$ \mathbb{P}(Y=1 \mid f_0(X)=p) = p $$
+$$ \mathbb{P}(Y=1 \mid f_0(X)=p) = p$$
 
 Practically, we measure miscalibration using metrics like **ECCE (Estimated Cumulative Calibration Error)**, which quantifies the deviation between predictions and outcomes without relying on arbitrary binning.
 
 ### Multicalibration
 We define a collection of segments $\mathcal{H}$ (e.g., "users in US", "users on Android"). A predictor $f_0$ is **multicalibrated** with respect to $\mathcal{H}$ if it is calibrated on every segment $h \in \mathcal{H}$.
 
-Formally, for all segments $h \in \mathcal{H}$ and all $u \in [0,1]$, the average prediction should match the average outcome:
+Formally, for all segments $h \in \mathcal{H}$ and all prediction values $p$, the conditional probability should match the prediction:
 
-$$ \mathbb{E}[Y - f_0(X) \mid h(X)=1, f_0(X) = p] \approx 0 $$
+$$ \mathbb{P}(Y=1 \mid h(X)=1, f_0(X) = p) = p$$
+
+This is equivalent to saying that the expected residual should be zero:
+
+$$ \mathbb{E}[Y - f_0(X) \mid h(X)=1, f_0(X) = p] = 0 $$
+
+This residual formulation directly connects to the gradient-based approach in MCGrad (see Insight 3 below).
 
 Existing algorithms often require you to manually specify $\mathcal{H}$ (the "protected groups"). MCGrad relaxes this: you only need to provide the features, and MCGrad implicitly calibrates across all segments definable by decision trees on those features.
 
@@ -56,7 +62,7 @@ Multicalibration requires checking calibration for every segment *and* every pre
 This split automatically isolates a specific *segment* in a specific *prediction range*. We don't need special logic for "intervals"; the decision tree handles it natively.
 
 #### Insight 3: Transformation to Regression
-With the first two insights, we have a target (the residual $Y - f_0(X)$) and a feature space $(X, f_0(X))$. The goal is to train a model $h$ that finds regions in this space where the residual is non-zero.
+With the first two insights, we have a target (the residual $Y - f_0(X)$) and a feature space $(X, f_0(X))$. The goal is to train a model $\phi$ that finds regions in this space where the residual is non-zero.
 
 How do we do this efficiently? This is where Gradient Boosting comes in.
 Gradient Boosted Decision Trees (GBDTs) work by iteratively training trees to predict the **negative gradient** of a loss function.
@@ -76,8 +82,8 @@ Correcting calibration in one region can create other regions with miscalibratio
 **Algorithm:**
 1.  **Initialize**: Start with the base model's logits $F_0(x)$.
 2.  **Iterate**: For round $t = 1, \dots, T$:
-    *   Train a GBDT $h_t$ to predict the residual $Y - f_{t-1}(X)$ using features $(X, f_{t-1}(X))$.
-    *   Update the model: $F_t(x) = F_{t-1}(x) + \eta \cdot h_t(x, f_{t-1}(x))$.
+    *   Train a GBDT $\phi_t$ to predict the residual $Y - f_{t-1}(X)$ using features $(X, f_{t-1}(X))$.
+    *   Update the model: $F_t(x) = F_{t-1}(x) + \eta \cdot \phi_t(x, f_{t-1}(x))$.
     *   Update predictions: $f_t(x) = \text{sigmoid}(F_t(x))$.
 3.  **Converge**: Stop when performance on a validation set no longer improves.
 
@@ -96,7 +102,7 @@ Instead of custom boosting logic, MCGrad delegates the heavy lifting to **LightG
 GBDTs use "shrinkage" (small learning rate) to prevent overfitting, but this can result in under-confident updates that require many trees to fix.
 MCGrad adds a **rescaling step** after each round: it learns a single scalar multiplier $\theta_t$ to perfectly scale the update.
 
-$$ F_t(x) = \theta_t \cdot (F_{t-1}(x) + h_t(\dots)) $$
+$$ F_t(x) = \theta_t \cdot (F_{t-1}(x) + \phi_t(\dots)) $$
 
 This drastically reduces the number of rounds needed for convergence.
 
