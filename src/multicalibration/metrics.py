@@ -629,7 +629,7 @@ def fpr_at_precision(
     return false_positive_rate
 
 
-class MulticalibrationErrorMetricInterface(Protocol):
+class _MulticalibrationErrorMetricInterface(Protocol):
     def __call__(
         self,
         labels: npt.NDArray,
@@ -645,7 +645,7 @@ def multicalibration_error(
     predictions: npt.NDArray,
     segments_df: pd.DataFrame,
     sample_weight: npt.NDArray | None = None,
-    metric: MulticalibrationErrorMetricInterface = adaptive_calibration_error,
+    metric: _MulticalibrationErrorMetricInterface = adaptive_calibration_error,
     num_bins: int = 40,
     epsilon: float = 0.0000001,
 ) -> float:
@@ -718,7 +718,7 @@ def multicalibration_error(
     return segment_errors["weighted_error"].sum()
 
 
-class MulticalibrationRankErrorMetricsInterface(Protocol):
+class _MulticalibrationRankErrorMetricsInterface(Protocol):
     def __call__(
         self,
         labels: npt.NDArray,
@@ -732,7 +732,7 @@ def multi_cg_score(
     labels: npt.NDArray,
     predictions: npt.NDArray,
     segments_df: pd.DataFrame,
-    metric: MulticalibrationRankErrorMetricsInterface = ndcg_score,
+    metric: _MulticalibrationRankErrorMetricsInterface = ndcg_score,
     rank_discount: Callable[[int], npt.NDArray] = utils.rank_no_discount,
     k: int | None = None,
 ) -> npt.NDArray:
