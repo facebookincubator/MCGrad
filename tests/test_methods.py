@@ -630,7 +630,7 @@ def test_calibration_methods_use_weight_column_correctly(
     # Adding this assertion because there were test cases earlier where a model passed
     # just because in both cases it was fit with 0 rounds
     # TODO: understand why early stopping is not equivalent with/without weights
-    if isinstance(model_unweighted, methods.BaseMCGrad):
+    if isinstance(model_unweighted, methods._BaseMCGrad):
         assert len(model_weighted.mr) > 0
         assert len(model_unweighted.mr) > 0
 
@@ -2334,7 +2334,7 @@ def test_mcgrad__check_predictions_fails_when_expected(
 
 
 def test_basemcgrad_implementations_transform_inverse_transform_invariance():
-    # Find all subclasses of BaseMCGrad. This only works for classes that are imported in this file
+    # Find all subclasses of _BaseMCGrad. This only works for classes that are imported in this file
     # so we're operating on the assumption that there's at least on other relevant test for any MCGrad implementation.
     def get_all_subclasses(cls):
         all_subclasses = []
@@ -2343,8 +2343,8 @@ def test_basemcgrad_implementations_transform_inverse_transform_invariance():
             all_subclasses.extend(get_all_subclasses(subclass))
         return all_subclasses
 
-    subclasses = get_all_subclasses(methods.BaseMCGrad)
-    assert len(subclasses) > 0, "Expected at least one subclass of BaseMCGrad"
+    subclasses = get_all_subclasses(methods._BaseMCGrad)
+    assert len(subclasses) > 0, "Expected at least one subclass of _BaseMCGrad"
 
     predictions = np.array([0.001, 0.1, 0.25, 0.5, 0.75, 0.9, 0.999])
 
@@ -3751,7 +3751,7 @@ def test_segmentwise_calibrator_fit_does_not_crash_on_empty_dataframe():
 
 
 def test_mcgrad_subclass_defaults_missing_lightgbm_params():
-    class SubMCGrad(methods.BaseMCGrad):
+    class SubMCGrad(methods._BaseMCGrad):
         DEFAULT_HYPERPARAMS = {
             "monotone_t": False,
             "early_stopping": True,
@@ -3804,7 +3804,7 @@ def test_mcgrad_subclass_defaults_missing_lightgbm_params():
 
 
 def test_mcgrad_default_minimization_behavior():
-    class AUCCalibrator(methods.BaseMCGrad):
+    class AUCCalibrator(methods._BaseMCGrad):
         DEFAULT_HYPERPARAMS = {
             "monotone_t": False,
             "early_stopping": True,

@@ -64,7 +64,7 @@ class _EstimationMethod(Enum):
     AUTO = 3
 
 
-class BaseMCGrad(
+class _BaseMCGrad(
     BaseCalibrator,
     ABC,
 ):
@@ -920,7 +920,7 @@ class BaseMCGrad(
         num_rounds = 0
         best_num_rounds = 0
 
-        mcgrad_per_fold: Dict[int, BaseMCGrad] = {}
+        mcgrad_per_fold: Dict[int, _BaseMCGrad] = {}
         predictions_per_fold: Dict[int, npt.NDArray] = {}
 
         best_score = -np.inf
@@ -1241,7 +1241,7 @@ class BaseMCGrad(
             return _EstimationMethod.HOLDOUT
 
 
-class MCGrad(BaseMCGrad):
+class MCGrad(_BaseMCGrad):
     """
     MCGrad (Multicalibration Gradient Boosting) as described in [1].
 
@@ -1367,7 +1367,7 @@ class MCGrad(BaseMCGrad):
         return utils.NoopSplitterWrapper()
 
 
-class RegressionMCGrad(BaseMCGrad):
+class RegressionMCGrad(_BaseMCGrad):
     """
     Regression variant of MCGrad for continuous label calibration.
 
