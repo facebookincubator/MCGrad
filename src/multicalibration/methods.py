@@ -17,7 +17,7 @@ from typing import Any, cast, Dict, Generic, TypeVar
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
-from multicalibration import utils
+from multicalibration import _utils as utils
 from multicalibration.base import BaseCalibrator
 from multicalibration.metrics import ScoreFunctionInterface, wrap_sklearn_metric_func
 from numpy import typing as npt

@@ -10,7 +10,6 @@ Welcome to multicalibration's API documentation!
    api/plotting
    api/segmentation
    api/tuning
-   api/utils
 
 
 Indices and tables
