@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 import scipy
 import sklearn.metrics as skmetrics
-from multicalibration import methods, utils
+from multicalibration import _utils as utils, methods
 from multicalibration.metrics import (
     ScoreFunctionInterface,
     wrap_multicalibration_error_metric,

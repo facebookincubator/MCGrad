@@ -36,7 +36,6 @@ const sidebars = {
         'api/plotting',
         'api/segmentation',
         'api/tuning',
-        'api/utils',
       ],
     },
     'contributing',
