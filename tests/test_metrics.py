@@ -368,41 +368,6 @@ def test_multi_cg_gives_same_result_as_cg_per_segment(rank_discount, rng):
             assert np.allclose(segment_result, multi_cg_scores[segment_1, segment_2])
 
 
-def test_predictions_to_labels_gives_expected_result():
-    data = pd.DataFrame(
-        {
-            "prediction": [0.1, 0.2, 0.4, 0.8, 0.9],
-            "segment_a": ["a", "a", "b", "b", "a"],
-            "segment_b": ["i", "j", "i", "j", "i"],
-        }
-    )
-    thresholds = pd.DataFrame(
-        {
-            "segment_a": ["a", "a", "b", "b"],
-            "segment_b": ["i", "j", "i", "j"],
-            "threshold": [0.8, 0.7, 0.6, 0.5],
-        }
-    )
-    expected = pd.DataFrame(
-        {
-            "prediction": [0.1, 0.2, 0.4, 0.8, 0.9],
-            "segment_a": ["a", "a", "b", "b", "a"],
-            "segment_b": ["i", "j", "i", "j", "i"],
-            "threshold": [0.8, 0.7, 0.6, 0.5, 0.8],
-            "predicted_label": [0, 0, 0, 1, 1],
-        }
-    )
-
-    data_with_predicted_labels_and_thresholds = metrics.predictions_to_labels(
-        data=data,
-        prediction_column="prediction",
-        thresholds=thresholds,
-        threshold_column="threshold",
-    )
-
-    pd.testing.assert_frame_equal(data_with_predicted_labels_and_thresholds, expected)
-
-
 def test_multicalibration_error_without_weights_gives_expected_results():
     # Create some sample data
     _labels = np.linspace(0, 1, 100)
@@ -1667,34 +1632,6 @@ def test_ecce_and_standard_deviation_return_zero_for_empty_segment(rng):
         segments=masks,
     )[0]
     assert c_jk == k_ub == k_std, "Expected 0 for empty segment"
-
-
-def test_predictions_to_labels_does_not_modify_input_dataframes():
-    """Verify predictions_to_labels does not modify input DataFrames."""
-    data = pd.DataFrame(
-        {
-            "prediction": [0.1, 0.2, 0.4, 0.8, 0.9],
-            "segment_a": ["a", "a", "b", "b", "a"],
-            "segment_b": ["i", "j", "i", "j", "i"],
-        }
-    )
-    thresholds = pd.DataFrame(
-        {
-            "segment_a": ["a", "a", "b", "b"],
-            "segment_b": ["i", "j", "i", "j"],
-            "threshold": [0.8, 0.7, 0.6, 0.5],
-        }
-    )
-
-    data_original = data.copy()
-    thresholds_original = thresholds.copy()
-
-    _ = metrics.predictions_to_labels(
-        data=data, prediction_column="prediction", thresholds=thresholds
-    )
-
-    pd.testing.assert_frame_equal(data, data_original)
-    pd.testing.assert_frame_equal(thresholds, thresholds_original)
 
 
 def test_multicalibration_error_does_not_modify_segments_df():

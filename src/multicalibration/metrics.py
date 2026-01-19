@@ -629,31 +629,6 @@ def fpr_at_precision(
     return false_positive_rate
 
 
-def predictions_to_labels(
-    data: pd.DataFrame,
-    prediction_column: str,
-    thresholds: pd.DataFrame,
-    threshold_column: str | None = "threshold",
-) -> pd.DataFrame:
-    """
-    Convert prediction scores to binary labels using segment-specific thresholds.
-
-    :param data: DataFrame containing predictions and segmentation columns.
-    :param prediction_column: Name of the column containing prediction scores.
-    :param thresholds: DataFrame with threshold values per segment.
-    :param threshold_column: Name of the column in thresholds containing threshold values.
-    :return: DataFrame with an added 'predicted_label' column.
-    """
-    segmentation_columns = [c for c in thresholds.columns if c != threshold_column]
-    data_w_thresholds = data.copy().merge(
-        thresholds, on=segmentation_columns, how="left"
-    )
-    data_w_thresholds["predicted_label"] = (
-        data_w_thresholds[prediction_column] >= data_w_thresholds.threshold
-    ).astype(int)
-    return data_w_thresholds
-
-
 class MulticalibrationErrorMetricInterface(Protocol):
     def __call__(
         self,
