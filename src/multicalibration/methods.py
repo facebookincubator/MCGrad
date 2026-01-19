@@ -7,6 +7,7 @@
 import json
 import logging
 import time
+import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
@@ -18,7 +19,9 @@ import lightgbm as lgb
 import numpy as np
 import pandas as pd
 from multicalibration import utils
+from multicalibration._compat import create_kbins_discretizer, groupby_apply
 from multicalibration.base import BaseCalibrator
+# @oss-disable[end= ]: from multicalibration.internal._compat import DeprecatedAttributesMixin
 from multicalibration.metrics import ScoreFunctionInterface, wrap_sklearn_metric_func
 from numpy import typing as npt
 from sklearn import isotonic, metrics as skmetrics
@@ -28,9 +31,6 @@ from sklearn.preprocessing import KBinsDiscretizer, OneHotEncoder
 from typing_extensions import Self
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-from multicalibration._compat import groupby_apply
-# @oss-disable[end= ]: from multicalibration.internal._compat import DeprecatedAttributesMixin
 
 
 @dataclass(frozen=True, slots=True)
@@ -1544,8 +1544,16 @@ class PlattScaling(BaseCalibrator):
         if len(np.unique(y)) < 2:
             self.log_reg = None
         else:
-            log_reg = LogisticRegression(penalty=None)
-            log_reg.fit(logits, y, sample_weight=w)
+            log_reg = LogisticRegression(C=np.inf)
+            # Suppress sklearn 1.8+ UserWarning which is a known bug. Will be fixed in sklearn 1.8.1
+            # See: https://github.com/scikit-learn/scikit-learn/issues/32927
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message="Setting penalty=None will ignore the C.*",
+                    category=UserWarning,
+                )
+                log_reg.fit(logits, y, sample_weight=w)
             self.log_reg = log_reg
         return self
 
@@ -1873,7 +1881,9 @@ class PlattScalingWithFeatures(BaseCalibrator):
             self.ohe = None
 
         if numerical_feature_column_names:
-            self.kbd = KBinsDiscretizer(encode="onehot-dense", n_bins=3, subsample=None)
+            self.kbd = create_kbins_discretizer(
+                encode="onehot-dense", n_bins=3, subsample=None
+            )
             self.kbd.fit(df[numerical_feature_column_names])
         else:
             self.kbd = None
