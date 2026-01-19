@@ -708,3 +708,33 @@ def log_peak_rss(
         return wrapper
 
     return decorator
+
+
+def predictions_to_labels(
+    data: pd.DataFrame,
+    prediction_column: str,
+    thresholds: pd.DataFrame,
+    threshold_column: str | None = "threshold",
+) -> pd.DataFrame:
+    """
+    Convert prediction scores to binary labels using segment-specific thresholds.
+
+    This utility function merges a DataFrame containing predictions with a thresholds
+    DataFrame that specifies decision thresholds per segment. It then creates a new
+    'predicted_label' column by comparing each prediction against its segment's threshold.
+
+    :param data: DataFrame containing predictions and segmentation columns.
+    :param prediction_column: Name of the column containing prediction scores.
+    :param thresholds: DataFrame with threshold values per segment. Must contain
+        the segmentation columns (used for merging) and a threshold column.
+    :param threshold_column: Name of the column in thresholds containing threshold values.
+    :return: DataFrame with an added 'predicted_label' column (1 if prediction >= threshold, else 0).
+    """
+    segmentation_columns = [c for c in thresholds.columns if c != threshold_column]
+    data_w_thresholds = data.copy().merge(
+        thresholds, on=segmentation_columns, how="left"
+    )
+    data_w_thresholds["predicted_label"] = (
+        data_w_thresholds[prediction_column] >= data_w_thresholds.threshold
+    ).astype(int)
+    return data_w_thresholds
