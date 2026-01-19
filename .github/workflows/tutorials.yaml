@@ -1,0 +1,93 @@
+name: Tutorials
+
+on:
+  push:
+    paths:
+      - 'tutorials/**'
+      - 'src/**'
+      - 'pyproject.toml'
+  pull_request:
+    paths:
+      - 'tutorials/**'
+      - 'src/**'
+      - 'pyproject.toml'
+  workflow_dispatch:
+
+jobs:
+  test-tutorials:
+    runs-on: 4-core-ubuntu
+    strategy:
+      matrix:
+        python-version: ['3.11']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-tutorials-${{ hashFiles('pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-tutorials-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev,tutorials]"
+
+    - name: Check notebook sync
+      run: |
+        sync_errors=0
+        for tutorial in tutorials/*.py; do
+          ipynb="${tutorial%.py}.ipynb"
+
+          if [ ! -f "$ipynb" ]; then
+            echo "❌ Missing: $ipynb"
+            sync_errors=$((sync_errors + 1))
+            continue
+          fi
+
+          # Round-trip comparison: convert .ipynb back to .py and compare
+          jupytext --to py:percent "$ipynb" -o /tmp/from_ipynb.py
+          if ! diff -q "$tutorial" /tmp/from_ipynb.py > /dev/null 2>&1; then
+            echo "❌ Out of sync: $ipynb"
+            diff "$tutorial" /tmp/from_ipynb.py || true
+            sync_errors=$((sync_errors + 1))
+          fi
+        done
+
+        if [ $sync_errors -gt 0 ]; then
+          echo ""
+          echo "=========================================="
+          echo "ERROR: $sync_errors notebook(s) out of sync!"
+          echo "Ensure pre-commit hooks are installed: pre-commit install"
+          echo "Then re-commit your changes."
+          echo "=========================================="
+          exit 1
+        fi
+
+        echo "✓ All notebooks in sync"
+
+    - name: Execute tutorials
+      run: |
+        for tutorial in tutorials/*.py; do
+          echo "=========================================="
+          echo "Testing: $tutorial"
+          echo "=========================================="
+
+          ipynb="${tutorial%.py}.ipynb"
+
+          # Execute with Papermill (timeout: 10 minutes per notebook)
+          papermill "$ipynb" /tmp/output.ipynb \
+            --cwd tutorials \
+            --execution-timeout 600 \
+            --log-output
+
+          echo "✓ $tutorial passed"
+        done
