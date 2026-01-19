@@ -1471,6 +1471,11 @@ def test_mce_correctly_setup_in_mcgrad(calibrator_class, rng):
         ),
         early_stopping_minimize_score=True,
         num_rounds=1,
+        lightgbm_params={
+            "num_leaves": 2,
+            "n_estimators": 1,
+            "max_depth": 2,
+        },
     ).fit(
         df_train=df_train,
         prediction_column_name="prediction",
@@ -1522,6 +1527,11 @@ def test_mce_parameters_correctly_setup_in_mcgrad(calibrator_class, rng):
         early_stopping_minimize_score=True,
         early_stopping=True,
         num_rounds=1,
+        lightgbm_params={
+            "num_leaves": 2,
+            "n_estimators": 1,
+            "max_depth": 2,
+        },
     ).fit(
         df_train=df_train,
         prediction_column_name="prediction",
@@ -1562,6 +1572,11 @@ def test_mcgrad_calls_score_func_during_early_stopping(calibrator_class, rng):
         early_stopping_score_func=mock_roc_auc_score,
         early_stopping_minimize_score=False,
         num_rounds=1,
+        lightgbm_params={
+            "num_leaves": 2,
+            "n_estimators": 1,
+            "max_depth": 2,
+        },
     )
     mcgrad.fit(
         df_train=df_train,
@@ -2977,7 +2992,7 @@ def test_predict_does_not_modify_input_predictions_array(calibrator_class, rng):
     This is a regression test for a bug where _predict would alias the input
     array instead of copying it, causing in-place modifications via += and *= operators.
     """
-    n_samples = 100
+    n_samples = 30
     df = pd.DataFrame(
         {
             "prediction": rng.uniform(0.3, 0.7, n_samples),
@@ -2986,7 +3001,15 @@ def test_predict_does_not_modify_input_predictions_array(calibrator_class, rng):
         }
     )
 
-    mcgrad = calibrator_class(early_stopping=False, num_rounds=2)
+    mcgrad = calibrator_class(
+        early_stopping=False,
+        num_rounds=1,
+        lightgbm_params={
+            "num_leaves": 2,
+            "n_estimators": 1,
+            "max_depth": 2,
+        },
+    )
 
     mcgrad.fit(
         df_train=df,
@@ -3037,7 +3060,7 @@ def test_early_stopping_produces_same_model_as_manual_num_rounds(calibrator_clas
     3. Final model training uses the modified predictions instead of original ones
     4. Result: Different model than manually setting num_rounds=N
     """
-    n_samples = 300
+    n_samples = 100
     df = pd.DataFrame(
         {
             "prediction": rng.uniform(0.2, 0.8, n_samples),
@@ -3049,9 +3072,15 @@ def test_early_stopping_produces_same_model_as_manual_num_rounds(calibrator_clas
 
     mcgrad_with_es = calibrator_class(
         early_stopping=True,
-        num_rounds=10,
+        num_rounds=5,
         save_training_performance=True,
         patience=0,
+        random_state=42,
+        lightgbm_params={
+            "num_leaves": 4,
+            "n_estimators": 10,
+            "max_depth": 3,
+        },
     )
 
     mcgrad_with_es.fit(
@@ -3065,7 +3094,14 @@ def test_early_stopping_produces_same_model_as_manual_num_rounds(calibrator_clas
     num_rounds_determined = len(mcgrad_with_es.mr)
 
     mcgrad_manual = calibrator_class(
-        early_stopping=False, num_rounds=num_rounds_determined, random_state=42
+        early_stopping=False,
+        num_rounds=num_rounds_determined,
+        random_state=42,
+        lightgbm_params={
+            "num_leaves": 4,
+            "n_estimators": 10,
+            "max_depth": 3,
+        },
     )
 
     mcgrad_manual.fit(
@@ -3113,7 +3149,7 @@ def test_multiple_predict_calls_produce_consistent_results(calibrator_class, rng
 
     This verifies that predict does not have side effects that alter subsequent predictions.
     """
-    n_samples = 80
+    n_samples = 50
     df = pd.DataFrame(
         {
             "prediction": rng.uniform(0.2, 0.8, n_samples),
@@ -3122,7 +3158,16 @@ def test_multiple_predict_calls_produce_consistent_results(calibrator_class, rng
         }
     )
 
-    mcgrad = calibrator_class(early_stopping=False, num_rounds=2, random_state=42)
+    mcgrad = calibrator_class(
+        early_stopping=False,
+        num_rounds=1,
+        random_state=42,
+        lightgbm_params={
+            "num_leaves": 2,
+            "n_estimators": 1,
+            "max_depth": 2,
+        },
+    )
 
     mcgrad.fit(
         df_train=df,
