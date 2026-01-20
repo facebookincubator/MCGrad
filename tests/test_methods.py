@@ -13,7 +13,7 @@ import scipy
 import sklearn.metrics as skmetrics
 from multicalibration import _utils as utils, methods
 from multicalibration.metrics import (
-    ScoreFunctionInterface,
+    _ScoreFunctionInterface,
     wrap_multicalibration_error_metric,
     wrap_sklearn_metric_func,
 )
@@ -3809,7 +3809,7 @@ def test_mcgrad_subclass_defaults_missing_lightgbm_params():
 
         @property
         def _default_early_stopping_metric(self):
-            m = Mock(spec=ScoreFunctionInterface)
+            m = Mock(spec=_ScoreFunctionInterface)
             m.name = "mock_metric"
             return m, True
 
@@ -3863,7 +3863,7 @@ def test_mcgrad_default_minimization_behavior():
 
         @property
         def _default_early_stopping_metric(self):
-            m = Mock(spec=ScoreFunctionInterface)
+            m = Mock(spec=_ScoreFunctionInterface)
             m.name = "auc"
             # Return tuple with minimize=False since AUC should be maximized
             return m, False
