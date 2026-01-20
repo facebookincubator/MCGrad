@@ -1295,8 +1295,12 @@ class MCGrad(_BaseMCGrad):
     MCGrad (Multicalibration Gradient Boosting) as described in [1].
 
     References:
-    [1] Perini, Haimovich, Linder, Tax, Karamshuk, Okati, Vojnovic, Apostolopoulos (2026). MCGrad: Multicalibration at Web Scale.
-    In Conference on Knowledge Discovery in Databases.
+
+    [1] Tax, N., Perini, L., Linder, F., Haimovich, D., Karamshuk, D., Okati, N., Vojnovic, M.,
+      & Apostolopoulos, P. A. (2026). MCGrad: Multicalibration at Web Scale.
+      In Proceedings of the 32nd ACM SIGKDD Conference on Knowledge Discovery and Data Mining (KDD 2026).
+      https://doi.org/10.1145/3770854.3783954
+    - arXiv preprint: https://arxiv.org/abs/2509.19884
     """
 
     UNSHRINK_LOGIT_EPSILON = 10
@@ -1551,14 +1555,24 @@ class RegressionMCGrad(_BaseMCGrad):
 class PlattScaling(BaseCalibrator):
     """Platt scaling calibration method.
 
+    Platt scaling fits a logistic regression model to transform uncalibrated predictions into
+    calibrated probabilities. Given an uncalibrated prediction :math:`\\hat{p}`, it first converts
+    to log-odds (logit): :math:`t = \\log(\\hat{p} / (1 - \\hat{p}))`, then fits the model:
 
-    Provides an implementation of Platt scaling, which is just a Logistic Regression applied to the logits.
+    .. math::
+
+        P(y=1 | t) = \\sigma(a \\cdot t + b)
+
+    where :math:`\\sigma` is the sigmoid function and :math:`a, b` are learned parameters.
+    This is equivalent to fitting a logistic regression with a single feature (the logit of the
+    original prediction).
 
     References:
+
     - Platt, J. (1999). Probabilistic outputs for support vector machines and comparisons to regularized
-        likelihood methods. Advances in large margin classifiers, 10(3), 61-74.
+      likelihood methods. Advances in large margin classifiers, 10(3), 61-74.
     - Niculescu-Mizil, A., & Caruana, R. (2005). Predicting good probabilities with supervised learning.
-        International Conference on Machine Learning (ICML). pp. 625-632.
+      International Conference on Machine Learning (ICML). pp. 625-632.
     """
 
     def __init__(self) -> None:
@@ -1630,15 +1644,24 @@ class PlattScaling(BaseCalibrator):
 class IsotonicRegression(BaseCalibrator):
     """Isotonic regression calibration method.
 
+    Isotonic regression fits a non-decreasing step function that minimizes the mean squared error
+    between calibrated predictions and true labels, subject to a monotonicity constraint.
+    Given uncalibrated predictions :math:`\\hat{p}_i` and labels :math:`y_i`, it finds:
 
-    Provides an implementation of Isotonic regression. For input values outside of the training
-    domain, predictions are set to the value corresponding to the nearest training interval endpoint.
+    .. math::
+
+        \\min_{f} \\sum_{i} (y_i - f(\\hat{p}_i))^2 \\quad \\text{subject to} \\quad f(\\hat{p}_i) \\leq f(\\hat{p}_j) \\text{ whenever } \\hat{p}_i \\leq \\hat{p}_j
+
+    The result is a piecewise-constant function that maps predictions to calibrated probabilities.
+    For input values outside of the training domain, predictions are clipped to the value
+    corresponding to the nearest training interval endpoint.
 
     References:
+
     - Zadrozny, B., & Elkan, C. (2001). Obtaining calibrated probability estimates from decision trees and
-        naive bayesian classifiers. International Conference on Machine Learning (ICML). pp. 609-616.
+      naive bayesian classifiers. International Conference on Machine Learning (ICML). pp. 609-616.
     - Niculescu-Mizil, A., & Caruana, R. (2005). Predicting good probabilities with supervised learning.
-        International Conference on Machine Learning (ICML). pp. 625-632.
+      International Conference on Machine Learning (ICML). pp. 625-632.
     """
 
     def __init__(self) -> None:
@@ -1706,8 +1729,18 @@ class IsotonicRegression(BaseCalibrator):
 
 class MultiplicativeAdjustment(BaseCalibrator):
     """
-    Calibrates predictions by multiplying scores with a correction factor derived from the ratio of total positive
-    labels to sum of predicted scores. This helps align the overall prediction distribution with the true label distribution.
+    Calibrates predictions by applying a multiplicative correction factor.
+
+    This method computes a scalar multiplier :math:`m` that aligns the sum of predictions with
+    the sum of labels. Given predictions :math:`\\hat{p}_i`, labels :math:`y_i`, and optional
+    weights :math:`w_i`, the multiplier is computed as:
+
+    .. math::
+
+        m = \\frac{\\sum_i w_i y_i}{\\sum_i w_i \\hat{p}_i}
+
+    The calibrated predictions are then :math:`m \\cdot \\hat{p}_i`.
+    This is useful when predictions are directionally correct but systematically over- or under-estimated.
     """
 
     def __init__(self, clip_to_zero_one: bool = True) -> None:
@@ -1775,8 +1808,18 @@ class MultiplicativeAdjustment(BaseCalibrator):
 
 class AdditiveAdjustment(BaseCalibrator):
     """
-    Calibrates predictions by adding a correction term derived from the difference between total positive labels
-    and sum of predicted scores. This helps align the overall prediction distribution with the true label distribution.
+    Calibrates predictions by adding a constant correction term.
+
+    This method computes a scalar offset :math:`c` that aligns the weighted average of predictions
+    with the weighted average of labels. Given predictions :math:`\\hat{p}_i`, labels :math:`y_i`,
+    and optional weights :math:`w_i`, the offset is computed as:
+
+    .. math::
+
+        c = \\frac{\\sum_i w_i (y_i - \\hat{p}_i)}{\\sum_i w_i}
+
+    The calibrated predictions are then :math:`\\hat{p}_i + c`.
+    This is useful when predictions have an approximately constant bias that needs correction.
     """
 
     def __init__(self, clip_to_zero_one: bool = True) -> None:
@@ -1896,8 +1939,24 @@ class IdentityCalibrator(BaseCalibrator):
 
 class PlattScalingWithFeatures(BaseCalibrator):
     """
-    A variant of Platt scaling that incorporates additional categorical and numerical features alongside logits.
-    Numerical features are discretized into bins.
+    A variant of Platt scaling that incorporates additional features alongside the log-odds.
+
+    This calibrator fits a logistic regression model using the log-odds of the original prediction
+    plus additional features derived from categorical and numerical columns. Given an uncalibrated
+    prediction :math:`\\hat{p}` and feature vector :math:`\\mathbf{x}`, it fits the model:
+
+    .. math::
+
+        P(y=1 | \\hat{p}, \\mathbf{x}) = \\sigma(a \\cdot t + \\mathbf{w}^T \\mathbf{x} + b)
+
+    where :math:`t = \\log(\\hat{p} / (1 - \\hat{p}))` is the logit transformation,
+    :math:`\\sigma` is the sigmoid function, :math:`a` is the coefficient for the logit,
+    :math:`\\mathbf{w}` are the coefficients for the features, and :math:`b` is the intercept.
+
+    Categorical features are one-hot encoded and numerical features are discretized into 3 quantile bins
+    before fitting. This allows the calibration to vary across different feature values while still
+    learning a single unified model (unlike :class:`SegmentwiseCalibrator` which fits completely
+    separate models per segment).
     """
 
     def __init__(self) -> None:
@@ -2095,6 +2154,25 @@ class SegmentwiseCalibrator(Generic[TCalibrator], BaseCalibrator):
     A meta-calibrator that partitions data into segments based on categorical features and applies a separate calibration
     method to each segment. This enables more precise calibration when different segments require different calibration
     adjustments.
+
+    Example::
+
+        calibrator = SegmentwiseCalibrator(calibrator_class=PlattScaling)
+        calibrator.fit(
+            df_train,
+            prediction_column_name="prediction",
+            label_column_name="label",
+            categorical_feature_column_names=["country"],
+        )
+        calibrated_predictions = calibrator.predict(
+            df_test,
+            prediction_column_name="prediction",
+            categorical_feature_column_names=["country"],
+        )
+
+    This is equivalent to fitting a separate :class:`PlattScaling` model for each unique country value in the dataset.
+    At prediction time, each sample is calibrated using the calibration model that was fit on its corresponding country
+    segment. For unseen segments during prediction, the uncalibrated predictions are returned.
     """
 
     calibrator_per_segment: dict[str, BaseCalibrator]
