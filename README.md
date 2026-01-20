@@ -24,11 +24,17 @@
 Traditional calibration methods, like Isotonic Regression or Platt Scaling, only ensure global calibration—meaning predicted probabilities match observed outcomes *on average* across all data—but your model can still be systematically overconfident or underconfident for specific groups. MCGrad automatically identifies and corrects these hidden calibration gaps without requiring you to manually specify protected groups.
 
 <p align="center">
-  <img src="website/static/img/global_calibration.png" alt="Global calibration curve showing well-calibrated predictions on average" width="45%" />
-  <img src="website/static/img/local_miscalibration.png" alt="Segment-level calibration curves revealing hidden miscalibration in specific groups" width="45%" />
+  <img src="website/static/img/global_calibration.png" alt="Global calibration curve showing well-calibrated predictions on average" width="90%" />
 </p>
 <p align="center">
-  <em>Left: A globally well-calibrated model. Right: The same model showing hidden miscalibration when broken down by segment. MCGrad fixes this.</em>
+  <em>A globally well-calibrated model: predictions match observed outcomes on average.</em>
+</p>
+
+<p align="center">
+  <img src="website/static/img/local_miscalibration.png" alt="Segment-level calibration curves revealing hidden miscalibration in specific groups" width="90%" />
+</p>
+<p align="center">
+  <em>The same model showing hidden miscalibration when broken down by segment. MCGrad fixes this.</em>
 </p>
 
 ## 🌟 Key Features
