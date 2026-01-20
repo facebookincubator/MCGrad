@@ -839,7 +839,7 @@ def _calculate_cumulative_differences(
     return differences
 
 
-class KuiperNormalizationInterface(Protocol):
+class _KuiperNormalizationInterface(Protocol):
     def __call__(
         self,
         predicted_scores: npt.NDArray,
@@ -1209,7 +1209,7 @@ def kuiper_distribution(x: float) -> float:
 
 def _normalization_method_assignment(
     method: str | None,
-) -> KuiperNormalizationInterface:
+) -> _KuiperNormalizationInterface:
     methods = {
         "kuiper_standard_deviation": kuiper_standard_deviation_per_segment,
         "kuiper_upper_bound_standard_deviation": kuiper_upper_bound_standard_deviation_per_segment,
@@ -1810,7 +1810,7 @@ class MulticalibrationError:
         self.max_depth = max_depth
         self.max_values_per_segment_feature = max_values_per_segment_feature
         self.min_samples_per_segment = min_samples_per_segment
-        self.estimate_sigma: KuiperNormalizationInterface = (
+        self.estimate_sigma: _KuiperNormalizationInterface = (
             _normalization_method_assignment(sigma_estimation_method)
         )
         self.df: pd.DataFrame = df.copy(deep=False)
@@ -2053,7 +2053,7 @@ class MulticalibrationError:
         return 5 * self.sigma_0 / self.prevalence * 100
 
 
-class ScoreFunctionInterface(Protocol):
+class _ScoreFunctionInterface(Protocol):
     name: str
 
     def __call__(
@@ -2067,7 +2067,7 @@ class ScoreFunctionInterface(Protocol):
 
 def wrap_sklearn_metric_func(
     func: Callable[..., float],
-) -> ScoreFunctionInterface:
+) -> _ScoreFunctionInterface:
     """
     Wrap an sklearn-style metric function for use with the evaluation framework.
 
@@ -2075,7 +2075,7 @@ def wrap_sklearn_metric_func(
     :return: A ScoreFunctionInterface-compatible wrapper.
     """
 
-    class WrappedFuncSkLearn(ScoreFunctionInterface):
+    class WrappedFuncSkLearn(_ScoreFunctionInterface):
         name = func.__name__
 
         def __call__(
@@ -2102,7 +2102,7 @@ def wrap_multicalibration_error_metric(
     sigma_estimation_method: str = DEFAULT_MULTI_KUIPER_NORMALIZATION_METHOD,
     max_n_segments: int | None = DEFAULT_MULTI_KUIPER_N_SEGMENTS,
     metric_version: str = "mce",
-) -> ScoreFunctionInterface:
+) -> _ScoreFunctionInterface:
     """
     Create a wrapped MulticalibrationError metric for use with the evaluation framework.
 
@@ -2128,7 +2128,7 @@ def wrap_multicalibration_error_metric(
             f"Got `{metric_version}`."
         )
 
-    class WrappedFuncMCE(ScoreFunctionInterface):
+    class WrappedFuncMCE(_ScoreFunctionInterface):
         name = f"Multicalibration Error<br>({metric_version})"
 
         def __init__(
