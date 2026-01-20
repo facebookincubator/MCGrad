@@ -34,7 +34,6 @@ const sidebars = {
         'api/methods',
         'api/metrics',
         'api/plotting',
-        'api/segmentation',
         'api/tuning',
       ],
     },
