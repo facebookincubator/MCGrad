@@ -4,6 +4,14 @@
 # LICENSE file in the root directory of this source tree.
 # pyre-strict
 
+"""
+Visualization tools for calibration analysis.
+
+This module provides functions for creating diagnostic plots to assess and
+visualize the calibration quality of probabilistic predictions. All plots
+are generated using Plotly for interactive visualization.
+"""
+
 import math
 from typing import Any, get_args, Literal, Tuple
 

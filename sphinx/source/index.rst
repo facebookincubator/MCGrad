@@ -5,6 +5,7 @@ Welcome to multicalibration's API documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   api/base
    api/methods
    api/metrics
    api/plotting

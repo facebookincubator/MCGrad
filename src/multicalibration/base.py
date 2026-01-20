@@ -4,6 +4,13 @@
 # LICENSE file in the root directory of this source tree.
 # pyre-strict
 
+"""
+Base classes for calibration methods.
+
+This module defines the abstract base class that all calibration methods in the
+multicalibration library inherit from.
+"""
+
 from abc import ABC, abstractmethod
 from typing import Any
 

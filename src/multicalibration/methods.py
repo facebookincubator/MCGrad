@@ -4,6 +4,17 @@
 # LICENSE file in the root directory of this source tree.
 # pyre-strict
 
+"""
+Calibration methods for machine learning models.
+
+This module provides implementations of various calibration techniques including
+multicalibration methods (MCGrad), traditional approaches (Platt scaling, isotonic
+regression), and segment-aware calibrators.
+
+All calibrators follow a scikit-learn-style fit/predict interface defined by
+:class:`~multicalibration.base.BaseCalibrator`.
+"""
+
 import json
 import logging
 import time
@@ -35,6 +46,26 @@ from multicalibration._compat import groupby_apply
 
 @dataclass(frozen=True, slots=True)
 class _MCGradProcessedData:
+    """Preprocessed data container for MCGrad training and prediction.
+
+    This immutable dataclass holds all preprocessed inputs needed for fitting
+    or applying an MCGrad calibration model. It supports indexing to extract
+    subsets of the data (e.g., for cross-validation folds).
+
+    :param features: 2D array of shape (n_samples, n_features) containing the
+        extracted segment features (categorical encoded + numerical).
+    :param predictions: 1D array of transformed predictions (e.g., logits for
+        binary classification).
+    :param weights: 1D array of sample weights.
+    :param output_presence_mask: Boolean array indicating which samples have
+        valid predictions. Samples with invalid predictions (NaN, out of bounds)
+        are marked as False.
+    :param categorical_feature_names: List of categorical feature column names.
+    :param numerical_feature_names: List of numerical feature column names.
+    :param labels: Optional 1D array of ground truth labels. Required for fitting,
+        but None during prediction.
+    """
+
     features: npt.NDArray
     predictions: npt.NDArray
     weights: npt.NDArray
@@ -44,6 +75,11 @@ class _MCGradProcessedData:
     labels: npt.NDArray | None = None
 
     def __getitem__(self, index: npt.NDArray) -> "_MCGradProcessedData":
+        """Index into the data to extract a subset.
+
+        :param index: Boolean or integer array specifying which samples to select.
+        :return: A new MCGradProcessedData instance containing only the selected samples.
+        """
         return _MCGradProcessedData(
             features=self.features[index],
             predictions=self.predictions[index],
@@ -59,6 +95,19 @@ class _MCGradProcessedData:
 
 
 class _EstimationMethod(Enum):
+    """Estimation method for early stopping validation.
+
+    Determines how the validation set is created for early stopping during
+    MCGrad training.
+
+    :cvar CROSS_VALIDATION: Use k-fold cross-validation to estimate performance.
+        More robust but slower, recommended for smaller datasets.
+    :cvar HOLDOUT: Use a single train/validation split. Faster but may have
+        higher variance, suitable for larger datasets.
+    :cvar AUTO: Automatically choose between cross-validation and holdout based
+        on the effective sample size of the dataset.
+    """
+
     CROSS_VALIDATION = 1
     HOLDOUT = 2
     AUTO = 3
