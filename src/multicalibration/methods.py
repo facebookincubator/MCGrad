@@ -19,7 +19,7 @@ import numpy as np
 import pandas as pd
 from multicalibration import _utils as utils
 from multicalibration.base import BaseCalibrator
-from multicalibration.metrics import ScoreFunctionInterface, wrap_sklearn_metric_func
+from multicalibration.metrics import _ScoreFunctionInterface, wrap_sklearn_metric_func
 from numpy import typing as npt
 from sklearn import isotonic, metrics as skmetrics
 from sklearn.linear_model import LinearRegression, LogisticRegression
@@ -98,7 +98,7 @@ class _BaseMCGrad(
 
     @property
     @abstractmethod
-    def _default_early_stopping_metric(self) -> tuple[ScoreFunctionInterface, bool]:
+    def _default_early_stopping_metric(self) -> tuple[_ScoreFunctionInterface, bool]:
         """Return the default early stopping metric and whether to minimize it.
 
         :return: A tuple of (score_function, minimize_score) where minimize_score
@@ -166,11 +166,11 @@ class _BaseMCGrad(
         patience: int | None = None,
         early_stopping_use_crossvalidation: bool | None = None,
         n_folds: int | None = None,
-        early_stopping_score_func: ScoreFunctionInterface | None = None,
+        early_stopping_score_func: _ScoreFunctionInterface | None = None,
         early_stopping_minimize_score: bool | None = None,
         early_stopping_timeout: int | None = 8 * 60 * 60,  # 8 hours
         save_training_performance: bool = False,
-        monitored_metrics_during_training: list[ScoreFunctionInterface] | None = None,
+        monitored_metrics_during_training: list[_ScoreFunctionInterface] | None = None,
         allow_missing_segment_feature_values: bool = DEFAULT_ALLOW_MISSING_SEGMENT_FEATURE_VALUES,
         random_state: int | np.random.Generator | None = 42,
     ) -> None:
@@ -212,7 +212,7 @@ class _BaseMCGrad(
                     "If using a custom score function the attribute "
                     "`early_stopping_minimize_score` has to be set."
                 )
-            self.early_stopping_score_func: ScoreFunctionInterface = (
+            self.early_stopping_score_func: _ScoreFunctionInterface = (
                 early_stopping_score_func
             )
             self.early_stopping_minimize_score: bool = early_stopping_minimize_score
@@ -304,7 +304,7 @@ class _BaseMCGrad(
 
         self.save_training_performance = save_training_performance
         self._performance_metrics: Dict[str, list[float]] = defaultdict(list)
-        self.monitored_metrics_during_training: list[ScoreFunctionInterface] = (
+        self.monitored_metrics_during_training: list[_ScoreFunctionInterface] = (
             []
             if monitored_metrics_during_training is None
             else monitored_metrics_during_training
@@ -724,8 +724,8 @@ class _BaseMCGrad(
 
     @staticmethod
     def _remove_duplicate_metrics(
-        monitored_metrics_during_training: list[ScoreFunctionInterface],
-    ) -> list[ScoreFunctionInterface]:
+        monitored_metrics_during_training: list[_ScoreFunctionInterface],
+    ) -> list[_ScoreFunctionInterface]:
         """
         Removes duplicate metrics from the list of monitored metrics during training.
         """
@@ -1107,7 +1107,7 @@ class _BaseMCGrad(
 
     def _compute_metric_on_internal_data(
         self,
-        metric: ScoreFunctionInterface,
+        metric: _ScoreFunctionInterface,
         data: _MCGradProcessedData,
         predictions: npt.NDArray,
     ) -> float:
@@ -1295,7 +1295,7 @@ class MCGrad(_BaseMCGrad):
     @property
     def _default_early_stopping_metric(
         self,
-    ) -> tuple[ScoreFunctionInterface, bool]:
+    ) -> tuple[_ScoreFunctionInterface, bool]:
         return wrap_sklearn_metric_func(skmetrics.log_loss), True
 
     def _check_predictions(
@@ -1422,7 +1422,7 @@ class RegressionMCGrad(_BaseMCGrad):
     @property
     def _default_early_stopping_metric(
         self,
-    ) -> tuple[ScoreFunctionInterface, bool]:
+    ) -> tuple[_ScoreFunctionInterface, bool]:
         return wrap_sklearn_metric_func(skmetrics.mean_squared_error), True
 
     def _check_predictions(
