@@ -4,6 +4,13 @@
 # LICENSE file in the root directory of this source tree.
 # pyre-strict
 
+"""
+Hyperparameter tuning utilities for MCGrad models.
+
+This module provides utilities for automatic hyperparameter optimization of
+MCGrad calibrators using the Ax experimentation platform.
+"""
+
 import copy
 import logging
 import uuid
