@@ -8,7 +8,6 @@ Welcome to multicalibration's API documentation!
    api/methods
    api/metrics
    api/plotting
-   api/segmentation
    api/tuning
 
 
