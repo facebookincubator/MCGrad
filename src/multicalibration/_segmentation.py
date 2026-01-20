@@ -4,6 +4,13 @@
 # LICENSE file in the root directory of this source tree.
 # pyre-strict
 
+"""
+Internal utilities for creating data segments for multicalibration analysis.
+
+This module provides functions for partitioning data into segments based on
+categorical and numerical features.
+"""
+
 import itertools
 import logging
 from collections.abc import Generator

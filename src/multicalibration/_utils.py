@@ -4,6 +4,13 @@
 # LICENSE file in the root directory of this source tree.
 # pyre-strict
 
+"""
+Internal utility functions for calibration and multicalibration operations.
+
+This module provides mathematical utilities, data transformation functions,
+and helper classes used throughout the multicalibration library.
+"""
+
 import ast
 import functools
 import hashlib

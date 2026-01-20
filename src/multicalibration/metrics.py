@@ -4,6 +4,28 @@
 # LICENSE file in the root directory of this source tree.
 # pyre-strict
 
+"""
+Calibration and multicalibration evaluation metrics.
+
+This module provides a comprehensive suite of metrics for evaluating the calibration
+quality of probabilistic predictions, with a focus on multicalibration—calibration
+across multiple subpopulations.
+
+Key metric families include:
+
+**Calibration Error Metrics**
+    Standard and adaptive calibration error measures using binning approaches.
+
+**Kuiper-based Calibration Metrics**
+    Statistical tests and metrics based on the Kuiper statistic.
+
+**Ranking Metrics**
+    Evaluation metrics for ranked predictions (DCG, NDCG, etc.).
+
+**Classification Metrics**
+    Standard precision, recall, and threshold-based metrics.
+"""
+
 import functools
 import logging
 import math
