@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 from multicalibration import _utils as utils
 from multicalibration._compat import groupby_apply
-from multicalibration.segmentation import get_segment_masks
+from multicalibration._segmentation import get_segment_masks
 from numpy import typing as npt
 from scipy import stats
 from sklearn import metrics as skmetrics
