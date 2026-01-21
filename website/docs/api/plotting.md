@@ -1,5 +1,6 @@
 ---
 sidebar_position: 3
+description: Reference for MCGrad plotting functions. Visualize global and local calibration curves for your ML models.
 ---
 
 # Plotting

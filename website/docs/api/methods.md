@@ -1,5 +1,6 @@
 ---
 sidebar_position: 1
+description: Reference for MCGrad calibration methods including MCGrad, Isotonic Regression, Platt Scaling.
 ---
 
 # Methods

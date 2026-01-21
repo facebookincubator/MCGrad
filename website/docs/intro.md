@@ -1,5 +1,6 @@
 ---
 sidebar_position: 1
+description: Learn why multicalibration matters for production ML models, and how to apply MCGrad to achieve it.
 ---
 
 # Why Multicalibration?

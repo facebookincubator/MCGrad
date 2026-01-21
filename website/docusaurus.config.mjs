@@ -65,6 +65,18 @@ const config = {
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
+      metadata: [
+        {name: 'description', content: 'MCGrad is a Python library for production-ready multicalibration. Ensure ML model calibration across all segments, not just globally.'},
+        {name: 'keywords', content: 'multicalibration, calibration, machine learning, fairness, MCGrad, Python, LightGBM'},
+        {property: 'og:title', content: 'MCGrad - Multicalibration for Machine Learning'},
+        {property: 'og:description', content: 'Production-ready multicalibration ensuring ML model fairness across all segments.'},
+        {property: 'og:image', content: 'https://facebookincubator.github.io/MCGrad/img/logo.png'},
+        {property: 'og:type', content: 'website'},
+        {name: 'twitter:card', content: 'summary_large_image'},
+        {name: 'twitter:title', content: 'MCGrad - Multicalibration for Machine Learning'},
+        {name: 'twitter:description', content: 'Production-ready multicalibration ensuring ML model fairness across all segments.'},
+        {name: 'twitter:image', content: 'https://facebookincubator.github.io/MCGrad/img/logo.png'},
+      ],
       navbar: {
         title: 'MCGrad',
         logo: {

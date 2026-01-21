@@ -1,5 +1,6 @@
 ---
 sidebar_position: 2
+description: Reference for MCGrad metrics including MulticalibrationError (MCE) for measuring segment-level calibration quality.
 ---
 
 # Metrics

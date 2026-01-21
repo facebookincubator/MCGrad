@@ -1,5 +1,6 @@
 ---
 sidebar_position: 7
+description: How to contribute to MCGrad. Development setup, coding standards, and pull request guidelines.
 ---
 
 # Contributing

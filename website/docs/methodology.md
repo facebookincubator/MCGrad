@@ -1,5 +1,6 @@
 ---
 sidebar_position: 5
+description: Technical details of MCGrad. Mathematical foundations, algorithm design, and production-safe implementation details.
 ---
 
 # Methodology
