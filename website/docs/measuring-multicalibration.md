@@ -1,5 +1,6 @@
 ---
 sidebar_position: 6
+description: How to measure multicalibration using the Multicalibration Error (MCE) metric. Understand segment-level calibration quality.
 ---
 
 # Measuring Multicalibration

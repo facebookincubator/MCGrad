@@ -1,5 +1,6 @@
 ---
 sidebar_position: 4
+description: Get started with MCGrad for multicalibration. Learn how to install, train, and evaluate multicalibrated ML models.
 ---
 
 # Quick Start

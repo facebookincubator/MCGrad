@@ -1,5 +1,6 @@
 ---
 sidebar_position: 5
+description: Reference for MCGrad hyperparameter tuning. Optimize MCGrad parameters for your dataset.
 ---
 
 # Tuning

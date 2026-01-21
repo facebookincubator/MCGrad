@@ -1,5 +1,6 @@
 ---
 sidebar_position: 3
+description: How to install MCGrad for Python. Requirements, pip installation, and development setup instructions.
 ---
 
 # Installation

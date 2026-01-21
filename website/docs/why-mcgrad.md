@@ -1,5 +1,6 @@
 ---
 sidebar_position: 2
+description: Why choose MCGrad for multicalibration? Learn about the challenges of segment-level calibration and how MCGrad solves them.
 ---
 
 # Why MCGrad?
