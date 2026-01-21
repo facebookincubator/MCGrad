@@ -54,11 +54,20 @@ jobs:
 
     - name: Run pytest
       run: |
-        pytest tests/ -v
+        # Collect tests from both old and new locations during migration
+        # This allows the CI to work regardless of which directory exists
+        TEST_PATHS=""
+        [ -d tests ] && TEST_PATHS="$TEST_PATHS tests/"
+        [ -d src/mcgrad/tests ] && TEST_PATHS="$TEST_PATHS src/mcgrad/tests/"
+        pytest $TEST_PATHS -v
 
     - name: Generate coverage report
       run: |
-        pytest tests/ --cov=src/multicalibration --cov-report=term --cov-report=html --cov-report=xml
+        # Collect tests from both old and new locations during migration
+        TEST_PATHS=""
+        [ -d tests ] && TEST_PATHS="$TEST_PATHS tests/"
+        [ -d src/mcgrad/tests ] && TEST_PATHS="$TEST_PATHS src/mcgrad/tests/"
+        pytest $TEST_PATHS --cov=src/mcgrad --cov-report=term --cov-report=html --cov-report=xml
       continue-on-error: true
 
     - name: Upload coverage report
