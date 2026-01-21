@@ -3,6 +3,7 @@
 
 # Distribution / packaging
 *.egg-info/
+dist/
 
 # Node modules
 node_modules/
