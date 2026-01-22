@@ -35,12 +35,13 @@ from typing import Any, Protocol
 
 import numpy as np
 import pandas as pd
-from multicalibration import _utils as utils
-from multicalibration._compat import groupby_apply
-from multicalibration._segmentation import get_segment_masks
 from numpy import typing as npt
 from scipy import stats
 from sklearn import metrics as skmetrics
+
+from . import _utils as utils
+from ._compat import groupby_apply
+from ._segmentation import get_segment_masks
 
 
 logger: logging.Logger = logging.getLogger(__name__)

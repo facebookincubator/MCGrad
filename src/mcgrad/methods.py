@@ -28,9 +28,6 @@ from typing import Any, cast, Dict, Generic, TypeVar
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
-from multicalibration import _utils as utils
-from multicalibration.base import BaseCalibrator
-from multicalibration.metrics import _ScoreFunctionInterface, wrap_sklearn_metric_func
 from numpy import typing as npt
 from sklearn import isotonic, metrics as skmetrics
 from sklearn.linear_model import LinearRegression, LogisticRegression
@@ -38,10 +35,14 @@ from sklearn.model_selection import KFold, StratifiedKFold
 from sklearn.preprocessing import KBinsDiscretizer, OneHotEncoder
 from typing_extensions import Self
 
+from . import _utils as utils
+from .base import BaseCalibrator
+from .metrics import _ScoreFunctionInterface, wrap_sklearn_metric_func
+
 logger: logging.Logger = logging.getLogger(__name__)
 
-from multicalibration._compat import groupby_apply
-# @oss-disable[end= ]: from multicalibration.internal._compat import DeprecatedAttributesMixin
+from ._compat import groupby_apply
+# @oss-disable[end= ]: from .internal._compat import DeprecatedAttributesMixin
 
 
 @dataclass(frozen=True, slots=True)

@@ -8,7 +8,8 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import pytest
-from multicalibration import methods, metrics, plotting
+
+from .. import methods, metrics, plotting
 
 
 @pytest.fixture

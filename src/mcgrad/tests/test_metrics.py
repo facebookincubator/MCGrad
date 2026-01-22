@@ -13,8 +13,9 @@ import pandas as pd
 import pytest
 import scipy
 import sklearn.metrics as skmetrics
-from multicalibration import _utils as utils, metrics
-from multicalibration.metrics import (
+
+from .. import _utils as utils, metrics
+from ..metrics import (
     fpr,
     kuiper_standard_deviation,
     kuiper_test,

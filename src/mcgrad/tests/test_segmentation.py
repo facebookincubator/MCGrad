@@ -7,7 +7,8 @@
 import numpy as np
 import pandas as pd
 import pytest
-from multicalibration import _segmentation as segmentation
+
+from .. import _segmentation as segmentation
 
 
 def _count_segments(generator):

@@ -11,8 +11,9 @@ import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pytest
-from multicalibration import _utils as utils
 from pandas.core.arrays import ArrowExtensionArray
+
+from .. import _utils as utils
 
 
 @pytest.fixture
