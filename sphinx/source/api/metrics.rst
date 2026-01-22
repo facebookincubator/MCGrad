@@ -1,7 +1,7 @@
 Metrics Module
 ==============
 
-.. automodule:: multicalibration.metrics
+.. automodule:: mcgrad.metrics
    :members:
    :undoc-members:
    :show-inheritance:

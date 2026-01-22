@@ -36,7 +36,7 @@ This will install the package in editable mode along with:
 Verify your installation by running a minimal example:
 
 ```python
-from multicalibration import methods
+from mcgrad import methods
 import numpy as np
 import pandas as pd
 

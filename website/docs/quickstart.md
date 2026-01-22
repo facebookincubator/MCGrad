@@ -24,7 +24,7 @@ Also, MCGrad requires that predictions:
 - cannot be NaNs.
 
 ```python
-from multicalibration import methods, metrics, plotting
+from mcgrad import methods, metrics, plotting
 import numpy as np
 import pandas as pd
 

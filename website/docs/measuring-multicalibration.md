@@ -20,7 +20,7 @@ The Multicalibration Error measures the worst-case noise-weighted calibration er
 #### Quickstart: Computing the MCE
 
 ```python
-from multicalibration.metrics import MulticalibrationError
+from mcgrad.metrics import MulticalibrationError
 
 mce = MulticalibrationError(
     df=df,

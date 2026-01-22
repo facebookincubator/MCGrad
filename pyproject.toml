@@ -39,7 +39,7 @@ python_files = ["test_*.py"]
 python_functions = ["test_*"]
 
 [tool.coverage.run]
-source = ["src/multicalibration"]
+source = ["src/mcgrad"]
 
 [tool.coverage.report]
 exclude_lines = [

@@ -1,7 +1,7 @@
 Methods Module
 ==============
 
-.. automodule:: multicalibration.methods
+.. automodule:: mcgrad.methods
    :members:
    :undoc-members:
    :show-inheritance:

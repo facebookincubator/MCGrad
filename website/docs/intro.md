@@ -36,7 +36,7 @@ Now, you apply **MCGrad** instead of Isotonic Regression, and revisit the reliab
 MCGrad automatically discovers and corrects miscalibrated regions defined by these features, including intersections like `market=US AND device_type=mobile`, no need to manually specify which groups to protect. Just provide your features, and MCGrad finds and fixes calibration issues across all relevant groups.
 
 ```python
-from multicalibration import methods
+from mcgrad import methods
 
 # df is a DataFrame with columns:
 #   - 'prediction': the uncalibrated model predictions (floats in [0, 1])
