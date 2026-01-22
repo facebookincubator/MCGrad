@@ -66,7 +66,7 @@ pip install git+https://github.com/facebookincubator/MCGrad.git
 ## 🚀 Quick Start
 
 ```python
-from multicalibration import methods
+from mcgrad import methods
 import numpy as np
 import pandas as pd
 

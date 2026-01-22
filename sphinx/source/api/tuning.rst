@@ -1,7 +1,7 @@
 Tuning Module
 =============
 
-.. automodule:: multicalibration.tuning
+.. automodule:: mcgrad.tuning
    :members:
    :undoc-members:
    :show-inheritance:

@@ -49,7 +49,7 @@ pytest tests/ -v
 
 With coverage:
 ```bash
-pytest tests/ --cov=multicalibration --cov-report=html
+pytest tests/ --cov=mcgrad --cov-report=html
 ```
 
 ## Submitting Changes

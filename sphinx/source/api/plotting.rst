@@ -1,7 +1,7 @@
 Plotting Module
 ===============
 
-.. automodule:: multicalibration.plotting
+.. automodule:: mcgrad.plotting
    :members:
    :undoc-members:
    :show-inheritance:
