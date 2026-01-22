@@ -11,13 +11,14 @@ import pandas as pd
 import pytest
 import scipy
 import sklearn.metrics as skmetrics
-from multicalibration import _utils as utils, methods
-from multicalibration.metrics import (
+from sklearn.model_selection import KFold, StratifiedKFold
+
+from .. import _utils as utils, methods
+from ..metrics import (
     _ScoreFunctionInterface,
     wrap_multicalibration_error_metric,
     wrap_sklearn_metric_func,
 )
-from sklearn.model_selection import KFold, StratifiedKFold
 
 
 @pytest.fixture

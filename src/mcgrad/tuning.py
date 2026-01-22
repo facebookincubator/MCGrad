@@ -20,9 +20,10 @@ from typing import Any, Generator
 import pandas as pd
 from ax.api.client import Client
 from ax.api.configs import RangeParameterConfig
-from multicalibration import methods
-from multicalibration.metrics import normalized_entropy
 from sklearn.model_selection import train_test_split
+
+from . import methods
+from .metrics import normalized_entropy
 
 logger: logging.Logger = logging.getLogger(__name__)
 

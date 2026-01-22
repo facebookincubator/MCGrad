@@ -5,7 +5,8 @@
 # pyre-unsafe
 
 import pandas as pd
-from multicalibration._compat import groupby_apply
+
+from .._compat import groupby_apply
 
 
 def test_groupby_apply_basic_functionality():

@@ -19,10 +19,11 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from multicalibration import _utils as utils, methods, metrics
-from multicalibration._compat import groupby_apply
-from multicalibration._utils import BinningMethodInterface
 from plotly.subplots import make_subplots
+
+from . import _utils as utils, methods, metrics
+from ._compat import groupby_apply
+from ._utils import BinningMethodInterface
 
 BinningMethod = Literal["equispaced", "equisized"]
 
