@@ -44,12 +44,12 @@ pre-commit run --all-files
 ## Running Tests
 
 ```bash
-pytest tests/ -v
+pytest src/mcgrad/tests/ -v
 ```
 
 With coverage:
 ```bash
-pytest tests/ --cov=mcgrad --cov-report=html
+pytest src/mcgrad/tests/ --cov=mcgrad --cov-report=html
 ```
 
 ## Submitting Changes
