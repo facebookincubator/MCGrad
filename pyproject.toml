@@ -40,6 +40,7 @@ python_functions = ["test_*"]
 
 [tool.coverage.run]
 source = ["src/mcgrad"]
+omit = ["src/mcgrad/tests/*"]
 
 [tool.coverage.report]
 exclude_lines = [
