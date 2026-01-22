@@ -8,10 +8,10 @@ description: Reference for MCGrad calibration methods including MCGrad, Isotonic
 Multicalibration methods for improving model calibration.
 
 :::info Python API Documentation
-For detailed Python API documentation with docstrings, please refer to the source code in `src/multicalibration/methods.py` or use Python's built-in help:
+For detailed Python API documentation with docstrings, please refer to the source code in `src/mcgrad/methods.py` or use Python's built-in help:
 
 ```python
-from multicalibration import methods
+from mcgrad import methods
 help(methods.MCGrad)
 ```
 :::
@@ -27,7 +27,7 @@ MCGrad takes base model predictions and features, then builds a lightweight cali
 ### Basic Usage
 
 ```python
-from multicalibration.methods import MCGrad
+from mcgrad.methods import MCGrad
 import pandas as pd
 import numpy as np
 
@@ -100,4 +100,4 @@ Additional calibration methods are available in the `methods` module for compari
 - **Platt Scaling** - Logistic regression-based calibration
 - **Temperature Scaling** - Single parameter scaling method
 
-See the [source code](https://github.com/facebookincubator/MCGrad/blob/main/src/multicalibration/methods.py) for full implementation details.
+See the [source code](https://github.com/facebookincubator/MCGrad/blob/main/src/mcgrad/methods.py) for full implementation details.

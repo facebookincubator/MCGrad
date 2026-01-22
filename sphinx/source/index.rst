@@ -1,4 +1,4 @@
-Welcome to multicalibration's API documentation!
+Welcome to mcgrad's API documentation!
 ==================================================
 
 .. toctree::

@@ -11,7 +11,7 @@ Visualization tools for calibration analysis.
 For detailed documentation, refer to the source code or use Python's help:
 
 ```python
-from multicalibration import plotting
+from mcgrad import plotting
 help(plotting)
 ```
 :::
@@ -19,7 +19,7 @@ help(plotting)
 ## Global Calibration Curves
 
 ```python
-from multicalibration import plotting
+from mcgrad import plotting
 
 # Plot global calibration curve
 fig = plotting.plot_global_calibration_curve(
@@ -37,7 +37,7 @@ fig.show()
 Visualize calibration across segments:
 
 ```python
-from multicalibration import plotting
+from mcgrad import plotting
 
 # Plot calibration curves for each segment
 fig = plotting.plot_calibration_curve_by_segment(
@@ -55,7 +55,7 @@ fig.show()
 Visualize calibration errors across multiple segments:
 
 ```python
-from multicalibration import metrics, plotting
+from mcgrad import metrics, plotting
 
 # Create a MulticalibrationError object
 mce = metrics.MulticalibrationError(
@@ -74,4 +74,4 @@ fig = plotting.plot_segment_calibration_errors(
 fig.show()
 ```
 
-See the [source code](https://github.com/facebookincubator/MCGrad/blob/main/src/multicalibration/plotting.py) for more visualization options.
+See the [source code](https://github.com/facebookincubator/MCGrad/blob/main/src/mcgrad/plotting.py) for more visualization options.

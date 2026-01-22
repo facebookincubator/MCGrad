@@ -1,7 +1,7 @@
 Base Module
 ===========
 
-.. automodule:: multicalibration.base
+.. automodule:: mcgrad.base
    :members:
    :undoc-members:
    :show-inheritance:

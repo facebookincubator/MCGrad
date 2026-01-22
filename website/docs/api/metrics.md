@@ -11,7 +11,7 @@ Metrics for evaluating calibration quality.
 For detailed Python API documentation with docstrings, refer to the source code or use Python's help:
 
 ```python
-from multicalibration import metrics
+from mcgrad import metrics
 help(metrics)
 ```
 :::
@@ -23,7 +23,7 @@ help(metrics)
 Measures calibration quality across multiple segments of the data, not just globally.
 
 ```python
-from multicalibration.metrics import MulticalibrationError
+from mcgrad.metrics import MulticalibrationError
 
 mce = MulticalibrationError(
     df=df,
@@ -47,7 +47,7 @@ The MulticalibrationError metric is based on the Kuiper statistic and provides a
 Measures the average difference between predicted probabilities and observed frequencies across bins.
 
 ```python
-from multicalibration.metrics import expected_calibration_error
+from mcgrad.metrics import expected_calibration_error
 
 ece = expected_calibration_error(
     labels=labels,
@@ -70,4 +70,4 @@ Standard ML metrics for comparing model performance:
 - **Brier Score** - Mean squared difference between predictions and labels
 - **PRAUC** - Precision-Recall Area Under Curve
 
-See the [source code](https://github.com/facebookincubator/MCGrad/blob/main/src/multicalibration/metrics.py) for full implementation details.
+See the [source code](https://github.com/facebookincubator/MCGrad/blob/main/src/mcgrad/metrics.py) for full implementation details.
