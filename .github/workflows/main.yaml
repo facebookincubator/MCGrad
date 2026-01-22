@@ -5,6 +5,17 @@ on:
   pull_request:
     branches: [ main ]
 
+# Permissions needed for GitHub Pages deployment
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -84,32 +95,7 @@ jobs:
           coverage.xml
         retention-days: 30
 
-  docs:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: website/package-lock.json
-
-    - name: Install dependencies
-      working-directory: ./website
-      run: npm ci
-
-    - name: Build website
-      working-directory: ./website
-      run: npm run build
-
-    - name: Upload documentation artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: documentation
-        path: website/build/
-
+  # Build Sphinx API documentation first
   sphinx:
     runs-on: 4-core-ubuntu
     steps:
@@ -139,8 +125,57 @@ jobs:
       run: |
         sphinx-build -b html source build/html
 
-    - name: Upload Sphinx documentation
+    - name: Upload Sphinx artifact
       uses: actions/upload-artifact@v4
       with:
-        name: sphinx-documentation
+        name: sphinx-docs
         path: sphinx/build/html/
+        retention-days: 1
+
+  # Build Docusaurus website and merge Sphinx docs
+  docs:
+    runs-on: ubuntu-latest
+    needs: sphinx
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: website/package-lock.json
+
+    - name: Download Sphinx docs
+      uses: actions/download-artifact@v4
+      with:
+        name: sphinx-docs
+        # Place Sphinx docs in static/reference folder
+        # Docusaurus copies static files to build root
+        path: website/static/reference
+
+    - name: Install dependencies
+      working-directory: ./website
+      run: npm ci
+
+    - name: Build website
+      working-directory: ./website
+      run: npm run build
+
+    - name: Upload Pages artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: website/build/
+
+  # Deploy combined site to GitHub Pages
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: docs
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
