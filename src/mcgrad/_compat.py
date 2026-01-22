@@ -7,6 +7,7 @@
 from typing import Any, Callable
 
 import pandas as pd
+from sklearn.preprocessing import KBinsDiscretizer
 
 # pandas >= 2.2.0 deprecated the default include_groups=True behavior
 _PANDAS_GROUPBY_INCLUDE_GROUPS: bool
@@ -33,3 +34,25 @@ def groupby_apply(
         return grouped.apply(func, include_groups=False, **kwargs)
     else:
         return grouped.apply(func, **kwargs)
+
+
+def create_kbins_discretizer(**kwargs: Any) -> KBinsDiscretizer:
+    """
+    Factory for KBinsDiscretizer.
+    Enforces 'linear' method on newer sklearn versions to maintain
+    mathematical consistency with older versions and silence warnings.
+    """
+    kwargs = kwargs.copy()
+
+    # Attempt 1: Try to explicitly set 'linear'.
+    # This silences the FutureWarning in newer versions (>=1.6) because we
+    # are no longer relying on the default.
+    kwargs.setdefault("quantile_method", "linear")
+
+    try:
+        return KBinsDiscretizer(**kwargs)
+    except TypeError:
+        # Attempt 2: Fallback for older sklearn (<1.6).
+        # These versions don't have 'quantile_method' but default to 'linear' anyway.
+        kwargs.pop("quantile_method", None)
+        return KBinsDiscretizer(**kwargs)

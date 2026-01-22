@@ -72,10 +72,17 @@ def unshrink(
         logits = np.clip(logits, -logit_epsilon, logit_epsilon)
 
     primary_solver = LogisticRegression(
-        fit_intercept=False, solver="newton-cg", penalty=None
+        C=np.inf, fit_intercept=False, solver="newton-cg"
     )
     with warnings.catch_warnings(record=True) as recorded_warnings:
         warnings.simplefilter("always")
+        # Suppress sklearn 1.8+ UserWarning which is a known bug. Will be fixed in sklearn 1.8.1
+        # See: https://github.com/scikit-learn/scikit-learn/issues/32927
+        warnings.filterwarnings(
+            "ignore",
+            message="Setting penalty=None will ignore the C and l1_ratio parameters",
+            category=UserWarning,
+        )
         primary_solver.fit(logits, y, sample_weight=w)
     for rec_warn in recorded_warnings:
         if isinstance(rec_warn.message, LineSearchWarning):
@@ -108,10 +115,16 @@ def unshrink(
 
         return primary_solver.coef_[0][0]
 
-    fallback_solver = LogisticRegression(
-        fit_intercept=False, solver="lbfgs", penalty=None
-    )
-    fallback_solver.fit(logits, y, sample_weight=w)
+    fallback_solver = LogisticRegression(C=np.inf, fit_intercept=False, solver="lbfgs")
+    # Suppress sklearn 1.8+ UserWarning which is a known bug. Will be fixed in sklearn 1.8.1
+    # See: https://github.com/scikit-learn/scikit-learn/issues/32927
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="Setting penalty=None will ignore the C and l1_ratio parameters",
+            category=UserWarning,
+        )
+        fallback_solver.fit(logits, y, sample_weight=w)
     if not np.isnan(fallback_solver.coef_).any():
         if primary_solver.coef_[0][0] < 0.95 or primary_solver.coef_[0][0] > 1.05:
             logger.warning(
