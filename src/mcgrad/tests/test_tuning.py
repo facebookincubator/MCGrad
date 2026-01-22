@@ -11,13 +11,16 @@ import numpy as np
 import pandas as pd
 import pytest
 from ax.api.configs import RangeParameterConfig
-from multicalibration import methods
-from multicalibration.tuning import (
+from sklearn.model_selection import train_test_split
+
+from .. import methods, tuning as tuning_module
+from ..tuning import (
     default_parameter_configurations,
     ORIGINAL_LIGHTGBM_PARAMS,
     tune_mcgrad_params,
 )
-from sklearn.model_selection import train_test_split
+
+TUNING_MODULE = tuning_module.__name__
 
 
 @pytest.fixture
@@ -72,7 +75,7 @@ def hyperparams_for_tuning():
 
 
 @pytest.mark.arm64_incompatible
-@patch("multicalibration.tuning.normalized_entropy")
+@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcgrad_params_with_weights(
     mock_normalized_entropy,
     sample_data,
@@ -110,7 +113,7 @@ def test_tune_mcgrad_params_with_weights(
 
 
 @pytest.mark.arm64_incompatible
-@patch("multicalibration.tuning.normalized_entropy")
+@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcgrad_params_without_weights(
     mock_normalized_entropy,
     sample_data,
@@ -147,7 +150,7 @@ def test_tune_mcgrad_params_without_weights(
 
 
 @pytest.mark.arm64_incompatible
-@patch("multicalibration.tuning.normalized_entropy")
+@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcgrad_params_default_parameters(
     mock_normalized_entropy,
     sample_data,
@@ -177,7 +180,7 @@ def test_tune_mcgrad_params_default_parameters(
 
 
 @pytest.mark.arm64_incompatible
-@patch("multicalibration.tuning.normalized_entropy")
+@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcgrad_params_ax_client_setup(
     mock_normalized_entropy,
     sample_data,
@@ -203,8 +206,8 @@ def test_tune_mcgrad_params_ax_client_setup(
 
 
 @pytest.mark.arm64_incompatible
-@patch("multicalibration.tuning.normalized_entropy")
-@patch("multicalibration.tuning.train_test_split")
+@patch(f"{TUNING_MODULE}.normalized_entropy")
+@patch(f"{TUNING_MODULE}.train_test_split")
 def test_tune_mcgrad_params_data_splitting(
     mock_train_test_split,
     mock_normalized_entropy,
@@ -240,7 +243,7 @@ def test_tune_mcgrad_params_data_splitting(
 
 
 @pytest.mark.arm64_incompatible
-@patch("multicalibration.tuning.normalized_entropy")
+@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcgrad_params_with_subset_of_parameters(
     mock_normalized_entropy,
     sample_data,
@@ -423,7 +426,7 @@ def test_non_default_parameters_preserved_when_not_in_tuning_configurations(
     for param, value in non_default_params.items():
         assert model.lightgbm_params[param] == value
 
-    with patch("multicalibration.tuning.normalized_entropy", return_value=0.5):
+    with patch(f"{TUNING_MODULE}.normalized_entropy", return_value=0.5):
         # Create parameter configurations that don't include our non-default parameters
         # This will tune only num_leaves and min_child_samples
         tune_params = ["num_leaves", "min_child_samples"]
@@ -451,8 +454,8 @@ def test_non_default_parameters_preserved_when_not_in_tuning_configurations(
 
 
 @pytest.mark.arm64_incompatible
-@patch("multicalibration.tuning.normalized_entropy")
-@patch("multicalibration.tuning.train_test_split")
+@patch(f"{TUNING_MODULE}.normalized_entropy")
+@patch(f"{TUNING_MODULE}.train_test_split")
 def test_tune_mcgrad_params_with_explicit_validation_set(
     mock_train_test_split,
     mock_normalized_entropy,
@@ -490,8 +493,8 @@ def test_tune_mcgrad_params_with_explicit_validation_set(
 
 
 @pytest.mark.arm64_incompatible
-@patch("multicalibration.tuning.normalized_entropy")
-@patch("multicalibration.tuning.train_test_split")
+@patch(f"{TUNING_MODULE}.normalized_entropy")
+@patch(f"{TUNING_MODULE}.train_test_split")
 def test_tune_mcgrad_params_fallback_to_train_test_split(
     mock_train_test_split,
     mock_normalized_entropy,
@@ -524,7 +527,7 @@ def test_tune_mcgrad_params_fallback_to_train_test_split(
     assert call_args[0][0] is sample_data
     assert call_args[1]["test_size"] == 0.2
     assert call_args[1]["random_state"] == 42
-    assert call_args[1]["stratify"] is sample_data["label"]
+    pd.testing.assert_series_equal(call_args[1]["stratify"], sample_data["label"])
 
     # Verify that the model was fit with the training portion
     assert mock_mcgrad_model.fit.call_count >= 1
@@ -540,7 +543,7 @@ def test_tune_mcgrad_params_fallback_to_train_test_split(
 
 
 @pytest.mark.arm64_incompatible
-@patch("multicalibration.tuning.normalized_entropy")
+@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcgrad_params_pass_df_val_into_tuning_true(
     mock_normalized_entropy,
     sample_data,
@@ -577,7 +580,7 @@ def test_tune_mcgrad_params_pass_df_val_into_tuning_true(
 
 
 @pytest.mark.arm64_incompatible
-@patch("multicalibration.tuning.normalized_entropy")
+@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcgrad_params_pass_df_val_into_tuning_false(
     mock_normalized_entropy,
     sample_data,
@@ -607,7 +610,7 @@ def test_tune_mcgrad_params_pass_df_val_into_tuning_false(
 
 
 @pytest.mark.arm64_incompatible
-@patch("multicalibration.tuning.normalized_entropy")
+@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcgrad_params_pass_df_val_into_final_fit_true(
     mock_normalized_entropy,
     sample_data,
@@ -644,7 +647,7 @@ def test_tune_mcgrad_params_pass_df_val_into_final_fit_true(
 
 
 @pytest.mark.arm64_incompatible
-@patch("multicalibration.tuning.normalized_entropy")
+@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcgrad_params_pass_df_val_into_final_fit_false(
     mock_normalized_entropy,
     sample_data,
@@ -674,7 +677,7 @@ def test_tune_mcgrad_params_pass_df_val_into_final_fit_false(
 
 
 @pytest.mark.arm64_incompatible
-@patch("multicalibration.tuning.normalized_entropy")
+@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcgrad_params_pass_df_val_into_both_tuning_and_final_fit(
     mock_normalized_entropy,
     sample_data,
@@ -713,7 +716,7 @@ def test_tune_mcgrad_params_pass_df_val_into_both_tuning_and_final_fit(
         (True, True),
     ],
 )
-@patch("multicalibration.tuning.normalized_entropy")
+@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcgrad_params_df_val_passing_defaults_to_false(
     mock_normalized_entropy,
     sample_data,
@@ -753,7 +756,7 @@ def test_tune_mcgrad_params_df_val_passing_defaults_to_false(
 
 
 @pytest.mark.arm64_incompatible
-@patch("multicalibration.tuning.normalized_entropy")
+@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcboost_params_does_not_modify_input_dataframes(
     mock_normalized_entropy,
     sample_data,
@@ -782,8 +785,8 @@ def test_tune_mcboost_params_does_not_modify_input_dataframes(
 
 
 @pytest.mark.arm64_incompatible
-@patch("multicalibration.tuning.normalized_entropy")
-@patch("multicalibration.tuning.train_test_split")
+@patch(f"{TUNING_MODULE}.normalized_entropy")
+@patch(f"{TUNING_MODULE}.train_test_split")
 def test_tune_mcboost_params_does_not_modify_input_dataframe_when_no_df_val(
     mock_train_test_split,
     mock_normalized_entropy,
