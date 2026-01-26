@@ -17,7 +17,6 @@ import sklearn.metrics as skmetrics
 from .. import _utils as utils, metrics
 from ..metrics import (
     fpr,
-    kuiper_standard_deviation,
     kuiper_test,
     wrap_multicalibration_error_metric,
     wrap_sklearn_metric_func,
@@ -743,7 +742,7 @@ def test_calibration_ratio__with_unjoined_adjustment_gives_correct_results(
     ],
 )
 def test_that_kuiper_total_variance_is_correct(predicted_scores, expected):
-    assert kuiper_standard_deviation(predicted_scores) == np.sqrt(expected)
+    assert metrics._ecce_standard_deviation(predicted_scores) == np.sqrt(expected)
 
 
 def test_that_kuiper_test_detects_miscalibration(rng):
@@ -1606,20 +1605,13 @@ def test_ecce_and_standard_deviation_return_zero_for_empty_segment(rng):
         segments=masks,
     )[0]
 
-    k_ub = metrics.kuiper_upper_bound_standard_deviation_per_segment(
+    k_std = metrics._ecce_standard_deviation_per_segment(
         labels=df["label"].values,
         predicted_scores=df["prediction"].values,
         sample_weight=df["weights"].values,
         segments=masks,
     )[0]
-
-    k_std = metrics.kuiper_standard_deviation_per_segment(
-        labels=df["label"].values,
-        predicted_scores=df["prediction"].values,
-        sample_weight=df["weights"].values,
-        segments=masks,
-    )[0]
-    assert c_jk == k_ub == k_std, "Expected 0 for empty segment"
+    assert c_jk == k_std == 0, "Expected 0 for empty segment"
 
 
 def test_multicalibration_error_does_not_modify_segments_df():
@@ -2093,7 +2085,7 @@ def test_kuiper_upper_bound_standard_deviation_with_sample_weight():
     assert result >= 0
 
 
-def test_kuiper_standard_deviation_per_segment_raises_error_with_mismatched_segments():
+def test_ecce_standard_deviation_per_segment_raises_error_with_mismatched_segments():
     predicted_scores = np.array([0.1, 0.5, 0.9, 0.2, 0.8])
     # Create segments with wrong shape (3 samples instead of 5)
     segments = np.ones(shape=(2, 3), dtype=np.bool_)
@@ -2101,7 +2093,7 @@ def test_kuiper_standard_deviation_per_segment_raises_error_with_mismatched_segm
     with pytest.raises(
         ValueError, match="Segments must be the same length as labels/predictions"
     ):
-        metrics.kuiper_standard_deviation_per_segment(
+        metrics._ecce_standard_deviation_per_segment(
             predicted_scores=predicted_scores,
             segments=segments,
         )
