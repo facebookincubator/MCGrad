@@ -1008,7 +1008,6 @@ def test_that_multicalibrationerror_is_equal_to_ecce_metric_on_single_segment():
         categorical_segment_columns=["segment_A"],
         max_depth=0,
         min_samples_per_segment=1,
-        sigma_estimation_method=None,
     )
     assert np.isclose(mce.mce_absolute, global_ecce_metric, rtol=1e-10, atol=1e-10)
 
@@ -1320,33 +1319,6 @@ def test_mce_reducing_precision_dtype_returns_correct_value_upto_third_digit(rng
             getattr(mce_float64, attr_name),
             rtol=FLOAT32_TOLERANCE,
         ).all()
-
-
-def test_equivalence_kuiper_label_based_standard_deviation_per_segment():
-    predicted_scores = np.random.rand(100)
-    labels = np.random.rand(100)
-    sample_weight = np.random.rand(100)
-
-    seg_idx_list = [
-        [1, 5, 10, 15, 20, 25, 30, 35, 40, 45],
-        [2, 6, 11, 16, 21, 26, 31, 36, 41, 46],
-        [3, 7, 12, 17, 22, 27, 32, 37, 42, 47],
-        [4, 8, 13, 18, 23, 28, 33, 38, 43, 48],
-        [5, 9, 14, 19, 24, 29, 34, 39, 44, 49],
-    ]
-
-    segments = np.zeros(shape=(5, 100), dtype=np.bool_)
-    std_dev_original = np.zeros(shape=(5,), dtype=np.float64)
-    for i, seg_idx in enumerate(seg_idx_list):
-        std_dev_original[i] = metrics.kuiper_label_based_standard_deviation(
-            predicted_scores[seg_idx], labels[seg_idx], sample_weight[seg_idx]
-        )
-        segments[i, seg_idx] = 1
-
-    std_dev_segment_based = metrics.kuiper_label_based_standard_deviation_per_segment(
-        predicted_scores, labels, sample_weight, segments
-    ).reshape(-1)
-    assert np.allclose(std_dev_original, std_dev_segment_based)
 
 
 def test_segment_feature_values_has_the_correct_features_used_for_segment_generation(
@@ -1759,46 +1731,6 @@ def test_ranking_metric_does_not_modify_input_arrays(rng, metric_func, metric_kw
     np.testing.assert_array_equal(predicted_labels, predicted_labels_original)
 
 
-@pytest.mark.parametrize(
-    "predictions,labels,sample_weight",
-    [
-        # Minimum viable case (2 points)
-        (np.array([0.1, 0.9]), np.array([0, 1]), None),
-        # Edge case: all same predictions
-        (np.array([0.5, 0.5, 0.5, 0.5]), np.array([0, 1, 0, 1]), None),
-        # Edge case: boundary values (0 and 1)
-        (np.array([0.0, 1.0, 0.5]), np.array([0, 1, 0]), None),
-        # With sample weights
-        (np.array([0.1, 0.5, 0.9]), np.array([0, 1, 1]), np.array([1.0, 2.0, 1.0])),
-        # Edge case: very small differences
-        (np.array([0.500, 0.501, 0.502]), np.array([0, 1, 0]), None),
-    ],
-)
-def test_kuiper_label_based_standard_deviation_edge_cases(
-    predictions, labels, sample_weight
-):
-    result = metrics.kuiper_label_based_standard_deviation(
-        predictions, labels, sample_weight
-    )
-    assert result >= 0
-    assert not np.isnan(result)
-
-
-def test_kuiper_label_based_standard_deviation_perfect_calibration():
-    # Perfect calibration should give near-zero deviation
-    predictions = np.array([0.0, 0.25, 0.5, 0.75, 1.0])
-    labels = np.array([0.0, 0.25, 0.5, 0.75, 1.0])
-    result = metrics.kuiper_label_based_standard_deviation(predictions, labels)
-    assert result == pytest.approx(0, abs=1e-10)
-
-
-def test_kuiper_label_based_standard_deviation_requires_labels():
-    with pytest.raises(ValueError, match="Labels are required"):
-        metrics.kuiper_label_based_standard_deviation(
-            np.array([0.1, 0.5, 0.9]), labels=None
-        )
-
-
 def test_calibration_free_normalized_entropy_higher_for_reversed_predictions():
     labels = np.array([0, 0, 0, 1, 1, 1])
     well_calibrated = np.array([0.1, 0.2, 0.3, 0.7, 0.8, 0.9])
@@ -2033,58 +1965,6 @@ def test_calculate_cumulative_differences_raises_error_with_mismatched_segments(
         )
 
 
-def test_kuiper_upper_bound_standard_deviation_per_segment_with_default_sample_weight():
-    predicted_scores = np.array([0.1, 0.5, 0.9, 0.2, 0.8])
-
-    result = metrics.kuiper_upper_bound_standard_deviation_per_segment(
-        predicted_scores=predicted_scores,
-        sample_weight=None,
-    )
-
-    assert isinstance(result, np.ndarray)
-    assert len(result) == 1
-    assert result[0] >= 0
-
-
-def test_kuiper_upper_bound_standard_deviation_per_segment_with_default_segments():
-    predicted_scores = np.array([0.1, 0.5, 0.9, 0.2, 0.8])
-    sample_weight = np.array([1.0, 1.0, 1.0, 1.0, 1.0])
-
-    result = metrics.kuiper_upper_bound_standard_deviation_per_segment(
-        predicted_scores=predicted_scores,
-        sample_weight=sample_weight,
-        segments=None,
-    )
-
-    assert isinstance(result, np.ndarray)
-    assert result.shape == (1,)
-    assert result[0] >= 0
-
-
-def test_kuiper_upper_bound_standard_deviation_wrapper_gives_expected_result():
-    predicted_scores = np.array([0.1, 0.5, 0.9, 0.2, 0.8])
-
-    result = metrics.kuiper_upper_bound_standard_deviation(
-        predicted_scores=predicted_scores,
-    )
-
-    assert isinstance(result, (float, np.floating))
-    assert result >= 0
-
-
-def test_kuiper_upper_bound_standard_deviation_with_sample_weight():
-    predicted_scores = np.array([0.1, 0.5, 0.9, 0.2, 0.8])
-    sample_weight = np.array([2.0, 1.0, 1.0, 1.0, 1.0])
-
-    result = metrics.kuiper_upper_bound_standard_deviation(
-        predicted_scores=predicted_scores,
-        sample_weight=sample_weight,
-    )
-
-    assert isinstance(result, (float, np.floating))
-    assert result >= 0
-
-
 def test_ecce_standard_deviation_per_segment_raises_error_with_mismatched_segments():
     predicted_scores = np.array([0.1, 0.5, 0.9, 0.2, 0.8])
     # Create segments with wrong shape (3 samples instead of 5)
@@ -2099,48 +1979,6 @@ def test_ecce_standard_deviation_per_segment_raises_error_with_mismatched_segmen
         )
 
 
-def test_kuiper_label_based_standard_deviation_per_segment_with_default_sample_weight():
-    predicted_scores = np.array([0.1, 0.5, 0.9, 0.2, 0.8])
-    labels = np.array([0, 1, 1, 0, 1])
-
-    result = metrics.kuiper_label_based_standard_deviation_per_segment(
-        predicted_scores=predicted_scores,
-        labels=labels,
-        sample_weight=None,
-    )
-
-    assert isinstance(result, np.ndarray)
-    assert len(result) == 1
-    assert result[0] >= 0
-
-
-def test_kuiper_label_based_standard_deviation_per_segment_with_default_segments():
-    predicted_scores = np.array([0.1, 0.5, 0.9, 0.2, 0.8])
-    labels = np.array([0, 1, 1, 0, 1])
-    sample_weight = np.array([1.0, 1.0, 1.0, 1.0, 1.0])
-
-    result = metrics.kuiper_label_based_standard_deviation_per_segment(
-        predicted_scores=predicted_scores,
-        labels=labels,
-        sample_weight=sample_weight,
-        segments=None,
-    )
-
-    assert isinstance(result, np.ndarray)
-    assert result.shape == (1,)
-    assert result[0] >= 0
-
-
-def test_kuiper_label_based_standard_deviation_per_segment_raises_error_when_labels_none():
-    predicted_scores = np.array([0.1, 0.5, 0.9, 0.2, 0.8])
-
-    with pytest.raises(ValueError, match="Labels are required for this method"):
-        metrics.kuiper_label_based_standard_deviation_per_segment(
-            predicted_scores=predicted_scores,
-            labels=None,
-        )
-
-
 def test_ecce_cdf_returns_near_one_for_large_x():
     result = metrics._ecce_cdf(8.3)
 
@@ -2148,13 +1986,6 @@ def test_ecce_cdf_returns_near_one_for_large_x():
 
     result_large = metrics._ecce_cdf(100.0)
     assert result_large == pytest.approx(1.0)
-
-
-def test_normalization_method_assignment_raises_error_for_unknown_method():
-    with pytest.raises(
-        ValueError, match="Unknown normalization method.*Available methods"
-    ):
-        metrics._normalization_method_assignment("invalid_method")
 
 
 def test_kuiper_test_returns_pvalue_one_for_very_small_statistic():
