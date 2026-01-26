@@ -49,11 +49,11 @@ CALIBRATION_ERROR_NUM_BINS = 40
 CALIBRATION_ERROR_EPSILON = 0.0000001
 DEFAULT_PRECISION_DTYPE = np.float64
 
-# Kuiper distribution constants
-# KUIPER_STATISTIC_MAX: Maximum statistic value before CDF is effectively 1.0
-# KUIPER_STATISTIC_MIN: Minimum statistic value below which p-value is 1.0
-KUIPER_STATISTIC_MAX: float = 8.26732673
-KUIPER_STATISTIC_MIN: float = 1e-20
+# ECCE sigma distribution constants
+# ECCE_SIGMA_MAX: Maximum statistic value before CDF is effectively 1.0
+# ECCE_SIGMA_MIN: Minimum statistic value below which p-value is 1.0
+ECCE_SIGMA_MAX: float = 8.26732673
+ECCE_SIGMA_MIN: float = 1e-20
 
 
 def _calibration_error(
@@ -1155,10 +1155,13 @@ def kuiper_calibration_per_segment(
         )
 
 
-def kuiper_distribution(x: float) -> float:
+def _ecce_cdf(x: float) -> float:
     """
-    Evaluates the cumulative distribution function for the range
-    (maximum minus minimum) of the standard Brownian motion on [0, 1].
+    Evaluate the cumulative distribution function for the ECCE statistic.
+
+    This computes the CDF for the range (maximum minus minimum) of the
+    standard Brownian motion on [0, 1], which is used to compute p-values
+    for the ECCE statistic.
 
     :param float x: argument at which to evaluate the cumulative distribution function
                     (must be positive)
@@ -1166,11 +1169,8 @@ def kuiper_distribution(x: float) -> float:
     :rtype: float
     """
     if x <= 0:
-        raise ValueError(
-            f"Can only evaluate cumulative Kuiper distribution at positive x, not at {x}"
-        )
-    # If x goes to infinity, c tends to 1.0
-    if x >= KUIPER_STATISTIC_MAX:
+        raise ValueError(f"Can only evaluate ECCE CDF at positive x, not at {x}")
+    if x >= ECCE_SIGMA_MAX:
         return 1.0 - sys.float_info.epsilon
 
     # Compute the machine precision assuming binary numerical representations.
@@ -1189,6 +1189,20 @@ def kuiper_distribution(x: float) -> float:
             -2.0 * kplus**2.0 * math.pi**2.0 / x**2.0
         )
     return c
+
+
+def ecce_pvalue_from_sigma(ecce_sigma: float) -> float:
+    """
+    Compute p-value from a sigma-scaled ECCE statistic.
+
+    :param ecce_sigma: The ECCE statistic normalized by standard deviation.
+    :return: The p-value from the ECCE test.
+    """
+    if ecce_sigma < ECCE_SIGMA_MIN:
+        return 1.0
+    if ecce_sigma > ECCE_SIGMA_MAX:
+        return sys.float_info.epsilon
+    return 1 - _ecce_cdf(ecce_sigma)
 
 
 def _normalization_method_assignment(
@@ -1222,15 +1236,8 @@ def kuiper_test(
     :param sample_weight: Optional array of weights for the samples, must be the same length as labels and predicted_scores.
     :return: A tuple containing the Kuiper statistic and the corresponding p-value.
     """
-
     kuiper_stat = ecce_sigma(labels, predicted_scores, sample_weight)
-    if kuiper_stat < KUIPER_STATISTIC_MIN:
-        pval = 1.0
-    elif kuiper_stat > KUIPER_STATISTIC_MAX:
-        pval = sys.float_info.epsilon
-    else:
-        pval = 1 - kuiper_distribution(kuiper_stat)
-
+    pval = ecce_pvalue_from_sigma(kuiper_stat)
     return kuiper_stat, pval
 
 
@@ -1340,8 +1347,8 @@ def ecce_pvalue(
     :param sample_weight: Optional array of sample weights.
     :return: The p-value from the calibration test.
     """
-    _, pvalue = kuiper_test(labels, predicted_scores, sample_weight)
-    return pvalue
+    sigma = ecce_sigma(labels, predicted_scores, sample_weight)
+    return ecce_pvalue_from_sigma(sigma)
 
 
 def kuiper_func_per_segment(
@@ -2021,10 +2028,8 @@ class MulticalibrationError:
 
     @functools.cached_property
     def segment_p_values(self) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
-        kuiper_distribution_vec = np.vectorize(kuiper_distribution)
-        p_values = np.ones_like(
-            self.segment_ecces_sigma_scale
-        ) - kuiper_distribution_vec(self.segment_ecces_sigma_scale)
+        ecce_pvalue_vec = np.vectorize(ecce_pvalue_from_sigma)
+        p_values = ecce_pvalue_vec(self.segment_ecces_sigma_scale)
         return p_values
 
     @functools.cached_property
@@ -2093,7 +2098,7 @@ class MulticalibrationError:
     def p_value(self) -> float:
         if "segment_p_values" in self.__dict__:
             return np.min(self.segment_p_values)
-        return 1 - kuiper_distribution(self.mce_sigma_scale)
+        return ecce_pvalue_from_sigma(self.mce_sigma_scale)
 
     @functools.cached_property
     def mde(self) -> float:
