@@ -13,7 +13,7 @@ import rehypeKatex from 'rehype-katex';
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'MCGrad',
-  tagline: 'Production-ready multicalibration for machine learning',
+  tagline: 'Production-Ready Multicalibration',
 
   url: 'https://facebookincubator.github.io',
   baseUrl: '/MCGrad/',
@@ -68,13 +68,13 @@ const config = {
       metadata: [
         {name: 'description', content: 'MCGrad is a Python library for production-ready multicalibration. Ensure ML model calibration across all segments, not just globally.'},
         {name: 'keywords', content: 'multicalibration, calibration, machine learning, fairness, MCGrad, Python, LightGBM'},
-        {property: 'og:title', content: 'MCGrad - Multicalibration for Machine Learning'},
-        {property: 'og:description', content: 'Production-ready multicalibration ensuring ML model fairness across all segments.'},
+        {property: 'og:title', content: 'MCGrad - Production-Ready Multicalibration'},
+        {property: 'og:description', content: 'Production-ready multicalibration ensuring ML model fairness and accuracy across all segments.'},
         {property: 'og:image', content: 'https://facebookincubator.github.io/MCGrad/img/logo.png'},
         {property: 'og:type', content: 'website'},
         {name: 'twitter:card', content: 'summary_large_image'},
-        {name: 'twitter:title', content: 'MCGrad - Multicalibration for Machine Learning'},
-        {name: 'twitter:description', content: 'Production-ready multicalibration ensuring ML model fairness across all segments.'},
+        {name: 'twitter:title', content: 'MCGrad - Production-Ready Multicalibration'},
+        {name: 'twitter:description', content: 'Production-ready multicalibration ensuring ML model fairness and accuracy across all segments.'},
         {name: 'twitter:image', content: 'https://facebookincubator.github.io/MCGrad/img/logo.png'},
       ],
       navbar: {
