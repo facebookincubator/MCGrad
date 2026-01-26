@@ -33,9 +33,9 @@ mce = MulticalibrationError(
     numerical_segment_columns=['numeric_feature']
 )
 
-print(f"MCE: {mce.mce}%")
+print(f"MCE: {mce.mce_relative}%")
 print(f"P-value: {mce.p_value}")
-print(f"Sigma scale: {mce.mce_sigma_scale}")
+print(f"Sigma: {mce.mce_sigma}")
 ```
 
 The MulticalibrationError metric is based on the Kuiper statistic and provides a principled way to measure multi-calibration quality. For details on the methodology, see:

@@ -30,16 +30,16 @@ mce = MulticalibrationError(
     numerical_segment_columns=['income']
 )
 
-print(f"MCE: {mce.mce:.2f}%")
+print(f"MCE: {mce.mce_relative:.2f}%")
 print(f"P-value: {mce.p_value:.4f}")
-print(f"Worst segment: {mce.mce_sigma_scale:.2f} standard deviations")
+print(f"Worst segment: {mce.mce_sigma:.2f} standard deviations")
 ```
 
 The output can be interpreted as follows:
 
-- **`mce`**: MCE as a percentage (relative to prevalence).
+- **`mce_relative`**: MCE as a percentage (relative to prevalence).
 - **`p_value`**: Statistical significance of the worst miscalibration.
-- **`mce_sigma_scale`**: MCE in units of standard deviations (for statistical significance).
+- **`mce_sigma`**: MCE in units of standard deviations (for statistical significance).
 
 ## How Does the MCE Work?
 The Multicalibration Error metric is computed in three steps:

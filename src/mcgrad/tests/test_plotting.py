@@ -71,14 +71,19 @@ def mce_with_all_segments(sample_df):
 
 def test_plot_segment_calibration_errors_basic(mce_with_all_segments):
     fig = plotting.plot_segment_calibration_errors(
-        mce=mce_with_all_segments, quantity="segment_ecces_sigma_scale"
+        mce=mce_with_all_segments, quantity="segment_ecce_sigma"
     )
     assert fig is not None
 
 
 @pytest.mark.parametrize(
     "quantity",
-    ["segment_ecces", "segment_p_values", "segment_sigmas", "segment_ecces_absolute"],
+    [
+        "segment_ecce_relative",
+        "segment_ecce_pvalue",
+        "segment_ecce_std",
+        "segment_ecce",
+    ],
 )
 def test_plot_segment_calibration_errors_quantities(mce_with_all_segments, quantity):
     fig = plotting.plot_segment_calibration_errors(

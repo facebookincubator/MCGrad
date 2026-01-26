@@ -1963,9 +1963,9 @@ def test_mce_below_initial_and_mce_below_strong_evidence_threshold_are_false_whe
         }
     )
 
-    def mce_sigma_scale_mock():
+    def mce_sigma_mock():
         class WrappedFuncMockMCE:
-            name = "Multicalibration Error<br>(mce_sigma_scale)"
+            name = "Multicalibration Error<br>(mce_sigma)"
 
             def __call__(
                 self,
@@ -1981,7 +1981,7 @@ def test_mce_below_initial_and_mce_below_strong_evidence_threshold_are_false_whe
     mcgrad = methods.MCGrad(
         num_rounds=5,
         early_stopping=True,
-        early_stopping_score_func=mce_sigma_scale_mock(),
+        early_stopping_score_func=mce_sigma_mock(),
         early_stopping_minimize_score=True,
         early_stopping_use_crossvalidation=False,
         lightgbm_params={

@@ -104,8 +104,8 @@ Explore the [methods API](api/methods.md) for other available global calibration
 ### 4. Model Evaluation: the Multicalibration Error Metric
 
 To rigorously evaluate whether your model is multicalibrated, you can use the `MulticalibrationError` class, which provides several important attributes:
-- **Multicalibration Error (MCE)**: The plain Multicalibration Error metric that is expressed in a percent scale. Briefly, it measures the largest deviation from perfect calibration over all segments. This is computed by `.mce` attribute.
-- **MCE Sigma Scale**: The Multicalibration Error normalized by its standard deviation under the null hypothesis of perfect calibration. It represents the largest segment error in the number of standard deviations of the metric. Conceptually equivalent to a p-value, it allows to assess the amount of statistical evidence of miscalibration. This is computed by `.mce_sigma_scale` attribute.
+- **Multicalibration Error (MCE)**: The plain Multicalibration Error metric that is expressed in a percent scale. Briefly, it measures the largest deviation from perfect calibration over all segments. This is computed by `.mce_relative` attribute.
+- **MCE Sigma**: The Multicalibration Error normalized by its standard deviation under the null hypothesis of perfect calibration. It represents the largest segment error in the number of standard deviations of the metric. Conceptually equivalent to a p-value, it allows to assess the amount of statistical evidence of miscalibration. This is computed by `.mce_sigma` attribute.
 - **p-value**: Statistical p-value measured under the null hypothesis of perfect calibration. It can help us determine whether the miscalibration we are seeing is statistically significant. This is computed by `.p_value` attribute.
 - **Minimum Detectable Error (MDE)**: This tells us roughly what values of MCE (percent scale) can be detected using the dataset. It is computed by `.mde` attributed.
 
@@ -120,8 +120,8 @@ mce = metrics.MulticalibrationError(
 )
 
 # Print key calibration metrics
-print(f"Multicalibration Error (MCE): {mce.mce:.3f}%")
-print(f"MCE Sigma Scale: {mce.mce_sigma_scale:.3f}")
+print(f"Multicalibration Error (MCE): {mce.mce_relative:.3f}%")
+print(f"MCE Sigma: {mce.mce_sigma:.3f}")
 print(f"MCE p-value: {mce.p_value:.4f}")
 print(f"Minimum Detectable Error (MDE): {mce.mde:.3f}%")
 ```
@@ -150,8 +150,8 @@ for method_name, score_col in score_columns.items():
     )
     results.append({
         'Method': method_name,
-        'MCE': round(mce.mce, 2),
-        'MCE σ': round(mce.mce_sigma_scale, 2),
+        'MCE': round(mce.mce_relative, 2),
+        'MCE σ': round(mce.mce_sigma, 2),
         'p-value': round(mce.p_value, 4),
     })
 

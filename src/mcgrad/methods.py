@@ -1132,7 +1132,7 @@ class _BaseMCGrad(
         logger.info(f"Determined {best_num_rounds} to be best number of rounds")
 
         for monitored_metric in self.monitored_metrics_during_training:
-            if monitored_metric.name == "Multicalibration Error<br>(mce_sigma_scale)":
+            if monitored_metric.name == "Multicalibration Error<br>(mce_sigma)":
                 mce_at_best_num_rounds = self._performance_metrics[
                     f"avg_valid_performance_{monitored_metric.name}"
                 ][best_num_rounds]
