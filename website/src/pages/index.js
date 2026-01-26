@@ -14,30 +14,30 @@ import Layout from '@theme/Layout';
 
 const features = [
   {
-    content:
-      'Ensures calibration not just globally, but across virtually any segment defined by your input features.',
-    title: 'Powerful Multicalibration',
+    content: 'Best-in-class calibration quality across a vast number of segments.',
+    title: 'State-of-the-art multicalibration',
   },
   {
-    content:
-      'Leverages information from similar samples, calibrating far more segments than alternative methods.',
-    title: 'Data Efficient',
+    content: 'Familiar interface. Pass features, not segments.',
+    title: 'Easy to use',
   },
   {
-    content:
-      'Built on LightGBM for orders-of-magnitude faster training and inference than neural network approaches.',
-    title: 'Lightweight & Fast',
+    content: 'Fast to train, low inference overhead, even on web-scale data.',
+    title: 'Highly scalable',
   },
   {
-    content:
-      'A likelihood-improving procedure that can enhance model performance with significant PRAUC improvements.',
-    title: 'Improved Performance',
+    content: 'Likelihood-improving updates with validation-based early stopping.',
+    title: 'Safe by design',
+  },
+  {
+    content: 'Designed for real-world deployment and validated at Meta scale.',
+    title: 'Proven in production',
   },
 ];
 
 const Feature = ({title, content}) => {
   return (
-    <div className="col col--3 feature text--center padding--md">
+    <div className="col feature text--center padding--md">
       <h3>{title}</h3>
       <p>{content}</p>
     </div>

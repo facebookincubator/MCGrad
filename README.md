@@ -37,13 +37,12 @@ Traditional calibration methods, like Isotonic Regression or Platt Scaling, only
   <em>The same model showing hidden miscalibration when broken down by segment. MCGrad fixes this.</em>
 </p>
 
-## 🌟 Key Features
+## 🌟 Why MCGrad?
 
-- **Powerful Multicalibration** — Calibrates across unlimited segments without pre-specification
-- **Data Efficient** — Like modern ML methods
-- **Lightweight & Fast** — Adds limited latency at training and inference time
-- **Improved Performance** — Likelihood-improving with significant PRAUC gains
-- **Safe by Design** — Cannot harm base model performance on training data
+- **State-of-the-art multicalibration** — Best-in-class calibration quality across a vast number of segments.
+- **Easy to use** — Familiar interface. Pass features, not segments.
+- **Highly scalable** — Fast to train, low inference overhead, even on web-scale data.
+- **Safe by design** — Likelihood-improving updates with validation-based early stopping.
 
 ## 🏭 Production Proven
 
