@@ -2204,11 +2204,11 @@ def test_kuiper_statistic_wrapper_returns_statistic_only():
     assert statistic >= 0
 
 
-def test_kuiper_pvalue_wrapper_returns_pvalue_only():
+def test_ecce_pvalue_wrapper_returns_pvalue_only():
     labels = np.array([0, 1, 1, 0, 1])
     predicted_scores = np.array([0.1, 0.9, 0.8, 0.2, 0.7])
 
-    pvalue = metrics.kuiper_pvalue(labels=labels, predicted_scores=predicted_scores)
+    pvalue = metrics.ecce_pvalue(labels=labels, predicted_scores=predicted_scores)
 
     assert isinstance(pvalue, (float, np.floating))
     assert 0 <= pvalue <= 1
