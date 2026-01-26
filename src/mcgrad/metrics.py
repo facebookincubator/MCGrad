@@ -16,8 +16,8 @@ Key metric families include:
 **Calibration Error Metrics**
     Standard and adaptive calibration error measures using binning approaches.
 
-**Kuiper-based Calibration Metrics**
-    Statistical tests and metrics based on the Kuiper statistic.
+**ECCE (Expected Cumulative Calibration Error) Metrics**
+    Statistical tests and metrics based on the ECCE statistic (also known as Kuiper calibration).
 
 **Ranking Metrics**
     Evaluation metrics for ranked predictions (DCG, NDCG, etc.).
@@ -818,7 +818,7 @@ def _calculate_cumulative_differences(
     """
     Calculate cumulative differences between labels and predictions.
 
-    Used internally by Kuiper calibration functions.
+    Used internally by ECCE calibration functions.
 
     :param labels: Array of binary labels.
     :param predicted_scores: Array of predicted probability scores.
@@ -908,7 +908,7 @@ def _ecce_standard_deviation_per_segment(
     if segments.shape[1] != predicted_scores.shape[0]:
         raise ValueError("Segments must be the same length as labels/predictions.")
 
-    kuip_std_dev = np.zeros(
+    ecce_std_dev = np.zeros(
         shape=(np.shape(segments)[0],),
         dtype=precision_dtype,
     )
@@ -924,10 +924,10 @@ def _ecce_standard_deviation_per_segment(
                 variance_weighted_segments,
                 normalization_variance,
             ),
-            out=kuip_std_dev,
+            out=ecce_std_dev,
         )
-    kuip_std_dev[np.isnan(kuip_std_dev)] = 0
-    return kuip_std_dev
+    ecce_std_dev[np.isnan(ecce_std_dev)] = 0
+    return ecce_std_dev
 
 
 def _ecce_per_segment(
@@ -1315,12 +1315,12 @@ def calibration_free_normalized_entropy(
     return calib_free_ne
 
 
-DEFAULT_MULTI_KUIPER_MAX_VALUES_PER_SEGMENT_FEATURE: int = 3
-DEFAULT_MULTI_KUIPER_MIN_DEPTH: int = 0
-DEFAULT_MULTI_KUIPER_MAX_DEPTH: int = 3
-DEFAULT_MULTI_KUIPER_MIN_SAMPLES_PER_SEGMENT: int = 10
-DEFAULT_MULTI_KUIPER_GLOBAL_NORMALIZATION: str = "prevalence_adjusted"
-DEFAULT_MULTI_KUIPER_N_SEGMENTS: int | None = 1000
+DEFAULT_MCE_MAX_VALUES_PER_SEGMENT_FEATURE: int = 3
+DEFAULT_MCE_MIN_DEPTH: int = 0
+DEFAULT_MCE_MAX_DEPTH: int = 3
+DEFAULT_MCE_MIN_SAMPLES_PER_SEGMENT: int = 10
+DEFAULT_MCE_GLOBAL_NORMALIZATION: str = "prevalence_adjusted"
+DEFAULT_MCE_N_SEGMENTS: int | None = 1000
 
 
 class MulticalibrationError:
@@ -1332,10 +1332,10 @@ class MulticalibrationError:
         weight_column: str | None = None,
         categorical_segment_columns: list[str] | None = None,
         numerical_segment_columns: list[str] | None = None,
-        max_depth: int | None = DEFAULT_MULTI_KUIPER_MAX_DEPTH,
-        max_values_per_segment_feature: int = DEFAULT_MULTI_KUIPER_MAX_VALUES_PER_SEGMENT_FEATURE,
-        min_samples_per_segment: int = DEFAULT_MULTI_KUIPER_MIN_SAMPLES_PER_SEGMENT,
-        max_n_segments: int | None = DEFAULT_MULTI_KUIPER_N_SEGMENTS,
+        max_depth: int | None = DEFAULT_MCE_MAX_DEPTH,
+        max_values_per_segment_feature: int = DEFAULT_MCE_MAX_VALUES_PER_SEGMENT_FEATURE,
+        min_samples_per_segment: int = DEFAULT_MCE_MIN_SAMPLES_PER_SEGMENT,
+        max_n_segments: int | None = DEFAULT_MCE_N_SEGMENTS,
         chunk_size: int = 50,
         precision_dtype: str = "float32",
     ) -> None:
@@ -1644,10 +1644,10 @@ def wrap_sklearn_metric_func(
 def wrap_multicalibration_error_metric(
     categorical_segment_columns: list[str] | None = None,
     numerical_segment_columns: list[str] | None = None,
-    max_depth: int = DEFAULT_MULTI_KUIPER_MAX_DEPTH,
-    max_values_per_segment_feature: int = DEFAULT_MULTI_KUIPER_MAX_VALUES_PER_SEGMENT_FEATURE,
-    min_samples_per_segment: int = DEFAULT_MULTI_KUIPER_MIN_SAMPLES_PER_SEGMENT,
-    max_n_segments: int | None = DEFAULT_MULTI_KUIPER_N_SEGMENTS,
+    max_depth: int = DEFAULT_MCE_MAX_DEPTH,
+    max_values_per_segment_feature: int = DEFAULT_MCE_MAX_VALUES_PER_SEGMENT_FEATURE,
+    min_samples_per_segment: int = DEFAULT_MCE_MIN_SAMPLES_PER_SEGMENT,
+    max_n_segments: int | None = DEFAULT_MCE_N_SEGMENTS,
     metric_version: str = "mce",
 ) -> _ScoreFunctionInterface:
     """
@@ -1681,10 +1681,10 @@ def wrap_multicalibration_error_metric(
             self,
             categorical_segment_columns: list[str] | None,
             numerical_segment_columns: list[str] | None,
-            max_depth: int = DEFAULT_MULTI_KUIPER_MAX_DEPTH,
-            max_values_per_segment_feature: int = DEFAULT_MULTI_KUIPER_MAX_VALUES_PER_SEGMENT_FEATURE,
-            min_samples_per_segment: int = DEFAULT_MULTI_KUIPER_MIN_SAMPLES_PER_SEGMENT,
-            max_n_segments: int | None = DEFAULT_MULTI_KUIPER_N_SEGMENTS,
+            max_depth: int = DEFAULT_MCE_MAX_DEPTH,
+            max_values_per_segment_feature: int = DEFAULT_MCE_MAX_VALUES_PER_SEGMENT_FEATURE,
+            min_samples_per_segment: int = DEFAULT_MCE_MIN_SAMPLES_PER_SEGMENT,
+            max_n_segments: int | None = DEFAULT_MCE_N_SEGMENTS,
         ):
             self.categorical_segment_columns = categorical_segment_columns
             self.numerical_segment_columns = numerical_segment_columns

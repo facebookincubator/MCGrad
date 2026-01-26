@@ -736,12 +736,12 @@ def test_calibration_ratio__with_unjoined_adjustment_gives_correct_results(
         (np.array([0.0, 0.0]), 0),
     ],
 )
-def test_that_kuiper_total_variance_is_correct(predicted_scores, expected):
+def test_that_ecce_total_variance_is_correct(predicted_scores, expected):
     assert metrics._ecce_standard_deviation(predicted_scores) == np.sqrt(expected)
 
 
 def test_ecce_detects_miscalibration(rng):
-    # Test that the Kuiper test detects miscalibration
+    # Test that ECCE detects miscalibration
     n = 100
     predictions = rng.uniform(low=0.0, high=1.0, size=n)
     miscalibrated_predictions = (predictions + 0.9) / 1.9
