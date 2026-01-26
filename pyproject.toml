@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=45"]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "MCGrad"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Production-ready multicalibration for machine learning"
 requires-python = ">=3.10"
 readme = "README.md"
@@ -47,3 +47,7 @@ exclude_lines = [
     "pragma: no cover",
     "@abstractmethod",
 ]
+
+[tool.setuptools_scm]
+root = ".."
+fallback_version = "0.0.0"
