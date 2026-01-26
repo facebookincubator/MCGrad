@@ -5,19 +5,20 @@ description: How to measure multicalibration using the Multicalibration Error (M
 
 # Measuring Multicalibration
 
-To measure how multicalibrated a model is, we use the Multicalibration Error (MCE) metric. It quantifies how well a model is multicalibrated across relevant segments of your data. We also use it to assess the success of applying a multicalibration algorithm, like MCGrad, by measuring MCE both before and after the multicalibration step.
+The Multicalibration Error (MCE) metric quantifies how well a model is multicalibrated across relevant segments (also known as protected groups) of your data. It is used to assess the success of applying a multicalibration algorithm, like MCGrad, by measuring MCE both before and after the multicalibration step.
 
-## What is MCE and How Can I Use it?
-The Multicalibration Error measures the worst-case noise-weighted calibration error across all segments that can be formed from your specified features. It answers the question: "What's the maximum miscalibration in any segment of my data?"
+## What is MCE and How Can I Use It?
 
-#### Key properties:
-- $\text{MCE} = 0$ means perfect multicalibration;
+The Multicalibration Error measures the worst-case noise-weighted calibration error across all segments that can be formed from your specified features. It answers the question: "What is the maximum miscalibration in any segment of my data?"
+
+#### Key Properties
+- $\text{MCE} = 0$ indicates perfect multicalibration;
 - Lower values are better;
 - Parameter-free - no arbitrary binning decisions required;
 - Statistically interpretable - includes p-values.
 
 
-#### Quickstart: Computing the MCE
+#### Quick Start: Computing the MCE
 
 ```python
 from mcgrad.metrics import MulticalibrationError
@@ -35,28 +36,28 @@ print(f"P-value: {mce.p_value:.4f}")
 print(f"Worst segment: {mce.mce_sigma_scale:.2f} standard deviations")
 ```
 
-The output can be interpreted as follows:
+The output is interpreted as follows:
 
 - **`mce`**: MCE as a percentage (relative to prevalence).
 - **`p_value`**: Statistical significance of the worst miscalibration.
 - **`mce_sigma_scale`**: MCE in units of standard deviations (for statistical significance).
 
 ## How Does the MCE Work?
+
 The Multicalibration Error metric is computed in three steps:
 
 <div style={{textAlign: 'center'}}>
 <img src={require('../static/img/mce_metric_design.png').default} alt="mce metric design" width="100%" />
 </div>
 
-### Step 1: Define a Set of Segments.
+### Step 1: Define a Set of Segments
 
-First, we specify the collection of segments over which calibration will be assessed. In some applications, segments may be predefined based on domain knowledge (e.g., demographic groups, device types). More commonly, we use a systematic approach:
+First, specify the collection of segments over which calibration will be assessed. In some applications, segments may be predefined based on domain knowledge (e.g., demographic groups, device types). More commonly, a systematic approach is used:
 
 - Each feature is partitioned into $k$ categories (such as quantiles for numerical features or grouped levels for categorical features).
+- All intersections of up to $n$ features are considered, generating a rich set of segments that capture meaningful subpopulations in the data.
 
-- We then consider all intersections of up to $n$ features, generating a rich set of segments that capture meaningful subpopulations in the data.
-
-**Example:** In our [ad click prediction scenario](intro.md#a-motivating-example), if we wanted to assess multicalibration using the features `{market, device_type}`, the set of segments would include:
+**Example:** In the [ad click prediction scenario](intro.md#a-motivating-example), to assess multicalibration using the features `{market, device_type}`, the set of segments would include:
 
 - **Segment 0:** All samples (global population);
 - **Segment 1:** Users in the US market;
@@ -68,58 +69,58 @@ First, we specify the collection of segments over which calibration will be asse
 - **Segment 7:** Users in non-US markets AND using mobile;
 - **Segment 8:** Users in non-US markets AND using desktop.
 
-Note that the number of segments grows exponentially with the number of features. Thus, we limit the number of features and the number of categories per feature used to identify the segments to, respectively, $n$ and $k$.
+The number of segments grows exponentially with the number of features. Therefore, the number of features and categories per feature used to identify segments are limited to $n$ and $k$, respectively.
 
-### Step 2: Measure Calibration Error Within Each Segment.
+### Step 2: Measure Calibration Error Within Each Segment
 
-After defining segments, we assess how well the model's predicted probabilities match the observed outcomes within each segment.
+After defining segments, assess how well the model's predicted probabilities match the observed outcomes within each segment.
 
-For each segment, we compute the **Estimated Cumulative Calibration Error (ECCE)**, which captures the sum of deviations between the predicted scores and the actual labels over any interval of scores in that segment.
+For each segment, the **Estimated Cumulative Calibration Error (ECCE)** is computed, which captures the sum of deviations between predicted scores and actual labels over any interval of scores in that segment.
 
-Why do we choose the ECCE?
+Why ECCE?
 
 - **ECCE is parameter-free:** It does not require arbitrary choices like bin sizes.
-- **ECCE is statistically interpretable:** Its value can be directly related to statistical significance, allowing us to distinguish genuine miscalibration from random fluctuations.
+- **ECCE is statistically interpretable:** Its value can be directly related to statistical significance, enabling distinction between genuine miscalibration and random fluctuations.
 
 **Example:**
-Continuing with our ad click prediction scenario, for each segment (e.g., "US market AND mobile", "non-US market AND desktop"), we:
+Continuing with the ad click prediction scenario, for each segment (e.g., "US market AND mobile", "non-US market AND desktop"):
 
-- Sort the samples in the segment by predicted probability.
-- For every possible interval of scores, calculate the cumulative difference between the number of actual clicks and the sum of predicted probabilities.
-- The ECCE for the segment is the range of these cumulative differences, normalized by the segment size.
+- Samples in the segment are sorted by predicted probability.
+- For every possible interval of scores, the cumulative difference between actual clicks and predicted probabilities is calculated.
+- The ECCE for the segment is the range of these cumulative differences, normalized by segment size.
 
-In addition to capturing miscalibration in segments, we also detect global miscalibrations, as the first segment representing the whole dataset.
+Global miscalibrations are also detected, as the first segment represents the entire dataset.
 
-### Step 3: Combine Segment Errors Into an Interpretable Single Score.
+### Step 3: Combine Segment Errors Into an Interpretable Single Score
 
-After computing the calibration error (ECCE) for each segment, we aggregate these results to produce a single summary metric: the **Multicalibration Error (MCE) on the sigma-scale**.
+After computing the calibration error (ECCE) for each segment, results are aggregated to produce a single summary metric: the **Multicalibration Error (MCE) on the sigma-scale**.
 
-- For each segment, we normalize the ECCE by its estimated standard deviation (the "sigma-scale"). This accounts for the statistical reliability of each segment and ensures that segments with few samples do not dominate the metric due to noise.
-- We then take the **maximum** normalized error across all segments. This approach highlights the segment with the worst signal-to-noise-weighted miscalibration, making the metric easy to interpret and actionable.
+- For each segment, the ECCE is normalized by its estimated standard deviation (the "sigma-scale"). This accounts for the statistical reliability of each segment and ensures that segments with few samples do not dominate the metric due to noise.
+- The **maximum** normalized error across all segments is taken. This approach highlights the segment with the worst signal-to-noise-weighted miscalibration, making the metric easy to interpret and actionable.
 
 **Example:**
-In our ad click prediction scenario, suppose the segment "US market AND mobile" is the segment with the highest normalized ECCE. The MCE will reflect this value, showing that this segment is the most miscalibrated one and should be the priority for further model improvement.
+In the ad click prediction scenario, suppose the segment "US market AND mobile" has the highest normalized ECCE. The MCE reflects this value, indicating that this segment is the most miscalibrated and should be the priority for further model improvement.
 
 #### Alternative Scale: Rescaling MCE to the Percent-Scale
 
-The obtained raw MCE value represents how many standard deviations the worst segment deviates from perfect calibration. Higher values indicate stronger statistical evidence for miscalibration. This scale will depend on the properties of the dataset, such as the minority class proportion, the distribution of scores, and the sample size.
+The raw MCE value represents how many standard deviations the worst segment deviates from perfect calibration. Higher values indicate stronger statistical evidence for miscalibration. This scale depends on dataset properties, such as minority class proportion, score distribution, and sample size.
 
-However, users might instead be interested in the magnitude of miscalibration. Thus, we offer the variant **Multicalibration Error (MCE) on the percent-scale**: by multiplying the MCE (sigma-scale) by the expected standard deviation for the global segment and dividing it by the prevalence of the minority class, the result is a relative effect size in [0, 1]. This represents the magnitude of miscalibration and is useful for comparing models or tracking improvements over time, since it's independent of the sample size.
+For applications requiring magnitude of miscalibration, the **Multicalibration Error (MCE) on the percent-scale** is available: by multiplying the MCE (sigma-scale) by the expected standard deviation for the global segment and dividing by the minority class prevalence, the result is a relative effect size in [0, 1]. This represents the magnitude of miscalibration and is useful for comparing models or tracking improvements over time, as it is independent of sample size.
 
-Next, we explain why we use the maximum: it aligns with theoretical definitions of multicalibration.
+The maximum is used because it aligns with theoretical definitions of multicalibration.
 
 
 ## How Does the MCE Relate to the Theoretical Definition of Multicalibration?
 
-The MCE (sigma scale) metric is not just a practical heuristic—it has a precise mathematical relationship to the theoretical definition of multicalibration, providing a finite-sample estimator of the minimal error parameter in approximate multicalibration.
+The MCE (sigma scale) metric has a precise mathematical relationship to the theoretical definition of multicalibration, providing a finite-sample estimator of the minimal error parameter in approximate multicalibration.
 
 ### The Definition of $\alpha$-Multicalibration
 
-The classic definition of multicalibration is simple: for every segment $h$ and every predicted probability $p$, the average outcome should match the prediction:
+The classic definition of multicalibration is straightforward: for every segment $h$ and every predicted probability $p$, the average outcome should match the prediction:
 
 $$ \mathbb{E}[Y - f(X) \mid h(X)=1, f(X) = p] = 0. $$
 
-However, in practice, this condition rarely holds. Thus, we relax it by allowing for a small error: A predictor $f$ is **$\alpha$-multicalibrated** with respect to $\mathcal{H}$ if
+In practice, this condition rarely holds exactly. Therefore, it is relaxed to allow for small error: A predictor $f$ is **$\alpha$-multicalibrated** with respect to $\mathcal{H}$ if
 
 $$\left| \mathbb{E}\left[h(X) \cdot \mathbf{1}_{f(X) \in [a,b]} \cdot (Y-f(X))\right] \right| \leq \alpha \cdot \tau_h(f,[a,b])$$
 
@@ -169,7 +170,7 @@ where $n$ is the sample size.
 
 ## Reference
 
-For full details on the methodology, see:
+For full methodological details, see:
 
 **Guy, I., Haimovich, D., Linder, F., Okati, N., Perini, L., Tax, N., & Tygert, M. (2025).** [Measuring multi-calibration](https://arxiv.org/abs/2506.11251). *arXiv:2506.11251*.
 
