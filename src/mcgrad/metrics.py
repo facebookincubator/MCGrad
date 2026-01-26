@@ -873,20 +873,20 @@ class _KuiperNormalizationInterface(Protocol):
     ) -> npt.NDArray: ...
 
 
-def kuiper_standard_deviation(
+def _ecce_standard_deviation(
     predicted_scores: npt.NDArray,
     labels: npt.NDArray | None = None,
     sample_weight: npt.NDArray | None = None,
 ) -> float:
     """
-    Calculate the Kuiper standard deviation for the entire dataset.
+    Calculate the ECCE standard deviation for the entire dataset.
 
     :param predicted_scores: Array of predicted probability scores.
     :param labels: Optional array of labels (unused in this method).
     :param sample_weight: Optional array of sample weights.
-    :return: The Kuiper standard deviation as a scalar.
+    :return: The ECCE standard deviation as a scalar.
     """
-    return kuiper_standard_deviation_per_segment(
+    return _ecce_standard_deviation_per_segment(
         predicted_scores, labels, sample_weight
     ).item()
 
@@ -943,7 +943,7 @@ def kuiper_upper_bound_standard_deviation(
     ).item()
 
 
-def kuiper_standard_deviation_per_segment(
+def _ecce_standard_deviation_per_segment(
     predicted_scores: npt.NDArray,
     labels: npt.NDArray | None = None,
     sample_weight: npt.NDArray | None = None,
@@ -953,7 +953,7 @@ def kuiper_standard_deviation_per_segment(
     | type[np.float64] = DEFAULT_PRECISION_DTYPE,
 ) -> npt.NDArray:
     """
-    Calculate Kuiper standard deviation per segment.
+    Calculate ECCE standard deviation per segment.
 
     Computes the standard deviation based on the variance of predictions.
 
@@ -1185,7 +1185,7 @@ def _normalization_method_assignment(
     method: str | None,
 ) -> _KuiperNormalizationInterface:
     methods = {
-        "kuiper_standard_deviation": kuiper_standard_deviation_per_segment,
+        "kuiper_standard_deviation": _ecce_standard_deviation_per_segment,
         "kuiper_upper_bound_standard_deviation": kuiper_upper_bound_standard_deviation_per_segment,
         "kuiper_label_based_standard_deviation": kuiper_label_based_standard_deviation_per_segment,
         None: identity_per_segment,
@@ -1301,7 +1301,7 @@ def ecce_sigma(
     :return: The normalized ECCE value.
     """
     ecce_value = ecce(labels, predicted_scores, sample_weight)
-    sigma = kuiper_standard_deviation(predicted_scores, labels, sample_weight)
+    sigma = _ecce_standard_deviation(predicted_scores, labels, sample_weight)
 
     if sigma == 0:
         return np.inf if ecce_value != 0 else 0.0
