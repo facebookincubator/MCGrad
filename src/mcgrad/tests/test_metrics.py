@@ -2149,12 +2149,12 @@ def test_kuiper_label_based_standard_deviation_per_segment_raises_error_when_lab
         )
 
 
-def test_kuiper_distribution_returns_near_one_for_large_x():
-    result = metrics.kuiper_distribution(8.3)
+def test_ecce_cdf_returns_near_one_for_large_x():
+    result = metrics._ecce_cdf(8.3)
 
     assert result == pytest.approx(1.0)
 
-    result_large = metrics.kuiper_distribution(100.0)
+    result_large = metrics._ecce_cdf(100.0)
     assert result_large == pytest.approx(1.0)
 
 
@@ -2549,7 +2549,7 @@ def test_multicalibration_error_p_value_fallback_when_segment_p_values_not_compu
     )
 
     # Access p_value before segment_p_values is computed
-    # This should trigger the fallback path using kuiper_distribution
+    # This should trigger the fallback path using _ecce_cdf
     p_value = mce.p_value
 
     # Should return a valid p-value
