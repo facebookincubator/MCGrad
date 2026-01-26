@@ -5,23 +5,23 @@ description: Get started with MCGrad for multicalibration. Learn how to install,
 
 # Quick Start
 
-This guide will help you get started with MCGrad for multicalibration.
+This guide covers the essential steps to begin using MCGrad for multicalibration.
 
 ## A Basic Multicalibration Workflow
 
-### 1. Prepare your data
+### 1. Prepare Your Data
 
-You need a DataFrame with the following columns:
-- `label` - the true binary label of the data point;
-- `prediction` - the uncalibrated prediction score;
-- `categorical_feature_1`, `categorical_feature_2`, ... - *optional* categorical features to identify the segments;
-- `numerical_feature_1`, `numerical_feature_2`, ... - *optional* numerical features to identify the segments.
+MCGrad requires a DataFrame with the following columns:
+- `label` — the true binary label for each data point;
+- `prediction` — the uncalibrated prediction score;
+- `categorical_feature_1`, `categorical_feature_2`, ... — *optional* categorical features that define segments (also known as protected groups);
+- `numerical_feature_1`, `numerical_feature_2`, ... — *optional* numerical features that define segments.
 
-Note that you don't need to use all the features, but at least one feature is desirable as it is necessary to identify the segments.
+At least one feature is recommended to enable segment identification.
 
-Also, MCGrad requires that predictions:
+MCGrad requires that predictions:
 - are in the range [0, 1];
-- cannot be NaNs.
+- do not contain NaN values.
 
 ```python
 from mcgrad import methods, metrics, plotting
@@ -46,11 +46,11 @@ df['label'] = (rng.uniform(size=n_samples) < df['true_prob']).astype(int)
 df['prediction'] = np.clip(rng.uniform(0.3, 0.7, size=n_samples), 0.01, 0.99)
 ```
 
-### 2. Apply MCGrad to Uncalibrated Predictions with Features
+### 2. Apply MCGrad to Uncalibrated Predictions
 
-MCGrad requires consistency between the categorical and numerical features passed to the `fit` and to the `predict` methods.
+MCGrad requires consistency between the categorical and numerical features passed to `fit` and `predict`.
 
-Despite being the same for this trivial example, the dataframes passed to the `fit` and to the `predict` methods can be (and usually are) different.
+Although this example uses the same DataFrame for both methods, in practice the training and prediction DataFrames are typically different.
 
 ```python
 # Apply MCGrad
@@ -60,28 +60,28 @@ mcgrad.fit(
     prediction_column_name='prediction',
     label_column_name='label',
     categorical_feature_column_names=['country', 'content_type', 'surface'],
-    numerical_feature_column_names=[] # optional, can be empty
+    numerical_feature_column_names=[]  # optional, can be empty
 )
 
-# Get multicalibrated predictions and add to the dataframe
+# Get multicalibrated predictions and add to the DataFrame
 df['prediction_mcgrad'] = mcgrad.predict(
     df=df,
     prediction_column_name='prediction',
     categorical_feature_column_names=['country', 'content_type', 'surface'],
-    numerical_feature_column_names=[] # optional, can be empty
+    numerical_feature_column_names=[]  # optional, can be empty
 )
 ```
 
-The multicalibrated predictions will be both **globally calibrated** and **multicalibrated**:
-- **Globally calibrated** - Well-calibrated across all data.
-- **Multicalibrated** - Well-calibrated for any segment defined by the features, i.e.
-  - For `country=US`, `country=UK`, `content_type=photo`, ...
-  - For intersections like `country=US AND content_type=photo`;
-  - ... And many more combinations!
+The multicalibrated predictions are both **globally calibrated** and **multicalibrated**:
+- **Globally calibrated** — well-calibrated across all data.
+- **Multicalibrated** — well-calibrated for any segment defined by the features:
+  - Individual segments like `country=US`, `country=UK`, `content_type=photo`, ...
+  - Intersections like `country=US AND content_type=photo`;
+  - And many more combinations.
 
-### 3. Apply Global Calibration Models for Comparison
+### 3. Apply Global Calibration Methods for Comparison
 
-The MCGrad package provides a few global calibration methods for comparison. For example, you can apply Isotonic Regression on the previous dataframe:
+MCGrad includes several global calibration methods for comparison. For example, to apply Isotonic Regression:
 
 ```python
 # Apply Isotonic Regression
@@ -91,23 +91,24 @@ isotonic_regression.fit(
     prediction_column_name='prediction',
     label_column_name='label')
 
-# Get globally calibrated predictions and add to the dataframe
+# Get globally calibrated predictions and add to the DataFrame
 df['prediction_isotonic'] = isotonic_regression.predict(
     df=df,
     prediction_column_name='prediction'
 )
 ```
 
-Explore the [methods API](api/methods.md) for other available global calibration methods.
+See the [methods API](api/methods.md) for other available global calibration methods.
 
 
-### 4. Model Evaluation: the Multicalibration Error Metric
+### 4. Model Evaluation: The Multicalibration Error Metric
 
-To rigorously evaluate whether your model is multicalibrated, you can use the `MulticalibrationError` class, which provides several important attributes:
-- **Multicalibration Error (MCE)**: The plain Multicalibration Error metric that is expressed in a percent scale. Briefly, it measures the largest deviation from perfect calibration over all segments. This is computed by `.mce` attribute.
-- **MCE Sigma Scale**: The Multicalibration Error normalized by its standard deviation under the null hypothesis of perfect calibration. It represents the largest segment error in the number of standard deviations of the metric. Conceptually equivalent to a p-value, it allows to assess the amount of statistical evidence of miscalibration. This is computed by `.mce_sigma_scale` attribute.
-- **p-value**: Statistical p-value measured under the null hypothesis of perfect calibration. It can help us determine whether the miscalibration we are seeing is statistically significant. This is computed by `.p_value` attribute.
-- **Minimum Detectable Error (MDE)**: This tells us roughly what values of MCE (percent scale) can be detected using the dataset. It is computed by `.mde` attributed.
+To evaluate multicalibration rigorously, use the `MulticalibrationError` class, which provides several key attributes:
+
+- **Multicalibration Error (MCE)**: The Multicalibration Error on a percentage scale. It measures the largest deviation from perfect calibration over all segments. Access via the `.mce` attribute.
+- **MCE Sigma Scale**: The Multicalibration Error normalized by its standard deviation under the null hypothesis of perfect calibration. It represents the largest segment error in standard deviations. Conceptually equivalent to a p-value, this metric assesses the statistical evidence of miscalibration. Access via the `.mce_sigma_scale` attribute.
+- **p-value**: Statistical p-value measured under the null hypothesis of perfect calibration. This helps determine whether observed miscalibration is statistically significant. Access via the `.p_value` attribute.
+- **Minimum Detectable Error (MDE)**: The approximate minimum MCE (percentage scale) detectable with the dataset. Access via the `.mde` attribute.
 
 ```python
 # Initialize the MulticalibrationError metric
@@ -126,10 +127,11 @@ print(f"MCE p-value: {mce.p_value:.4f}")
 print(f"Minimum Detectable Error (MDE): {mce.mde:.3f}%")
 ```
 
-See the [metrics API](api/metrics.md) for more evaluation options.
+See the [metrics API](api/metrics.md) for additional evaluation options.
 
 ### 5. Compare Calibration Methods
-Compare the multicalibration error metrics across the three methods: uncalibrated, isotonic regression, and MCGrad. Given that the data presents segment-specific miscalibration, we expect MCGrad to outperform the other methods.
+
+Compare the multicalibration error metrics across uncalibrated predictions, Isotonic Regression, and MCGrad. Given that the data exhibits segment-specific miscalibration, MCGrad is expected to outperform the other methods.
 
 ```python
 # Define methods to compare
@@ -159,7 +161,7 @@ for method_name, score_col in score_columns.items():
 pd.DataFrame(results).set_index('Method')
 ```
 
-The expected output is:
+Expected output:
 
 | Method       | MCE   | MCE σ | p-value |
 |--------------|-------|-------|---------|
@@ -167,17 +169,15 @@ The expected output is:
 | Isotonic     | 17.30 | 13.54 | 0.0000  |
 | MCGrad       | 2.99  | 2.38  | 0.0691  |
 
-As expected, MCGrad significantly reduces the Multicalibration Error compared to both uncalibrated predictions and Isotonic Regression. The p-value for MCGrad (0.0691) indicates that there is no statistically significant evidence of miscalibration remaining.
+As expected, MCGrad significantly reduces the Multicalibration Error compared to both uncalibrated predictions and Isotonic Regression. The p-value for MCGrad (0.0691) indicates no statistically significant evidence of remaining miscalibration.
 
-### 6. Visualization of (Multi)calibration Error
+### 6. Visualize (Multi)calibration Error
 
 The plotting module provides tools for visualizing (multi)calibration.
 
 **Global Calibration Curves**
 
-The global calibration curve shows the average label per score bin. Perfect calibration corresponds to all bin means overlapping with the diagonal line (i.e. the average label is equal to the average score in the bin). 95% confidence intervals for the estimate of the average label are shown. The histogram in the background shows the distribution of the score.
-
-You can plot the global calibration curve for any other model by changing the `score_col` argument.
+The global calibration curve displays the average label per score bin. Perfect calibration corresponds to all bin means overlapping with the diagonal line (i.e., the average label equals the average score in each bin). The plot includes 95% confidence intervals for the estimated average label, with a histogram showing the score distribution in the background.
 
 ```python
 # Plot Global Calibration Curve
@@ -197,7 +197,7 @@ fig.show()
 
 **Local Calibration Curves**
 
-Here you can plot the calibration curves for single feature segment. I.e. one curve per feature value. This allows you to inspect if the model is calibrated for specific segments (e.g. `country=US`, `content_type=video`), even if it appears calibrated globally.
+Local calibration curves display one curve per feature value within a single feature segment. This enables inspection of whether the model is calibrated for specific segments (e.g., `country=US`, `content_type=video`), even when it appears calibrated globally.
 
 ```python
 features_to_plot = ['country', 'content_type']
@@ -209,7 +209,7 @@ for feature in features_to_plot:
     fig = plotting.plot_calibration_curve_by_segment(
         data=df,
         group_var=feature,
-        score_col="prediction_mcgrad", # Change this to any model's score column
+        score_col="prediction_mcgrad",  # Change this to any model's score column
         label_col="label",
         n_cols=3,
     ).update_layout(
@@ -228,11 +228,11 @@ for feature in features_to_plot:
 <img src={require('../static/img/mcgrad_content.png').default} alt="local calibration content mcgrad" width="80%" />
 </div>
 
-See the [plotting API](api/plotting.md) for more visualization options.
+See the [plotting API](api/plotting.md) for additional visualization options.
 
 ## Next Steps
 
-- [Methodology](methodology.md) - Understand how MCGrad works formally.
-- [Measuring Multicalibration](measuring-multicalibration.md) - Undertand how the Multicalibration Error works formally.
-- [API Reference](api/methods.md) - Explore all available methods.
-- [Contributing](contributing.md) - Contribute to the project.
+- [Methodology](methodology.md) — Understand how MCGrad works formally.
+- [Measuring Multicalibration](measuring-multicalibration.md) — Understand the Multicalibration Error metric in detail.
+- [API Reference](api/methods.md) — Explore all available methods.
+- [Contributing](contributing.md) — Contribute to the project.

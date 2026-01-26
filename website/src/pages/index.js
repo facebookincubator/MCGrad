@@ -15,22 +15,22 @@ import Layout from '@theme/Layout';
 const features = [
   {
     content:
-      'MCGrad ensures calibration not just globally, but also across virtually any segment defined using your input features.',
+      'Ensures calibration not just globally, but across virtually any segment defined by your input features.',
     title: 'Powerful Multicalibration',
   },
   {
     content:
-      'Borrows information from similar samples like modern ML models, calibrating far more segments than alternatives.',
+      'Leverages information from similar samples, calibrating far more segments than alternative methods.',
     title: 'Data Efficient',
   },
   {
     content:
-      'Implemented using LightGBM, orders of magnitude faster than heavier NN-based models.',
+      'Built on LightGBM for orders-of-magnitude faster training and inference than neural network approaches.',
     title: 'Lightweight & Fast',
   },
   {
     content:
-      'A likelihood-improving procedure that can boost model performance with significant PRAUC improvements.',
+      'A likelihood-improving procedure that can enhance model performance with significant PRAUC improvements.',
     title: 'Improved Performance',
   },
 ];
@@ -44,21 +44,21 @@ const Feature = ({title, content}) => {
   );
 };
 
-const codeExample = `from multicalibration import MCGrad
+const codeExample = `from mcgrad import methods
 import pandas as pd
 import numpy as np
 
 # Prepare your data in a DataFrame
 df = pd.DataFrame({
     'prediction': np.array([...]),  # Base model predictions
-    'label': np.array([...]),       # Ground truth
-    'country': [...],                # Categorical features
-    'content_type': [...],           # defining segments
+    'label': np.array([...]),        # Ground truth labels
+    'country': [...],                 # Categorical features
+    'content_type': [...],            # defining segments
     'surface': [...],
 })
 
 # Train MCGrad
-mcgrad = MCGrad()
+mcgrad = methods.MCGrad()
 mcgrad.fit(
     df_train=df,
     prediction_column_name='prediction',
@@ -66,7 +66,7 @@ mcgrad.fit(
     categorical_feature_column_names=['country', 'content_type', 'surface']
 )
 
-# Get multi-calibrated predictions
+# Get multicalibrated predictions
 calibrated_predictions = mcgrad.predict(
     df=df,
     prediction_column_name='prediction',

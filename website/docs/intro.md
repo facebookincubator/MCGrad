@@ -1,39 +1,39 @@
 ---
 sidebar_position: 1
-description: Learn why multicalibration matters for production ML models, and how to apply MCGrad to achieve it.
+description: Learn why multicalibration matters for production ML models and how MCGrad achieves it.
 ---
 
 # Why Multicalibration?
 
 Machine learning models are increasingly used to make decisions that affect people, content, and business outcomes. For these systems, *calibration*—ensuring that predicted probabilities match real-world outcomes—is essential for trust, fairness, and optimal decision-making.
-However, global calibration alone is *not enough*. Even if a model is well-calibrated on average, it can still systematically overestimate or underestimate for specific groups (segments)—such as users in a particular country, transactions on a certain device, or content of a certain type. These hidden calibration gaps can lead to unfair, unreliable, or suboptimal decisions for those groups.
+
+However, global calibration alone is insufficient. Even a well-calibrated model on average can systematically overestimate or underestimate for specific segments (also known as protected groups)—such as users in a particular country, transactions on a certain device, or content of a certain type. These hidden calibration gaps lead to unfair, unreliable, or suboptimal decisions for affected segments.
 
 ## A Motivating Example
 
-Imagine you have trained a model to predict the likelihood of a user clicking on an ad. You check its reliability plot, and the model is clearly miscalibrated. So, you apply a global calibration method, like Isotonic Regression, and the reliability plot looks almost perfect.
-
+Consider a model trained to predict the likelihood of a user clicking on an ad. The reliability plot shows clear miscalibration, so you apply a global calibration method like Isotonic Regression. The resulting reliability plot looks nearly perfect.
 
 <div style={{textAlign: 'center'}}>
 <img src={require('../static/img/global_calibration.png').default} alt="global calibration" width="90%" />
 </div>
 
-But let's dig deeper. You decide to look at two specific groups: the US and the non US markets. To your surprise, the reliability plots for these groups tell a different story. For the US market, the model underestimates—its predictions are lower than the actual click rates. For non US markets, the model overestimates, consistently predicting higher probabilities than reality.
+Upon closer inspection, a different picture emerges. When examining two specific segments—US and non-US markets—the reliability plots reveal significant problems. For the US market, the model underestimates, predicting lower than the actual click rates. For non-US markets, the model overestimates, consistently predicting higher probabilities than reality.
 
 <div style={{textAlign: 'center'}}>
 <img src={require('../static/img/local_miscalibration.png').default} alt="local miscalibration" width="50%" />
 </div>
 
-This is a common pitfall: global calibration can mask significant miscalibration in groups. These hidden errors can have real consequences and lead to poor business outcomes.
+This is a common pitfall: global calibration can mask significant miscalibration within segments. These hidden errors have real consequences and lead to poor business outcomes.
 
-Now, you apply **MCGrad** instead of Isotonic Regression, and revisit the reliability plots for those same groups. This time, the curves are much closer to the diagonal. The predictions for US and non US markets now accurately reflect the true click rates. MCGrad hasn't just fixed the model globally — it makes sure every meaningful group gets calibrated predictions.
+After applying **MCGrad** instead of Isotonic Regression, the reliability plots for those same segments show curves much closer to the diagonal. Predictions for US and non-US markets now accurately reflect the true click rates. MCGrad does not just fix the model globally—it ensures every meaningful segment receives calibrated predictions.
 
 <div style={{textAlign: 'center'}}>
 <img src={require('../static/img/mcgrad.png').default} alt="mcgrad fixes local miscalibration" width="50%" />
 </div>
 
-## How MCGrad Works
+## MCGrad in Action
 
-MCGrad automatically discovers and corrects miscalibrated regions defined by these features, including intersections like `market=US AND device_type=mobile`, no need to manually specify which groups to protect. Just provide your features, and MCGrad finds and fixes calibration issues across all relevant groups.
+MCGrad automatically discovers and corrects miscalibrated regions defined by your features, including intersections like `market=US AND device_type=mobile`. There is no need to manually specify which segments to calibrate—simply provide your features, and MCGrad identifies and fixes calibration issues across all relevant segments.
 
 ```python
 from mcgrad import methods
@@ -42,7 +42,7 @@ from mcgrad import methods
 #   - 'prediction': the uncalibrated model predictions (floats in [0, 1])
 #   - 'label': the true binary labels (0 or 1)
 #   - categorical features such as 'market', 'device_type', or 'content_type'
-#   - Optionally, numerical features like 'age', etc.
+#   - optionally, numerical features such as 'age'
 
 mcgrad = methods.MCGrad()
 mcgrad.fit(
@@ -50,24 +50,24 @@ mcgrad.fit(
     prediction_column_name='prediction',
     label_column_name='label',
     categorical_feature_column_names=['market', 'device_type', 'content_type'],
-    numerical_feature_column_names=['age']  # MCGrad also supports continuous features
+    numerical_feature_column_names=['age'],  # MCGrad also supports continuous features
 )
 
-mc_probs = mcgrad.predict(
+calibrated_predictions = mcgrad.predict(
     df,
     prediction_column_name='prediction',
     categorical_feature_column_names=['market', 'device_type', 'content_type'],
-    numerical_feature_column_names=['age']
+    numerical_feature_column_names=['age'],
 )
 ```
 
-The result: predictions calibrated globally AND for virtually any group defined by your features.
+The result: predictions calibrated globally AND for virtually any segment defined by your features.
 
 ## Get Started
 
 - [Why MCGrad?](why-mcgrad.md) — Learn about the challenges MCGrad solves and see results.
 - [Installation](installation.md) — Step-by-step instructions for installing MCGrad.
-- [Quick Start](quickstart.md) — Example workflows.
+- [Quick Start](quickstart.md) — Complete example workflows with evaluation and visualization.
 
 ## Citation
 
