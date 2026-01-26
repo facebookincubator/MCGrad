@@ -1155,45 +1155,6 @@ def kuiper_calibration_per_segment(
         )
 
 
-def kuiper_calibration(
-    labels: npt.NDArray,
-    predicted_scores: npt.NDArray,
-    sample_weight: npt.NDArray | None = None,
-    normalization_method: str | None = None,
-    segments: npt.NDArray | None = None,
-    precision_dtype: type[np.float16]
-    | type[np.float32]
-    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
-) -> float:
-    """
-    Calculates Kuiper calibration distance between responses and scores.
-
-    For details, see:
-    Mark Tygert. (2024, January 10). Conditioning on and controlling for
-    variates via cumulative differences: measuring calibration, reliability,
-    biases, and other treatment effects. Zenodo.
-    https://doi.org/10.5281/zenodo.10481097
-
-    :param labels: Array of binary labels (0 or 1)
-    :param predicted_scores: Array of predicted probability scores (floats between 0 and 1)
-    :param sample_weight: Optional array of sample weights (non-negative floats)
-    :param normalization_method: Optional method name for calculating a normalization constant.
-        See kuiper_standard_deviation_per_segment or kuiper_upper_bound_standard_deviation_per_segment.
-    :param segments: Optional array of segments to parallelize the computation of the kuiper calibration distance.
-    :param precision_dtype: Data type for precision of computation. Defaults to np.float64.
-    :return: Kuiper calibration distance
-    """
-
-    return kuiper_calibration_per_segment(
-        labels,
-        predicted_scores,
-        sample_weight,
-        normalization_method,
-        segments,
-        precision_dtype,
-    ).item()
-
-
 def kuiper_distribution(x: float) -> float:
     """
     Evaluates the cumulative distribution function for the range
@@ -1262,12 +1223,7 @@ def kuiper_test(
     :return: A tuple containing the Kuiper statistic and the corresponding p-value.
     """
 
-    kuiper_stat = kuiper_calibration(
-        labels,
-        predicted_scores,
-        sample_weight,
-        normalization_method="kuiper_standard_deviation",
-    )
+    kuiper_stat = ecce_sigma(labels, predicted_scores, sample_weight)
     if kuiper_stat < KUIPER_STATISTIC_MIN:
         pval = 1.0
     elif kuiper_stat > KUIPER_STATISTIC_MAX:
@@ -1339,9 +1295,9 @@ def ecce(
     :param sample_weight: Optional array of sample weights.
     :return: The ECCE value.
     """
-    return kuiper_calibration(
+    return kuiper_calibration_per_segment(
         labels, predicted_scores, sample_weight, normalization_method=None
-    )
+    ).item()
 
 
 def ecce_sigma(
@@ -1360,12 +1316,12 @@ def ecce_sigma(
     :param sample_weight: Optional array of sample weights.
     :return: The normalized ECCE value.
     """
-    return kuiper_calibration(
+    return kuiper_calibration_per_segment(
         labels,
         predicted_scores,
         sample_weight,
         normalization_method="kuiper_standard_deviation",
-    )
+    ).item()
 
 
 def ecce_pvalue(
