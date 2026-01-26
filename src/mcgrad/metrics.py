@@ -36,7 +36,6 @@ from typing import Any, Protocol
 import numpy as np
 import pandas as pd
 from numpy import typing as npt
-from scipy import stats
 from sklearn import metrics as skmetrics
 
 from . import _utils as utils
@@ -1009,26 +1008,6 @@ def ecce_pvalue_from_sigma(ecce_sigma: float) -> float:
     if ecce_sigma > ECCE_SIGMA_MAX:
         return sys.float_info.epsilon
     return 1 - _ecce_cdf(ecce_sigma)
-
-
-def kuiper_test(
-    labels: npt.NDArray,
-    predicted_scores: npt.NDArray,
-    sample_weight: npt.NDArray | None = None,
-) -> tuple[float, float]:
-    """
-    Calculates the Kuiper test statistic and p-value for the Kuiper calibration
-    distance. This test is used to assess how well the predicted probabilities
-    of a binary classifier are calibrated.
-
-    :param labels: Array of true binary labels (0 or 1).
-    :param predicted_scores: Array of predicted probabilities, corresponding to the likelihood of the label being 1.
-    :param sample_weight: Optional array of weights for the samples, must be the same length as labels and predicted_scores.
-    :return: A tuple containing the Kuiper statistic and the corresponding p-value.
-    """
-    kuiper_stat = ecce_sigma(labels, predicted_scores, sample_weight)
-    pval = ecce_pvalue_from_sigma(kuiper_stat)
-    return kuiper_stat, pval
 
 
 def ecce(
