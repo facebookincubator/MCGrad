@@ -1735,6 +1735,12 @@ def test_kuiper_per_segment_does_not_modify_segments_df(rng, metric_func):
         ),
         (metrics.normalized_entropy, {}, True),
         (metrics.normalized_entropy, {}, False),
+        (metrics.ecce, {}, True),
+        (metrics.ecce, {}, False),
+        (metrics.ecce_sigma, {}, True),
+        (metrics.ecce_sigma, {}, False),
+        (metrics.ecce_pvalue, {}, True),
+        (metrics.ecce_pvalue, {}, False),
     ],
 )
 def test_metric_does_not_modify_input_arrays(
@@ -2611,3 +2617,44 @@ def test_ndcg_score_returns_nan_on_empty_arrays():
     predicted_labels = np.array([])
     result = metrics.ndcg_score(labels, predicted_labels)
     assert np.isnan(result), f"Expected NaN for empty arrays, got {result}"
+
+
+# ECCE wrapper function tests
+def test_ecce_consistency_with_kuiper_calibration(rng):
+    labels = rng.randint(0, 2, 100)
+    predicted_scores = rng.rand(100)
+    ecce_result = metrics.ecce(labels, predicted_scores)
+    kuiper_result = metrics.kuiper_calibration(
+        labels, predicted_scores, normalization_method=None
+    )
+    assert ecce_result == pytest.approx(kuiper_result, rel=1e-10)
+
+
+def test_ecce_sigma_consistency_with_kuiper_calibration(rng):
+    labels = rng.randint(0, 2, 100)
+    predicted_scores = rng.rand(100)
+    ecce_sigma_result = metrics.ecce_sigma(labels, predicted_scores)
+    kuiper_result = metrics.kuiper_calibration(
+        labels, predicted_scores, normalization_method="kuiper_standard_deviation"
+    )
+    assert ecce_sigma_result == pytest.approx(kuiper_result, rel=1e-10)
+
+
+def test_ecce_pvalue_consistency_with_kuiper_pvalue(rng):
+    labels = rng.randint(0, 2, 100)
+    predicted_scores = rng.rand(100)
+    ecce_pvalue_result = metrics.ecce_pvalue(labels, predicted_scores)
+    _, kuiper_pvalue_result = metrics.kuiper_test(labels, predicted_scores)
+    assert ecce_pvalue_result == pytest.approx(kuiper_pvalue_result, rel=1e-10)
+
+
+def test_ecce_with_sample_weight(rng):
+    labels = rng.randint(0, 2, 100)
+    predicted_scores = rng.rand(100)
+    sample_weight = rng.rand(100) + 0.5
+
+    ecce_result = metrics.ecce(labels, predicted_scores, sample_weight)
+    kuiper_result = metrics.kuiper_calibration(
+        labels, predicted_scores, sample_weight, normalization_method=None
+    )
+    assert ecce_result == pytest.approx(kuiper_result, rel=1e-10)
