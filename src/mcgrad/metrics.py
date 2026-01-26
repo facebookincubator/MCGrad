@@ -1318,6 +1318,76 @@ def kuiper_pvalue(
     )[1]
 
 
+def ecce(
+    labels: npt.NDArray,
+    predicted_scores: npt.NDArray,
+    sample_weight: npt.NDArray | None = None,
+) -> float:
+    """
+    Calculate the Expected Cumulative Calibration Error (ECCE) [1].
+
+    ECCE measures the maximum deviation between the cumulative distribution of
+    predicted probabilities for positive and negative examples. It is equivalent
+    to the unnormalized Kuiper calibration statistic.
+
+    [1]: Arrieta-Ibarra, I., Gujral, P., Tannen, J., Tygert, M., & Xu, C. (2022).
+    Metrics of calibration for probabilistic predictions. Journal of Machine
+    Learning Research, 23(351), 1-54. (https://tygert.com/ece.pdf)
+
+    :param labels: Array of true binary labels (0 or 1).
+    :param predicted_scores: Array of predicted probabilities.
+    :param sample_weight: Optional array of sample weights.
+    :return: The ECCE value.
+    """
+    return kuiper_calibration(
+        labels, predicted_scores, sample_weight, normalization_method=None
+    )
+
+
+def ecce_sigma(
+    labels: npt.NDArray,
+    predicted_scores: npt.NDArray,
+    sample_weight: npt.NDArray | None = None,
+) -> float:
+    """
+    Calculate the ECCE normalized by standard deviation.
+
+    This returns the ECCE statistic normalized by the standard deviation of the
+    calibration error under the null hypothesis of perfect calibration.
+
+    :param labels: Array of true binary labels (0 or 1).
+    :param predicted_scores: Array of predicted probabilities.
+    :param sample_weight: Optional array of sample weights.
+    :return: The normalized ECCE value.
+    """
+    return kuiper_calibration(
+        labels,
+        predicted_scores,
+        sample_weight,
+        normalization_method="kuiper_standard_deviation",
+    )
+
+
+def ecce_pvalue(
+    labels: npt.NDArray,
+    predicted_scores: npt.NDArray,
+    sample_weight: npt.NDArray | None = None,
+) -> float:
+    """
+    Calculate the p-value for the ECCE statistic.
+
+    Tests the null hypothesis that predictions are perfectly calibrated using
+    the Kuiper test.
+
+    :param labels: Array of true binary labels (0 or 1).
+    :param predicted_scores: Array of predicted probabilities.
+    :param sample_weight: Optional array of sample weights.
+    :return: The p-value from the calibration test.
+    """
+    _, pvalue = kuiper_test(labels, predicted_scores, sample_weight)
+    return pvalue
+
+
 def kuiper_func_per_segment(
     labels: npt.NDArray,
     predictions: npt.NDArray,
