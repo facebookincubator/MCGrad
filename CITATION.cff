@@ -11,7 +11,6 @@ authors:
 url: https://github.com/facebookincubator/MCGrad
 repository-code: https://github.com/facebookincubator/MCGrad
 license: MIT
-version: 0.1.0
 preferred-citation:
   type: conference-paper
   title: "MCGrad: Multicalibration at Web Scale"
