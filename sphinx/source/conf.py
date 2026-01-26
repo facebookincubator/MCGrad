@@ -20,7 +20,14 @@ sys.path.insert(0, os.path.abspath("../../src"))
 project = "mcgrad"
 copyright = "2026, Contributors"
 author = "Contributors"
-release = "0.1.0"
+
+# Get version from package metadata (set by setuptools-scm)
+from importlib.metadata import PackageNotFoundError, version as get_version
+
+try:
+    release = get_version("MCGrad")
+except PackageNotFoundError:
+    release = "0.0.0"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
