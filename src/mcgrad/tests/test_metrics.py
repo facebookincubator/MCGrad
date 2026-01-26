@@ -1599,7 +1599,7 @@ def test_ecce_and_standard_deviation_return_zero_for_empty_segment(rng):
         dtype=bool,
     )
 
-    c_jk = metrics.kuiper_calibration_per_segment(
+    c_jk = metrics._ecce_per_segment(
         labels=df["label"].values,
         predicted_scores=df["prediction"].values,
         sample_weight=df["weights"].values,
