@@ -1101,58 +1101,34 @@ def identity_per_segment(
     return np.ones(segments.shape[0])
 
 
-def kuiper_calibration_per_segment(
+def _ecce_per_segment(
     labels: npt.NDArray,
     predicted_scores: npt.NDArray,
     sample_weight: npt.NDArray | None = None,
-    normalization_method: str | None = None,
     segments: npt.NDArray | None = None,
     precision_dtype: type[np.float16]
     | type[np.float32]
     | type[np.float64] = DEFAULT_PRECISION_DTYPE,
 ) -> npt.NDArray:
     """
-    Calculates Kuiper calibration distance between responses and scores.
+    Compute ECCE (unnormalized) for multiple segments efficiently.
 
-    For details, see:
-    Mark Tygert. (2024, January 10). Conditioning on and controlling for
-    variates via cumulative differences: measuring calibration, reliability,
-    biases, and other treatment effects. Zenodo.
-    https://doi.org/10.5281/zenodo.10481097
+    This is an optimized internal helper for MulticalibrationError that computes
+    ECCE across multiple segments in a vectorized manner.
 
     :param labels: Array of binary labels (0 or 1)
-    :param predicted_scores: Array of predicted probability scores. (floats between 0 and 1)
-    :param sample_weight: Optional array of sample weights (non-negative floats)
-    :param normalization_method: Optional function to calculate a normalization constant.
-            See for example kuiper_sd or inverse_sqrt_sample_size, methods need to follow the same interface.
-    :param segments: Optional array of segments to parallelize the computation of the kuiper calibration distance.
-    :param precision_dtype: Optional dtype for the precision of the output. Defaults to np.float64.
-    :return: Kuiper calibration distance
+    :param predicted_scores: Array of predicted probability scores
+    :param sample_weight: Optional array of sample weights
+    :param segments: Array of segment masks for parallel computation
+    :param precision_dtype: Data type for precision of the output
+    :return: Array of ECCE values per segment
     """
-
-    normalization_func = _normalization_method_assignment(normalization_method)
-
-    denominator = normalization_func(
-        predicted_scores=predicted_scores,
-        labels=labels,
-        sample_weight=sample_weight,
-        segments=segments,
-        precision_dtype=precision_dtype,
-    )
-
     differences = _calculate_cumulative_differences(
         labels, predicted_scores, sample_weight, segments, precision_dtype
     )
     if segments is None:
         differences = differences.reshape(1, -1)
-
-    c_range = np.ptp(differences, axis=1)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        return np.where(
-            (denominator == 0) & (c_range != 0),
-            np.inf,
-            np.where(denominator == 0, 0, c_range / denominator),
-        )
+    return np.ptp(differences, axis=1)
 
 
 def _ecce_cdf(x: float) -> float:
@@ -1302,9 +1278,10 @@ def ecce(
     :param sample_weight: Optional array of sample weights.
     :return: The ECCE value.
     """
-    return kuiper_calibration_per_segment(
-        labels, predicted_scores, sample_weight, normalization_method=None
-    ).item()
+    differences = _calculate_cumulative_differences(
+        labels, predicted_scores, sample_weight
+    )
+    return np.ptp(differences)
 
 
 def ecce_sigma(
@@ -1323,12 +1300,12 @@ def ecce_sigma(
     :param sample_weight: Optional array of sample weights.
     :return: The normalized ECCE value.
     """
-    return kuiper_calibration_per_segment(
-        labels,
-        predicted_scores,
-        sample_weight,
-        normalization_method="kuiper_standard_deviation",
-    ).item()
+    ecce_value = ecce(labels, predicted_scores, sample_weight)
+    sigma = kuiper_standard_deviation(predicted_scores, labels, sample_weight)
+
+    if sigma == 0:
+        return np.inf if ecce_value != 0 else 0.0
+    return ecce_value / sigma
 
 
 def ecce_pvalue(
@@ -1981,7 +1958,7 @@ class MulticalibrationError:
                     self.chunk_size * (i + 1),
                     self.total_number_segments,
                 )
-            ] = kuiper_calibration_per_segment(
+            ] = _ecce_per_segment(
                 labels=self.df[self.label_column].values,
                 predicted_scores=self.df[self.score_column].values,
                 sample_weight=(
@@ -1989,8 +1966,8 @@ class MulticalibrationError:
                     if self.weight_column is None
                     else self.df[self.weight_column].values
                 ),
-                normalization_method=None,
                 segments=segment[: self.total_number_segments - self.chunk_size * i,],
+                precision_dtype=self.precision_dtype,
             )
         return statistics
 
