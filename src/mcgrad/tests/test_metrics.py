@@ -1648,26 +1648,6 @@ def test_rank_multicalibration_error_does_not_modify_segments_df(rng):
 
 
 @pytest.mark.parametrize(
-    "metric_func",
-    [
-        metrics.kuiper_pvalue_per_segment,
-        metrics.kuiper_statistic_per_segment,
-    ],
-)
-def test_kuiper_per_segment_does_not_modify_segments_df(rng, metric_func):
-    n_samples = 100
-    labels = rng.randint(0, 2, n_samples)
-    predictions = rng.random_sample(n_samples)
-    segments_df = pd.DataFrame({"segment": rng.choice(["A", "B"], size=n_samples)})
-
-    segments_df_original = segments_df.copy()
-
-    _ = metric_func(labels=labels, predictions=predictions, segments_df=segments_df)
-
-    pd.testing.assert_frame_equal(segments_df, segments_df_original)
-
-
-@pytest.mark.parametrize(
     "metric_func,metric_kwargs,use_sample_weight",
     [
         (metrics.expected_calibration_error, {}, True),
@@ -2015,19 +1995,7 @@ def test_kuiper_test_returns_epsilon_pvalue_for_very_large_statistic():
     assert statistic > 5  # Should be a large statistic
 
 
-def test_kuiper_statistic_wrapper_returns_statistic_only():
-    labels = np.array([0, 1, 1, 0, 1])
-    predicted_scores = np.array([0.1, 0.9, 0.8, 0.2, 0.7])
-
-    statistic = metrics.kuiper_statistic(
-        labels=labels, predicted_scores=predicted_scores
-    )
-
-    assert isinstance(statistic, (float, np.floating))
-    assert statistic >= 0
-
-
-def test_ecce_pvalue_wrapper_returns_pvalue_only():
+def test_ecce_pvalue_returns_pvalue_only():
     labels = np.array([0, 1, 1, 0, 1])
     predicted_scores = np.array([0.1, 0.9, 0.8, 0.2, 0.7])
 
@@ -2035,102 +2003,6 @@ def test_ecce_pvalue_wrapper_returns_pvalue_only():
 
     assert isinstance(pvalue, (float, np.floating))
     assert 0 <= pvalue <= 1
-
-
-def test_kuiper_pvalue_per_segment_calculates_pvalues_for_each_segment():
-    labels = np.array([0, 1, 0, 1, 0, 1, 0, 1])
-    predictions = np.array([0.1, 0.9, 0.2, 0.8, 0.1, 0.9, 0.2, 0.8])
-    segments_df = pd.DataFrame({"segment": ["A", "A", "A", "A", "B", "B", "B", "B"]})
-
-    result = metrics.kuiper_pvalue_per_segment(
-        labels=labels, predictions=predictions, segments_df=segments_df
-    )
-
-    assert isinstance(result, pd.Series)
-    assert len(result) == 2
-    assert all(0 <= pval <= 1 for pval in result.values)
-
-
-def test_kuiper_statistic_per_segment_calculates_statistics_for_each_segment():
-    labels = np.array([0, 1, 0, 1, 0, 1, 0, 1])
-    predictions = np.array([0.1, 0.9, 0.2, 0.8, 0.1, 0.9, 0.2, 0.8])
-    segments_df = pd.DataFrame({"segment": ["A", "A", "A", "A", "B", "B", "B", "B"]})
-
-    result = metrics.kuiper_statistic_per_segment(
-        labels=labels, predictions=predictions, segments_df=segments_df
-    )
-
-    assert isinstance(result, pd.Series)
-    assert len(result) == 2
-    assert all(stat >= 0 for stat in result.values)
-
-
-def test_multi_segment_pvalue_geometric_mean_calculates_geometric_mean():
-    labels = np.array([0, 1, 0, 1, 0, 1, 0, 1])
-    predictions = np.array([0.1, 0.9, 0.2, 0.8, 0.1, 0.9, 0.2, 0.8])
-    segments_df = pd.DataFrame({"segment": ["A", "A", "A", "A", "B", "B", "B", "B"]})
-
-    result = metrics.multi_segment_pvalue_geometric_mean(
-        labels=labels, predictions=predictions, segments_df=segments_df
-    )
-
-    assert isinstance(result, (float, np.floating))
-    assert 0 <= result <= 1
-
-
-def test_multi_segment_inverse_sqrt_normalized_statistic_max_returns_max():
-    labels = np.array([0, 1, 0, 1, 0, 1, 0, 1])
-    predictions = np.array([0.1, 0.9, 0.2, 0.8, 0.1, 0.9, 0.2, 0.8])
-    segments_df = pd.DataFrame({"segment": ["A", "A", "A", "A", "B", "B", "B", "B"]})
-
-    result = metrics.multi_segment_inverse_sqrt_normalized_statistic_max(
-        labels=labels, predictions=predictions, segments_df=segments_df
-    )
-
-    assert isinstance(result, (float, np.floating))
-    assert result >= 0
-
-
-def test_multi_segment_kuiper_test_with_poisson_combination():
-    labels = np.array([0, 1, 0, 1, 0, 1, 0, 1])
-    predictions = np.array([0.1, 0.9, 0.2, 0.8, 0.1, 0.9, 0.2, 0.8])
-    segments_df = pd.DataFrame({"segment": ["A", "A", "A", "A", "B", "B", "B", "B"]})
-
-    result = metrics.multi_segment_kuiper_test(
-        labels=labels,
-        predictions=predictions,
-        segments_df=segments_df,
-        combination_method="poisson",
-    )
-
-    assert isinstance(result, dict)
-    assert "n_segments" in result
-    assert "statistic" in result
-    assert "p_value" in result
-    assert "segment_p_values" in result
-
-    assert result["n_segments"] == 2
-    assert 0 <= result["p_value"] <= 1
-
-
-def test_multi_segment_kuiper_test_with_fisher_combination():
-    labels = np.array([0, 1, 0, 1, 0, 1, 0, 1])
-    predictions = np.array([0.1, 0.9, 0.2, 0.8, 0.1, 0.9, 0.2, 0.8])
-    segments_df = pd.DataFrame({"segment": ["A", "A", "A", "A", "B", "B", "B", "B"]})
-
-    result = metrics.multi_segment_kuiper_test(
-        labels=labels,
-        predictions=predictions,
-        segments_df=segments_df,
-        combination_method="fisher",
-    )
-
-    assert isinstance(result, dict)
-    assert "n_segments" in result
-    assert "statistic" in result
-    assert "p_value" in result
-    assert result["n_segments"] == 2
-    assert 0 <= result["p_value"] <= 1
 
 
 def test_rank_multicalibration_error_calculates_weighted_average():
