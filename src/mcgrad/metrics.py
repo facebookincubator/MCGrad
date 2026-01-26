@@ -862,17 +862,6 @@ def _calculate_cumulative_differences(
     return differences
 
 
-class _KuiperNormalizationInterface(Protocol):
-    def __call__(
-        self,
-        predicted_scores: npt.NDArray,
-        labels: npt.NDArray | None,
-        sample_weight: npt.NDArray | None,
-        segments: npt.NDArray | None,
-        precision_dtype: type[np.float16] | type[np.float32] | type[np.float64],
-    ) -> npt.NDArray: ...
-
-
 def _ecce_standard_deviation(
     predicted_scores: npt.NDArray,
     labels: npt.NDArray | None = None,
@@ -887,58 +876,6 @@ def _ecce_standard_deviation(
     :return: The ECCE standard deviation as a scalar.
     """
     return _ecce_standard_deviation_per_segment(
-        predicted_scores, labels, sample_weight
-    ).item()
-
-
-def kuiper_upper_bound_standard_deviation_per_segment(
-    predicted_scores: npt.NDArray,
-    labels: npt.NDArray | None = None,
-    sample_weight: npt.NDArray | None = None,
-    segments: npt.NDArray | None = None,
-    precision_dtype: type[np.float16]
-    | type[np.float32]
-    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
-) -> npt.NDArray:
-    """
-    Calculate an upper bound on Kuiper standard deviation per segment.
-
-    Uses a conservative estimate: 1 / (2 * sqrt(n)) for each segment.
-
-    :param predicted_scores: Array of predicted probability scores.
-    :param labels: Optional array of labels (unused in this method).
-    :param sample_weight: Optional array of sample weights.
-    :param segments: Optional array of segment masks.
-    :param precision_dtype: Data type for precision of computation.
-    :return: Array of upper bound standard deviations per segment.
-    """
-    if sample_weight is None:
-        sample_weight = np.ones_like(predicted_scores)
-    if segments is None:
-        segments = np.ones(shape=(1, len(predicted_scores)), dtype=np.bool_)
-    with np.errstate(divide="ignore"):
-        kuiper_ub = np.divide(1, (2 * np.sqrt((segments * sample_weight).sum(axis=1))))
-    kuiper_ub[np.isinf(kuiper_ub)] = 0
-    return kuiper_ub
-
-
-def kuiper_upper_bound_standard_deviation(
-    predicted_scores: npt.NDArray,
-    labels: npt.NDArray | None = None,
-    sample_weight: npt.NDArray | None = None,
-) -> float:
-    """
-    Calculate an upper bound on Kuiper standard deviation for the entire dataset.
-
-    :param predicted_scores: Array of predicted probability scores.
-    :param labels: Optional array of labels (unused in this method).
-    :param sample_weight: Optional array of sample weights.
-    :return: The upper bound standard deviation as a scalar.
-    """
-    if sample_weight is None:
-        sample_weight = np.ones_like(predicted_scores)
-
-    return kuiper_upper_bound_standard_deviation_per_segment(
         predicted_scores, labels, sample_weight
     ).item()
 
@@ -992,113 +929,6 @@ def _ecce_standard_deviation_per_segment(
         )
     kuip_std_dev[np.isnan(kuip_std_dev)] = 0
     return kuip_std_dev
-
-
-def kuiper_label_based_standard_deviation_per_segment(
-    predicted_scores: npt.NDArray,
-    labels: npt.NDArray | None,
-    sample_weight: npt.NDArray | None = None,
-    segments: npt.NDArray | None = None,
-    precision_dtype: type[np.float16]
-    | type[np.float32]
-    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
-) -> npt.NDArray:
-    """
-    Calculate label-based Kuiper standard deviation per segment.
-
-    Uses differences between labels and predictions to estimate variance.
-
-    :param predicted_scores: Array of predicted probability scores.
-    :param labels: Array of binary labels (required for this method).
-    :param sample_weight: Optional array of sample weights.
-    :param segments: Optional array of segment masks.
-    :param precision_dtype: Data type for precision of computation.
-    """
-    if sample_weight is None:
-        sample_weight = np.ones_like(predicted_scores)
-    if segments is None:
-        segments = np.ones(shape=(1, len(predicted_scores)), dtype=np.bool_)
-
-    if labels is not None:
-        return np.array(
-            [
-                kuiper_label_based_standard_deviation(
-                    predicted_scores[np.where(segment)[0]],
-                    labels[np.where(segment)[0]],
-                    sample_weight[np.where(segment)[0]],
-                )
-                for segment in segments
-            ]
-        )
-    raise ValueError("Labels are required for this method")
-
-
-def kuiper_label_based_standard_deviation(
-    predicted_scores: npt.NDArray,
-    labels: npt.NDArray | None,
-    sample_weight: npt.NDArray | None = None,
-) -> float:
-    """
-    Calculate label-based Kuiper standard deviation for the entire dataset.
-
-    :param predicted_scores: Array of predicted probability scores.
-    :param labels: Array of binary labels (required for this method).
-    :param sample_weight: Optional array of sample weights.
-    :return: The label-based standard deviation as a scalar.
-    """
-    if sample_weight is None:
-        sample_weight = np.ones_like(predicted_scores)
-
-    if labels is not None:
-        return np.sqrt(
-            np.sum(
-                (
-                    labels[:-1]
-                    - predicted_scores[:-1]
-                    - labels[1:]
-                    + predicted_scores[1:]
-                )
-                ** 2
-                * (sample_weight[:-1] + sample_weight[1:]) ** 2
-            )
-            / (
-                8
-                * sample_weight.sum()
-                * (
-                    0.5 * sample_weight[0]
-                    + 0.5 * sample_weight[-1]
-                    + np.sum(sample_weight[1:-1])
-                )
-            )
-        )
-
-    raise ValueError("Labels are required for this method")
-
-
-def identity_per_segment(
-    predicted_scores: npt.NDArray,
-    labels: npt.NDArray | None = None,
-    sample_weight: npt.NDArray | None = None,
-    segments: npt.NDArray | None = None,
-    precision_dtype: type[np.float16]
-    | type[np.float32]
-    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
-) -> npt.NDArray:
-    """
-    Return an array of ones (identity normalization).
-
-    Used when no normalization is desired for Kuiper calibration.
-
-    :param predicted_scores: Array of predicted probability scores (unused).
-    :param labels: Optional array of labels (unused).
-    :param sample_weight: Optional array of sample weights (unused).
-    :param segments: Optional array of segment masks.
-    :param precision_dtype: Data type for precision of computation (unused).
-    :return: Array of ones with length equal to number of segments.
-    """
-    if segments is None:
-        return np.ones(1)
-    return np.ones(segments.shape[0])
 
 
 def _ecce_per_segment(
@@ -1179,22 +1009,6 @@ def ecce_pvalue_from_sigma(ecce_sigma: float) -> float:
     if ecce_sigma > ECCE_SIGMA_MAX:
         return sys.float_info.epsilon
     return 1 - _ecce_cdf(ecce_sigma)
-
-
-def _normalization_method_assignment(
-    method: str | None,
-) -> _KuiperNormalizationInterface:
-    methods = {
-        "kuiper_standard_deviation": _ecce_standard_deviation_per_segment,
-        "kuiper_upper_bound_standard_deviation": kuiper_upper_bound_standard_deviation_per_segment,
-        "kuiper_label_based_standard_deviation": kuiper_label_based_standard_deviation_per_segment,
-        None: identity_per_segment,
-    }
-    if method not in methods:
-        raise ValueError(
-            f"Unknown normalization method {method}. Available methods are {list(methods)}"
-        )
-    return methods[method]
 
 
 def kuiper_test(
@@ -1792,7 +1606,6 @@ def calibration_free_normalized_entropy(
     return calib_free_ne
 
 
-DEFAULT_MULTI_KUIPER_NORMALIZATION_METHOD: str = "kuiper_standard_deviation"
 DEFAULT_MULTI_KUIPER_MAX_VALUES_PER_SEGMENT_FEATURE: int = 3
 DEFAULT_MULTI_KUIPER_MIN_DEPTH: int = 0
 DEFAULT_MULTI_KUIPER_MAX_DEPTH: int = 3
@@ -1813,7 +1626,6 @@ class MulticalibrationError:
         max_depth: int | None = DEFAULT_MULTI_KUIPER_MAX_DEPTH,
         max_values_per_segment_feature: int = DEFAULT_MULTI_KUIPER_MAX_VALUES_PER_SEGMENT_FEATURE,
         min_samples_per_segment: int = DEFAULT_MULTI_KUIPER_MIN_SAMPLES_PER_SEGMENT,
-        sigma_estimation_method: str | None = DEFAULT_MULTI_KUIPER_NORMALIZATION_METHOD,
         max_n_segments: int | None = DEFAULT_MULTI_KUIPER_N_SEGMENTS,
         chunk_size: int = 50,
         precision_dtype: str = "float32",
@@ -1830,7 +1642,6 @@ class MulticalibrationError:
         :param max_depth: The maximum depth for segment generation.
         :param max_values_per_segment_feature: The maximum number of unique values per segment feature.
         :param min_samples_per_segment: The minimum number of samples required per segment.
-        :param sigma_estimation_method: The method used for sigma estimation.
         :param max_n_segments: The maximum number of segments to generate.
         :param chunk_size: Size of chunks of segments to process per iteration of the algorithm. Larger values improve runtime but increase memory usage (OOM errors are possible).
         :param precision_dtype: The precision type for the metric. Can be 'float16', 'float32', or 'float64'.
@@ -1843,9 +1654,6 @@ class MulticalibrationError:
         self.max_depth = max_depth
         self.max_values_per_segment_feature = max_values_per_segment_feature
         self.min_samples_per_segment = min_samples_per_segment
-        self.estimate_sigma: _KuiperNormalizationInterface = (
-            _normalization_method_assignment(sigma_estimation_method)
-        )
         self.df: pd.DataFrame = df.copy(deep=False)
         self.df.sort_values(by=score_column, inplace=True)
         self.df.reset_index(inplace=True)
@@ -2019,7 +1827,7 @@ class MulticalibrationError:
                     self.chunk_size * (i + 1),
                     self.total_number_segments,
                 )
-            ] = self.estimate_sigma(
+            ] = _ecce_standard_deviation_per_segment(
                 predicted_scores=self.df[self.score_column].values,
                 labels=self.df[self.label_column].values,
                 sample_weight=(
@@ -2036,7 +1844,7 @@ class MulticalibrationError:
     def sigma_0(self) -> float:
         if "segment_sigmas" in self.__dict__:
             return self.segment_sigmas[0]
-        sigma_0 = self.estimate_sigma(
+        sigma_0 = _ecce_standard_deviation_per_segment(
             predicted_scores=self.df[self.score_column].values,
             labels=self.df[self.label_column].values,
             sample_weight=(
@@ -2130,7 +1938,6 @@ def wrap_multicalibration_error_metric(
     max_depth: int = DEFAULT_MULTI_KUIPER_MAX_DEPTH,
     max_values_per_segment_feature: int = DEFAULT_MULTI_KUIPER_MAX_VALUES_PER_SEGMENT_FEATURE,
     min_samples_per_segment: int = DEFAULT_MULTI_KUIPER_MIN_SAMPLES_PER_SEGMENT,
-    sigma_estimation_method: str = DEFAULT_MULTI_KUIPER_NORMALIZATION_METHOD,
     max_n_segments: int | None = DEFAULT_MULTI_KUIPER_N_SEGMENTS,
     metric_version: str = "mce",
 ) -> _ScoreFunctionInterface:
@@ -2142,7 +1949,6 @@ def wrap_multicalibration_error_metric(
     :param max_depth: Maximum depth for segment generation.
     :param max_values_per_segment_feature: Max unique values per segment feature.
     :param min_samples_per_segment: Minimum samples required per segment.
-    :param sigma_estimation_method: Method for sigma estimation.
     :param max_n_segments: Maximum number of segments to generate.
     :param metric_version: Which metric to return ('mce', 'mce_sigma_scale', 'mce_absolute', 'p_value').
     :return: A ScoreFunctionInterface-compatible wrapper.
@@ -2169,7 +1975,6 @@ def wrap_multicalibration_error_metric(
             max_depth: int = DEFAULT_MULTI_KUIPER_MAX_DEPTH,
             max_values_per_segment_feature: int = DEFAULT_MULTI_KUIPER_MAX_VALUES_PER_SEGMENT_FEATURE,
             min_samples_per_segment: int = DEFAULT_MULTI_KUIPER_MIN_SAMPLES_PER_SEGMENT,
-            sigma_estimation_method: str = DEFAULT_MULTI_KUIPER_NORMALIZATION_METHOD,
             max_n_segments: int | None = DEFAULT_MULTI_KUIPER_N_SEGMENTS,
         ):
             self.categorical_segment_columns = categorical_segment_columns
@@ -2177,7 +1982,6 @@ def wrap_multicalibration_error_metric(
             self.max_depth = max_depth
             self.max_values_per_segment_feature = max_values_per_segment_feature
             self.min_samples_per_segment = min_samples_per_segment
-            self.sigma_estimation_method = sigma_estimation_method
             self.max_n_segments = max_n_segments
 
         def __call__(
@@ -2197,7 +2001,6 @@ def wrap_multicalibration_error_metric(
                 max_depth=self.max_depth,
                 max_values_per_segment_feature=self.max_values_per_segment_feature,
                 min_samples_per_segment=self.min_samples_per_segment,
-                sigma_estimation_method=self.sigma_estimation_method,
                 max_n_segments=self.max_n_segments,
             )
             return getattr(mce, metric_version)
@@ -2208,6 +2011,5 @@ def wrap_multicalibration_error_metric(
         max_depth,
         max_values_per_segment_feature,
         min_samples_per_segment,
-        sigma_estimation_method,
         max_n_segments,
     )
