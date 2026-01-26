@@ -1515,7 +1515,6 @@ def test_mce_parameters_correctly_setup_in_mcgrad(calibrator_class, rng):
         "min_samples_per_segment": 8,
         "max_values_per_segment_feature": 9,
         "max_n_segments": 10,
-        "sigma_estimation_method": "kuiper_upper_bound_standard_deviation",
     }
 
     # Create an MCGrad object using MCE with the expected parameters and fit MCGrad
