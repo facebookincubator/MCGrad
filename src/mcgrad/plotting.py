@@ -293,11 +293,11 @@ def plot_calibration_curve_by_segment(
 
 
 SegmentQuantity = Literal[
-    "segment_ecces",
-    "segment_ecces_absolute",
-    "segment_p_values",
-    "segment_sigmas",
-    "segment_ecces_sigma_scale",
+    "segment_ecce_relative",
+    "segment_ecce",
+    "segment_ecce_pvalue",
+    "segment_ecce_std",
+    "segment_ecce_sigma",
 ]
 _VALID_SEGMENT_QUANTITIES: tuple[str, ...] = get_args(SegmentQuantity)
 
@@ -305,7 +305,7 @@ _VALID_SEGMENT_QUANTITIES: tuple[str, ...] = get_args(SegmentQuantity)
 def plot_segment_calibration_errors(
     mce: metrics.MulticalibrationError,
     highlight_feature: str | None = None,
-    quantity: SegmentQuantity = "segment_ecces",
+    quantity: SegmentQuantity = "segment_ecce_relative",
 ) -> go.Figure:
     """
     Plots a segment-level calibration error scatter plot.
@@ -316,9 +316,9 @@ def plot_segment_calibration_errors(
 
     :param mce: A MulticalibrationError object containing computed segment-level metrics.
     :param highlight_feature: Optional feature name to color-code points by.
-    :param quantity: The quantity to plot. Options are "segment_ecces",
-        "segment_ecces_absolute", "segment_p_values", "segment_sigmas",
-        and "segment_ecces_sigma_scale".
+    :param quantity: The quantity to plot. Options are "segment_ecce_relative",
+        "segment_ecce", "segment_ecce_pvalue", "segment_ecce_std",
+        and "segment_ecce_sigma".
     :return: A Plotly Figure object with the scatter plot of the specified quantity
         against segment size.
     """
@@ -361,11 +361,11 @@ def plot_segment_calibration_errors(
     fig.update_xaxes(title="Segment Size")
 
     y_axis_config = {
-        "segment_ecces": ("ECCE", "%"),
-        "segment_ecces_absolute": ("ECCE (absolute)", None),
-        "segment_sigmas": ("Standard deviation", None),
-        "segment_p_values": ("P-value", None),
-        "segment_ecces_sigma_scale": ("ECCE / Standard Deviation", "\u03c3"),
+        "segment_ecce_relative": ("ECCE", "%"),
+        "segment_ecce": ("ECCE (absolute)", None),
+        "segment_ecce_std": ("Standard deviation", None),
+        "segment_ecce_pvalue": ("P-value", None),
+        "segment_ecce_sigma": ("ECCE / Standard Deviation", "\u03c3"),
     }
     title, suffix = y_axis_config[quantity]
     fig.update_yaxes(title=title)
@@ -501,7 +501,7 @@ def plot_learning_curve(
                 col=1,
             )
 
-        if "mce_sigma_scale" in metric_name:
+        if "mce_sigma" in metric_name:
             _add_mce_threshold_annotations(
                 fig, mcgrad_model, valid_perf, max_perf, row_num, tot_num_rounds
             )

@@ -16,8 +16,8 @@ Key metric families include:
 **Calibration Error Metrics**
     Standard and adaptive calibration error measures using binning approaches.
 
-**Kuiper-based Calibration Metrics**
-    Statistical tests and metrics based on the Kuiper statistic.
+**ECCE (Expected Cumulative Calibration Error) Metrics**
+    Statistical tests and metrics based on the ECCE statistic (also known as Kuiper calibration).
 
 **Ranking Metrics**
     Evaluation metrics for ranked predictions (DCG, NDCG, etc.).
@@ -36,7 +36,6 @@ from typing import Any, Protocol
 import numpy as np
 import pandas as pd
 from numpy import typing as npt
-from scipy import stats
 from sklearn import metrics as skmetrics
 
 from . import _utils as utils
@@ -49,11 +48,11 @@ CALIBRATION_ERROR_NUM_BINS = 40
 CALIBRATION_ERROR_EPSILON = 0.0000001
 DEFAULT_PRECISION_DTYPE = np.float64
 
-# Kuiper distribution constants
-# KUIPER_STATISTIC_MAX: Maximum statistic value before CDF is effectively 1.0
-# KUIPER_STATISTIC_MIN: Minimum statistic value below which p-value is 1.0
-KUIPER_STATISTIC_MAX: float = 8.26732673
-KUIPER_STATISTIC_MIN: float = 1e-20
+# ECCE sigma distribution constants
+# ECCE_SIGMA_MAX: Maximum statistic value before CDF is effectively 1.0
+# ECCE_SIGMA_MIN: Minimum statistic value below which p-value is 1.0
+ECCE_SIGMA_MAX: float = 8.26732673
+ECCE_SIGMA_MIN: float = 1e-20
 
 
 def _calibration_error(
@@ -819,7 +818,7 @@ def _calculate_cumulative_differences(
     """
     Calculate cumulative differences between labels and predictions.
 
-    Used internally by Kuiper calibration functions.
+    Used internally by ECCE calibration functions.
 
     :param labels: Array of binary labels.
     :param predicted_scores: Array of predicted probability scores.
@@ -862,36 +861,25 @@ def _calculate_cumulative_differences(
     return differences
 
 
-class _KuiperNormalizationInterface(Protocol):
-    def __call__(
-        self,
-        predicted_scores: npt.NDArray,
-        labels: npt.NDArray | None,
-        sample_weight: npt.NDArray | None,
-        segments: npt.NDArray | None,
-        precision_dtype: type[np.float16] | type[np.float32] | type[np.float64],
-    ) -> npt.NDArray: ...
-
-
-def kuiper_standard_deviation(
+def _ecce_standard_deviation(
     predicted_scores: npt.NDArray,
     labels: npt.NDArray | None = None,
     sample_weight: npt.NDArray | None = None,
 ) -> float:
     """
-    Calculate the Kuiper standard deviation for the entire dataset.
+    Calculate the ECCE standard deviation for the entire dataset.
 
     :param predicted_scores: Array of predicted probability scores.
     :param labels: Optional array of labels (unused in this method).
     :param sample_weight: Optional array of sample weights.
-    :return: The Kuiper standard deviation as a scalar.
+    :return: The ECCE standard deviation as a scalar.
     """
-    return kuiper_standard_deviation_per_segment(
+    return _ecce_standard_deviation_per_segment(
         predicted_scores, labels, sample_weight
     ).item()
 
 
-def kuiper_upper_bound_standard_deviation_per_segment(
+def _ecce_standard_deviation_per_segment(
     predicted_scores: npt.NDArray,
     labels: npt.NDArray | None = None,
     sample_weight: npt.NDArray | None = None,
@@ -901,59 +889,7 @@ def kuiper_upper_bound_standard_deviation_per_segment(
     | type[np.float64] = DEFAULT_PRECISION_DTYPE,
 ) -> npt.NDArray:
     """
-    Calculate an upper bound on Kuiper standard deviation per segment.
-
-    Uses a conservative estimate: 1 / (2 * sqrt(n)) for each segment.
-
-    :param predicted_scores: Array of predicted probability scores.
-    :param labels: Optional array of labels (unused in this method).
-    :param sample_weight: Optional array of sample weights.
-    :param segments: Optional array of segment masks.
-    :param precision_dtype: Data type for precision of computation.
-    :return: Array of upper bound standard deviations per segment.
-    """
-    if sample_weight is None:
-        sample_weight = np.ones_like(predicted_scores)
-    if segments is None:
-        segments = np.ones(shape=(1, len(predicted_scores)), dtype=np.bool_)
-    with np.errstate(divide="ignore"):
-        kuiper_ub = np.divide(1, (2 * np.sqrt((segments * sample_weight).sum(axis=1))))
-    kuiper_ub[np.isinf(kuiper_ub)] = 0
-    return kuiper_ub
-
-
-def kuiper_upper_bound_standard_deviation(
-    predicted_scores: npt.NDArray,
-    labels: npt.NDArray | None = None,
-    sample_weight: npt.NDArray | None = None,
-) -> float:
-    """
-    Calculate an upper bound on Kuiper standard deviation for the entire dataset.
-
-    :param predicted_scores: Array of predicted probability scores.
-    :param labels: Optional array of labels (unused in this method).
-    :param sample_weight: Optional array of sample weights.
-    :return: The upper bound standard deviation as a scalar.
-    """
-    if sample_weight is None:
-        sample_weight = np.ones_like(predicted_scores)
-
-    return kuiper_upper_bound_standard_deviation_per_segment(
-        predicted_scores, labels, sample_weight
-    ).item()
-
-
-def kuiper_standard_deviation_per_segment(
-    predicted_scores: npt.NDArray,
-    labels: npt.NDArray | None = None,
-    sample_weight: npt.NDArray | None = None,
-    segments: npt.NDArray | None = None,
-    precision_dtype: type[np.float16]
-    | type[np.float32]
-    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
-) -> npt.NDArray:
-    """
-    Calculate Kuiper standard deviation per segment.
+    Calculate ECCE standard deviation per segment.
 
     Computes the standard deviation based on the variance of predictions.
 
@@ -972,7 +908,7 @@ def kuiper_standard_deviation_per_segment(
     if segments.shape[1] != predicted_scores.shape[0]:
         raise ValueError("Segments must be the same length as labels/predictions.")
 
-    kuip_std_dev = np.zeros(
+    ecce_std_dev = np.zeros(
         shape=(np.shape(segments)[0],),
         dtype=precision_dtype,
     )
@@ -988,216 +924,49 @@ def kuiper_standard_deviation_per_segment(
                 variance_weighted_segments,
                 normalization_variance,
             ),
-            out=kuip_std_dev,
+            out=ecce_std_dev,
         )
-    kuip_std_dev[np.isnan(kuip_std_dev)] = 0
-    return kuip_std_dev
+    ecce_std_dev[np.isnan(ecce_std_dev)] = 0
+    return ecce_std_dev
 
 
-def kuiper_label_based_standard_deviation_per_segment(
-    predicted_scores: npt.NDArray,
-    labels: npt.NDArray | None,
-    sample_weight: npt.NDArray | None = None,
-    segments: npt.NDArray | None = None,
-    precision_dtype: type[np.float16]
-    | type[np.float32]
-    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
-) -> npt.NDArray:
-    """
-    Calculate label-based Kuiper standard deviation per segment.
-
-    Uses differences between labels and predictions to estimate variance.
-
-    :param predicted_scores: Array of predicted probability scores.
-    :param labels: Array of binary labels (required for this method).
-    :param sample_weight: Optional array of sample weights.
-    :param segments: Optional array of segment masks.
-    :param precision_dtype: Data type for precision of computation.
-    """
-    if sample_weight is None:
-        sample_weight = np.ones_like(predicted_scores)
-    if segments is None:
-        segments = np.ones(shape=(1, len(predicted_scores)), dtype=np.bool_)
-
-    if labels is not None:
-        return np.array(
-            [
-                kuiper_label_based_standard_deviation(
-                    predicted_scores[np.where(segment)[0]],
-                    labels[np.where(segment)[0]],
-                    sample_weight[np.where(segment)[0]],
-                )
-                for segment in segments
-            ]
-        )
-    raise ValueError("Labels are required for this method")
-
-
-def kuiper_label_based_standard_deviation(
-    predicted_scores: npt.NDArray,
-    labels: npt.NDArray | None,
-    sample_weight: npt.NDArray | None = None,
-) -> float:
-    """
-    Calculate label-based Kuiper standard deviation for the entire dataset.
-
-    :param predicted_scores: Array of predicted probability scores.
-    :param labels: Array of binary labels (required for this method).
-    :param sample_weight: Optional array of sample weights.
-    :return: The label-based standard deviation as a scalar.
-    """
-    if sample_weight is None:
-        sample_weight = np.ones_like(predicted_scores)
-
-    if labels is not None:
-        return np.sqrt(
-            np.sum(
-                (
-                    labels[:-1]
-                    - predicted_scores[:-1]
-                    - labels[1:]
-                    + predicted_scores[1:]
-                )
-                ** 2
-                * (sample_weight[:-1] + sample_weight[1:]) ** 2
-            )
-            / (
-                8
-                * sample_weight.sum()
-                * (
-                    0.5 * sample_weight[0]
-                    + 0.5 * sample_weight[-1]
-                    + np.sum(sample_weight[1:-1])
-                )
-            )
-        )
-
-    raise ValueError("Labels are required for this method")
-
-
-def identity_per_segment(
-    predicted_scores: npt.NDArray,
-    labels: npt.NDArray | None = None,
-    sample_weight: npt.NDArray | None = None,
-    segments: npt.NDArray | None = None,
-    precision_dtype: type[np.float16]
-    | type[np.float32]
-    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
-) -> npt.NDArray:
-    """
-    Return an array of ones (identity normalization).
-
-    Used when no normalization is desired for Kuiper calibration.
-
-    :param predicted_scores: Array of predicted probability scores (unused).
-    :param labels: Optional array of labels (unused).
-    :param sample_weight: Optional array of sample weights (unused).
-    :param segments: Optional array of segment masks.
-    :param precision_dtype: Data type for precision of computation (unused).
-    :return: Array of ones with length equal to number of segments.
-    """
-    if segments is None:
-        return np.ones(1)
-    return np.ones(segments.shape[0])
-
-
-def kuiper_calibration_per_segment(
+def _ecce_per_segment(
     labels: npt.NDArray,
     predicted_scores: npt.NDArray,
     sample_weight: npt.NDArray | None = None,
-    normalization_method: str | None = None,
     segments: npt.NDArray | None = None,
     precision_dtype: type[np.float16]
     | type[np.float32]
     | type[np.float64] = DEFAULT_PRECISION_DTYPE,
 ) -> npt.NDArray:
     """
-    Calculates Kuiper calibration distance between responses and scores.
+    Compute ECCE (unnormalized) for multiple segments efficiently.
 
-    For details, see:
-    Mark Tygert. (2024, January 10). Conditioning on and controlling for
-    variates via cumulative differences: measuring calibration, reliability,
-    biases, and other treatment effects. Zenodo.
-    https://doi.org/10.5281/zenodo.10481097
+    This is an optimized internal helper for MulticalibrationError that computes
+    ECCE across multiple segments in a vectorized manner.
 
     :param labels: Array of binary labels (0 or 1)
-    :param predicted_scores: Array of predicted probability scores. (floats between 0 and 1)
-    :param sample_weight: Optional array of sample weights (non-negative floats)
-    :param normalization_method: Optional function to calculate a normalization constant.
-            See for example kuiper_sd or inverse_sqrt_sample_size, methods need to follow the same interface.
-    :param segments: Optional array of segments to parallelize the computation of the kuiper calibration distance.
-    :param precision_dtype: Optional dtype for the precision of the output. Defaults to np.float64.
-    :return: Kuiper calibration distance
+    :param predicted_scores: Array of predicted probability scores
+    :param sample_weight: Optional array of sample weights
+    :param segments: Array of segment masks for parallel computation
+    :param precision_dtype: Data type for precision of the output
+    :return: Array of ECCE values per segment
     """
-
-    normalization_func = _normalization_method_assignment(normalization_method)
-
-    denominator = normalization_func(
-        predicted_scores=predicted_scores,
-        labels=labels,
-        sample_weight=sample_weight,
-        segments=segments,
-        precision_dtype=precision_dtype,
-    )
-
     differences = _calculate_cumulative_differences(
         labels, predicted_scores, sample_weight, segments, precision_dtype
     )
     if segments is None:
         differences = differences.reshape(1, -1)
-
-    c_range = np.ptp(differences, axis=1)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        return np.where(
-            (denominator == 0) & (c_range != 0),
-            np.inf,
-            np.where(denominator == 0, 0, c_range / denominator),
-        )
+    return np.ptp(differences, axis=1)
 
 
-def kuiper_calibration(
-    labels: npt.NDArray,
-    predicted_scores: npt.NDArray,
-    sample_weight: npt.NDArray | None = None,
-    normalization_method: str | None = None,
-    segments: npt.NDArray | None = None,
-    precision_dtype: type[np.float16]
-    | type[np.float32]
-    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
-) -> float:
+def _ecce_cdf(x: float) -> float:
     """
-    Calculates Kuiper calibration distance between responses and scores.
+    Evaluate the cumulative distribution function for the ECCE statistic.
 
-    For details, see:
-    Mark Tygert. (2024, January 10). Conditioning on and controlling for
-    variates via cumulative differences: measuring calibration, reliability,
-    biases, and other treatment effects. Zenodo.
-    https://doi.org/10.5281/zenodo.10481097
-
-    :param labels: Array of binary labels (0 or 1)
-    :param predicted_scores: Array of predicted probability scores (floats between 0 and 1)
-    :param sample_weight: Optional array of sample weights (non-negative floats)
-    :param normalization_method: Optional method name for calculating a normalization constant.
-        See kuiper_standard_deviation_per_segment or kuiper_upper_bound_standard_deviation_per_segment.
-    :param segments: Optional array of segments to parallelize the computation of the kuiper calibration distance.
-    :param precision_dtype: Data type for precision of computation. Defaults to np.float64.
-    :return: Kuiper calibration distance
-    """
-
-    return kuiper_calibration_per_segment(
-        labels,
-        predicted_scores,
-        sample_weight,
-        normalization_method,
-        segments,
-        precision_dtype,
-    ).item()
-
-
-def kuiper_distribution(x: float) -> float:
-    """
-    Evaluates the cumulative distribution function for the range
-    (maximum minus minimum) of the standard Brownian motion on [0, 1].
+    This computes the CDF for the range (maximum minus minimum) of the
+    standard Brownian motion on [0, 1], which is used to compute p-values
+    for the ECCE statistic.
 
     :param float x: argument at which to evaluate the cumulative distribution function
                     (must be positive)
@@ -1205,11 +974,8 @@ def kuiper_distribution(x: float) -> float:
     :rtype: float
     """
     if x <= 0:
-        raise ValueError(
-            f"Can only evaluate cumulative Kuiper distribution at positive x, not at {x}"
-        )
-    # If x goes to infinity, c tends to 1.0
-    if x >= KUIPER_STATISTIC_MAX:
+        raise ValueError(f"Can only evaluate ECCE CDF at positive x, not at {x}")
+    if x >= ECCE_SIGMA_MAX:
         return 1.0 - sys.float_info.epsilon
 
     # Compute the machine precision assuming binary numerical representations.
@@ -1230,322 +996,116 @@ def kuiper_distribution(x: float) -> float:
     return c
 
 
-def _normalization_method_assignment(
-    method: str | None,
-) -> _KuiperNormalizationInterface:
-    methods = {
-        "kuiper_standard_deviation": kuiper_standard_deviation_per_segment,
-        "kuiper_upper_bound_standard_deviation": kuiper_upper_bound_standard_deviation_per_segment,
-        "kuiper_label_based_standard_deviation": kuiper_label_based_standard_deviation_per_segment,
-        None: identity_per_segment,
-    }
-    if method not in methods:
-        raise ValueError(
-            f"Unknown normalization method {method}. Available methods are {list(methods)}"
-        )
-    return methods[method]
+def ecce_pvalue_from_sigma(ecce_sigma: float) -> float:
+    """
+    Compute p-value from a sigma-scaled ECCE statistic.
+
+    :param ecce_sigma: The ECCE statistic normalized by standard deviation.
+    :return: The p-value from the ECCE test.
+    """
+    if ecce_sigma < ECCE_SIGMA_MIN:
+        return 1.0
+    if ecce_sigma > ECCE_SIGMA_MAX:
+        return sys.float_info.epsilon
+    return 1 - _ecce_cdf(ecce_sigma)
 
 
-def kuiper_test(
+def ecce(
     labels: npt.NDArray,
     predicted_scores: npt.NDArray,
     sample_weight: npt.NDArray | None = None,
-) -> tuple[float, float]:
+) -> float:
     """
-    Calculates the Kuiper test statistic and p-value for the Kuiper calibration
-    distance. This test is used to assess how well the predicted probabilities
-    of a binary classifier are calibrated.
+    Calculate the Expected Cumulative Calibration Error (ECCE) [1].
+
+    ECCE measures the maximum deviation between the cumulative distribution of
+    predicted probabilities for positive and negative examples. It is equivalent
+    to the unnormalized Kuiper calibration statistic.
+
+    [1]: Arrieta-Ibarra, I., Gujral, P., Tannen, J., Tygert, M., & Xu, C. (2022).
+    Metrics of calibration for probabilistic predictions. Journal of Machine
+    Learning Research, 23(351), 1-54. (https://tygert.com/ece.pdf)
 
     :param labels: Array of true binary labels (0 or 1).
-    :param predicted_scores: Array of predicted probabilities, corresponding to the likelihood of the label being 1.
-    :param sample_weight: Optional array of weights for the samples, must be the same length as labels and predicted_scores.
-    :return: A tuple containing the Kuiper statistic and the corresponding p-value.
+    :param predicted_scores: Array of predicted probabilities.
+    :param sample_weight: Optional array of sample weights.
+    :return: The ECCE value.
     """
-
-    kuiper_stat = kuiper_calibration(
-        labels,
-        predicted_scores,
-        sample_weight,
-        normalization_method="kuiper_standard_deviation",
+    differences = _calculate_cumulative_differences(
+        labels, predicted_scores, sample_weight
     )
-    if kuiper_stat < KUIPER_STATISTIC_MIN:
-        pval = 1.0
-    elif kuiper_stat > KUIPER_STATISTIC_MAX:
-        pval = sys.float_info.epsilon
-    else:
-        pval = 1 - kuiper_distribution(kuiper_stat)
-
-    return kuiper_stat, pval
+    return np.ptp(differences)
 
 
-def kuiper_statistic(
+def ecce_sigma(
     labels: npt.NDArray,
     predicted_scores: npt.NDArray,
     sample_weight: npt.NDArray | None = None,
 ) -> float:
     """
-    Calculate the Kuiper test statistic.
+    Calculate the ECCE normalized by standard deviation.
 
-    :param labels: Array of true binary labels.
-    :param predicted_scores: Array of predicted probability scores.
+    This returns the ECCE statistic normalized by the standard deviation of the
+    calibration error under the null hypothesis of perfect calibration.
+
+    :param labels: Array of true binary labels (0 or 1).
+    :param predicted_scores: Array of predicted probabilities.
     :param sample_weight: Optional array of sample weights.
-    :return: The Kuiper statistic.
+    :return: The normalized ECCE value.
     """
-    return kuiper_test(
-        labels,
-        predicted_scores,
-        sample_weight,
-    )[0]
+    ecce_value = ecce(labels, predicted_scores, sample_weight)
+    sigma = _ecce_standard_deviation(predicted_scores, labels, sample_weight)
+
+    if sigma == 0:
+        return np.inf if ecce_value != 0 else 0.0
+    return ecce_value / sigma
 
 
-def kuiper_pvalue(
+def ecce_pvalue(
     labels: npt.NDArray,
     predicted_scores: npt.NDArray,
     sample_weight: npt.NDArray | None = None,
 ) -> float:
     """
-    Calculate the Kuiper test p-value.
+    Calculate the p-value for the ECCE statistic.
 
-    :param labels: Array of true binary labels.
-    :param predicted_scores: Array of predicted probability scores.
+    Tests the null hypothesis that predictions are perfectly calibrated using
+    the Kuiper test.
+
+    :param labels: Array of true binary labels (0 or 1).
+    :param predicted_scores: Array of predicted probabilities.
     :param sample_weight: Optional array of sample weights.
-    :return: The p-value from the Kuiper test.
+    :return: The p-value from the calibration test.
     """
-    return kuiper_test(
-        labels,
-        predicted_scores,
-        sample_weight,
-    )[1]
+    sigma = ecce_sigma(labels, predicted_scores, sample_weight)
+    return ecce_pvalue_from_sigma(sigma)
 
 
-def kuiper_func_per_segment(
+def ecce_relative(
     labels: npt.NDArray,
-    predictions: npt.NDArray,
-    segments_df: pd.DataFrame,
-    func: Callable[[pd.DataFrame], float | npt.NDArray | None],
-    output_series_name: str,
+    predicted_scores: npt.NDArray,
     sample_weight: npt.NDArray | None = None,
-    min_segment_size: int = 2,
-) -> pd.Series:
-    """
-    Apply a function to each segment and return results as a Series.
-
-    :param labels: Array of true binary labels.
-    :param predictions: Array of predicted probability scores.
-    :param segments_df: DataFrame defining the segmentation columns.
-    :param func: Function to apply to each segment's DataFrame.
-    :param output_series_name: Name for the resulting Series.
-    :param sample_weight: Optional array of sample weights.
-    :param min_segment_size: Minimum samples required per segment.
-    :return: Series with function results indexed by segment.
-    """
-    segments_df = segments_df.copy()
-    segmentation_cols = list(segments_df.columns)
-    segments_df["label"] = labels
-    segments_df["prediction"] = predictions
-    segments_df["sample_weight"] = (
-        sample_weight if sample_weight is not None else np.ones_like(labels)
-    )
-
-    grouping_cols = (
-        segmentation_cols if len(segmentation_cols) > 1 else segmentation_cols[0]
-    )
-
-    segment_p_values = (
-        groupby_apply(segments_df.groupby(grouping_cols), func)
-        # pyre-ignore[6]: groupby_apply returns Series when func returns scalar; Series.rename(str) is valid
-        .rename(output_series_name)
-        .dropna()
-    )
-
-    # pyre-ignore[7]: Return type is Series when func returns scalar
-    return segment_p_values
-
-
-def kuiper_pvalue_per_segment(
-    labels: npt.NDArray,
-    predictions: npt.NDArray,
-    segments_df: pd.DataFrame,
-    sample_weight: npt.NDArray | None = None,
-    min_segment_size: int = 2,
-) -> pd.Series:
-    """
-    Calculate Kuiper p-values for each segment.
-
-    :param labels: Array of true binary labels.
-    :param predictions: Array of predicted probability scores.
-    :param segments_df: DataFrame defining the segmentation columns.
-    :param sample_weight: Optional array of sample weights.
-    :param min_segment_size: Minimum samples required per segment.
-    :return: Series of p-values indexed by segment.
-    """
-
-    def _group_kuiper_p_value(group: pd.DataFrame) -> float | None:
-        if len(group) < min_segment_size:
-            return None
-        return kuiper_test(
-            labels=group.label.values,
-            predicted_scores=group.prediction.values,
-            sample_weight=group.sample_weight.values,
-        )[1]
-
-    segment_p_values = kuiper_func_per_segment(
-        labels=labels,
-        predictions=predictions,
-        segments_df=segments_df,
-        func=_group_kuiper_p_value,
-        output_series_name="p_value",
-        sample_weight=sample_weight,
-        min_segment_size=min_segment_size,
-    )
-
-    return segment_p_values
-
-
-def kuiper_statistic_per_segment(
-    labels: npt.NDArray,
-    predictions: npt.NDArray,
-    segments_df: pd.DataFrame,
-    sample_weight: npt.NDArray | None = None,
-    min_segment_size: int = 2,
-    standardization_method: str | None = "kuiper_standard_deviation",
-) -> pd.Series:
-    """
-    Calculate kuiper statistics for each segment in the data.
-
-    :param labels: Array of true binary labels (0 or 1)
-    :param predictions: Array of predicted probabilities corresponding to the likelihood of label being 1
-    :param segments_df: DataFrame containing the segment definitions to calculate statistics for
-    :param sample_weight: Optional array of weights for each instance. If None, all instances have weight 1
-    :param min_segment_size: Minimum number of samples required in a segment to calculate statistics. Defaults to 2
-    :param standardization_method: Optional string specifying the method used for standardizing the kuiper statistic. Defaults to kuiper_standard_deviation
-    :return: series containing kuiper statistics for each segment
-    """
-
-    def _group_kuiper_statistic_value(group: pd.DataFrame) -> float | None:
-        if len(group) < min_segment_size:
-            return None
-        return kuiper_test(
-            labels=group.label.values,
-            predicted_scores=group.prediction.values,
-            sample_weight=group.sample_weight.values,
-        )[0]
-
-    segment_p_values = kuiper_func_per_segment(
-        labels=labels,
-        predictions=predictions,
-        segments_df=segments_df,
-        func=_group_kuiper_statistic_value,
-        output_series_name="kuiper_statistic",
-        sample_weight=sample_weight,
-        min_segment_size=min_segment_size,
-    )
-
-    return segment_p_values
-
-
-def multi_segment_pvalue_geometric_mean(
-    labels: npt.NDArray,
-    predictions: npt.NDArray,
-    segments_df: pd.DataFrame,
-    sample_weight: npt.NDArray | None = None,
-    min_segment_size: int = 2,
 ) -> float:
     """
-    Calculate the geometric mean of Kuiper p-values across segments.
+    Calculate the prevalence-adjusted ECCE as a percentage.
 
-    :param labels: Array of true binary labels.
-    :param predictions: Array of predicted probability scores.
-    :param segments_df: DataFrame defining the segmentation columns.
+    This returns the ECCE normalized by the prevalence (min of positive rate
+    and negative rate) and multiplied by 100 to express as a percentage.
+
+    :param labels: Array of true binary labels (0 or 1).
+    :param predicted_scores: Array of predicted probabilities.
     :param sample_weight: Optional array of sample weights.
-    :param min_segment_size: Minimum samples required per segment.
-    :return: Geometric mean of segment p-values.
+    :return: The prevalence-adjusted ECCE as a percentage.
     """
-    segment_p_values = kuiper_pvalue_per_segment(
-        labels=labels,
-        predictions=predictions,
-        segments_df=segments_df,
-        sample_weight=sample_weight,
-        min_segment_size=min_segment_size,
-    )
-    result = utils.geometric_mean(segment_p_values.to_numpy(np.float64))
-    return result
-
-
-def multi_segment_inverse_sqrt_normalized_statistic_max(
-    labels: npt.NDArray,
-    predictions: npt.NDArray,
-    segments_df: pd.DataFrame,
-    sample_weight: npt.NDArray | None = None,
-    min_segment_size: int = 2,
-) -> float:
-    """
-    Calculate the max Kuiper statistic across segments with inverse-sqrt normalization.
-
-    :param labels: Array of true binary labels.
-    :param predictions: Array of predicted probability scores.
-    :param segments_df: DataFrame defining the segmentation columns.
-    :param sample_weight: Optional array of sample weights.
-    :param min_segment_size: Minimum samples required per segment.
-    :return: Maximum normalized Kuiper statistic across all segments.
-    """
-    segment_statistics = kuiper_statistic_per_segment(
-        labels=labels,
-        predictions=predictions,
-        segments_df=segments_df,
-        sample_weight=sample_weight,
-        min_segment_size=min_segment_size,
-        standardization_method="kuiper_upper_bound_standard_deviation",
-    )
-    result = segment_statistics.to_numpy(np.float64).max()
-    return result
-
-
-def multi_segment_kuiper_test(
-    labels: npt.NDArray,
-    predictions: npt.NDArray,
-    segments_df: pd.DataFrame,
-    sample_weight: npt.NDArray | None = None,
-    alpha: float = 0.05,
-    combination_method: str = "poisson",
-    min_segment_size: int = 2,
-) -> dict[str, float]:
-    """
-    Perform a combined Kuiper test across multiple segments.
-
-    :param labels: Array of true binary labels.
-    :param predictions: Array of predicted probability scores.
-    :param segments_df: DataFrame defining the segmentation columns.
-    :param sample_weight: Optional array of sample weights.
-    :param alpha: Significance level for the test.
-    :param combination_method: Method to combine p-values ('poisson' or scipy methods).
-    :param min_segment_size: Minimum samples required per segment.
-    :return: Dictionary with n_segments, statistic, p_value, and segment_p_values.
-    """
-    segment_p_values = kuiper_pvalue_per_segment(
-        labels=labels,
-        predictions=predictions,
-        segments_df=segments_df,
-        sample_weight=sample_weight,
-        min_segment_size=min_segment_size,
-    )
-
-    n_tests = len(segment_p_values)
-
-    combined_p_value = None
-    if combination_method == "poisson":
-        statistic = np.sum(segment_p_values.values < alpha)
-        combined_p_value = 1 - stats.poisson.cdf(statistic - 1, n_tests * alpha)
+    ecce_value = ecce(labels, predicted_scores, sample_weight)
+    if sample_weight is not None:
+        prevalence = np.sum(labels * sample_weight) / np.sum(sample_weight)
     else:
-        statistic, combined_p_value = stats.combine_pvalues(
-            segment_p_values, method=combination_method
-        )
-    return {
-        "n_segments": n_tests,
-        "statistic": statistic,
-        "p_value": combined_p_value,
-        "segment_p_values": segment_p_values,
-    }
+        prevalence = np.mean(labels)
+    prevalence = min(prevalence, 1 - prevalence)
+    if prevalence == 0:
+        return np.inf if ecce_value != 0 else 0.0
+    return ecce_value / prevalence * 100
 
 
 def _rank_calibration_error(
@@ -1782,16 +1342,55 @@ def calibration_free_normalized_entropy(
     return calib_free_ne
 
 
-DEFAULT_MULTI_KUIPER_NORMALIZATION_METHOD: str = "kuiper_standard_deviation"
-DEFAULT_MULTI_KUIPER_MAX_VALUES_PER_SEGMENT_FEATURE: int = 3
-DEFAULT_MULTI_KUIPER_MIN_DEPTH: int = 0
-DEFAULT_MULTI_KUIPER_MAX_DEPTH: int = 3
-DEFAULT_MULTI_KUIPER_MIN_SAMPLES_PER_SEGMENT: int = 10
-DEFAULT_MULTI_KUIPER_GLOBAL_NORMALIZATION: str = "prevalence_adjusted"
-DEFAULT_MULTI_KUIPER_N_SEGMENTS: int | None = 1000
+DEFAULT_MCE_MAX_VALUES_PER_SEGMENT_FEATURE: int = 3
+DEFAULT_MCE_MIN_DEPTH: int = 0
+DEFAULT_MCE_MAX_DEPTH: int = 3
+DEFAULT_MCE_MIN_SAMPLES_PER_SEGMENT: int = 10
+DEFAULT_MCE_GLOBAL_NORMALIZATION: str = "prevalence_adjusted"
+DEFAULT_MCE_N_SEGMENTS: int | None = 1000
 
 
 class MulticalibrationError:
+    """
+    Computes Multicalibration Error (MCE) metrics across data segments.
+
+    MCE measures calibration errors across intersectional subgroups of the data,
+    helping identify where a model's probability predictions are systematically
+    biased. The metric is based on the Expected Cumulative Calibration Error (ECCE).
+
+    For methodological details, see: https://arxiv.org/abs/2506.11251
+
+    **Core Properties:**
+
+    Segment-level metrics (arrays with one value per segment):
+
+    - ``segment_ecce``: Raw ECCE values per segment (absolute scale).
+    - ``segment_ecce_relative``: ECCE normalized by prevalence, as percentage.
+    - ``segment_ecce_std``: Standard deviation of ECCE per segment.
+    - ``segment_ecce_sigma``: ECCE divided by its standard deviation (z-score).
+    - ``segment_ecce_pvalue``: P-value for statistical significance per segment.
+
+    Global metrics (single values for the worst segment):
+
+    - ``mce``: Maximum ECCE across segments (raw scale).
+    - ``mce_relative``: Maximum ECCE normalized by prevalence, as percentage.
+    - ``mce_sigma``: Maximum ECCE in sigma scale (z-score).
+    - ``p_value``: P-value for the worst segment.
+    - ``mde``: Minimum detectable error (conservative approximation).
+
+    **Example usage:**
+
+    .. code-block:: python
+
+        mce = MulticalibrationError(
+            df=data,
+            label_column="label",
+            score_column="prediction",
+            categorical_segment_columns=["gender", "age_group"],
+        )
+        print(f"MCE: {mce.mce_relative:.2f}% (p={mce.p_value:.4f})")
+    """
+
     def __init__(
         self,
         df: pd.DataFrame,
@@ -1800,16 +1399,15 @@ class MulticalibrationError:
         weight_column: str | None = None,
         categorical_segment_columns: list[str] | None = None,
         numerical_segment_columns: list[str] | None = None,
-        max_depth: int | None = DEFAULT_MULTI_KUIPER_MAX_DEPTH,
-        max_values_per_segment_feature: int = DEFAULT_MULTI_KUIPER_MAX_VALUES_PER_SEGMENT_FEATURE,
-        min_samples_per_segment: int = DEFAULT_MULTI_KUIPER_MIN_SAMPLES_PER_SEGMENT,
-        sigma_estimation_method: str | None = DEFAULT_MULTI_KUIPER_NORMALIZATION_METHOD,
-        max_n_segments: int | None = DEFAULT_MULTI_KUIPER_N_SEGMENTS,
+        max_depth: int | None = DEFAULT_MCE_MAX_DEPTH,
+        max_values_per_segment_feature: int = DEFAULT_MCE_MAX_VALUES_PER_SEGMENT_FEATURE,
+        min_samples_per_segment: int = DEFAULT_MCE_MIN_SAMPLES_PER_SEGMENT,
+        max_n_segments: int | None = DEFAULT_MCE_N_SEGMENTS,
         chunk_size: int = 50,
         precision_dtype: str = "float32",
     ) -> None:
         """
-        Calculates the multicalibration error with respect to a set of segments for a given dataset.
+        Initialize MulticalibrationError for a dataset.
 
         :param df: A pandas DataFrame containing the data.
         :param label_column: The name of the column in `df` that contains the true labels.
@@ -1820,7 +1418,6 @@ class MulticalibrationError:
         :param max_depth: The maximum depth for segment generation.
         :param max_values_per_segment_feature: The maximum number of unique values per segment feature.
         :param min_samples_per_segment: The minimum number of samples required per segment.
-        :param sigma_estimation_method: The method used for sigma estimation.
         :param max_n_segments: The maximum number of segments to generate.
         :param chunk_size: Size of chunks of segments to process per iteration of the algorithm. Larger values improve runtime but increase memory usage (OOM errors are possible).
         :param precision_dtype: The precision type for the metric. Can be 'float16', 'float32', or 'float64'.
@@ -1833,9 +1430,6 @@ class MulticalibrationError:
         self.max_depth = max_depth
         self.max_values_per_segment_feature = max_values_per_segment_feature
         self.min_samples_per_segment = min_samples_per_segment
-        self.estimate_sigma: _KuiperNormalizationInterface = (
-            _normalization_method_assignment(sigma_estimation_method)
-        )
         self.df: pd.DataFrame = df.copy(deep=False)
         self.df.sort_values(by=score_column, inplace=True)
         self.df.reset_index(inplace=True)
@@ -1876,15 +1470,15 @@ class MulticalibrationError:
         self.total_number_segments: int = -1  # initialized as -1
 
     def __str__(self) -> str:
-        return f"""{self.mce}% (sigmas={self.mce_sigma_scale}, p={self.p_value}, mde={self.mde})"""
+        return f"""{self.mce_relative}% (sigmas={self.mce_sigma}, p={self.p_value}, mde={self.mde})"""
 
     def __format__(self, format_spec: str) -> str:
         # Use the format specifier to format each attribute
-        formatted_mce_relative = format(self.mce, format_spec)
+        formatted_mce_relative = format(self.mce_relative, format_spec)
         formatted_p_value = format(self.p_value, format_spec)
         formatted_mde = format(self.mde, format_spec)
-        formatted_mce_sigma_scale = format(self.mce_sigma_scale, format_spec)
-        return f"""{formatted_mce_relative}% (sigmas={formatted_mce_sigma_scale}, p={formatted_p_value}, mde={formatted_mde})"""
+        formatted_mce_sigma = format(self.mce_sigma, format_spec)
+        return f"""{formatted_mce_relative}% (sigmas={formatted_mce_sigma}, p={formatted_p_value}, mde={formatted_mde})"""
 
     @functools.cached_property
     def segments(self) -> tuple[npt.NDArray[np.bool_], pd.DataFrame]:
@@ -1933,9 +1527,16 @@ class MulticalibrationError:
         return index_series
 
     @functools.cached_property
-    def segment_ecces_absolute(
+    def segment_ecce(
         self,
     ) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
+        """
+        Raw ECCE (Expected Cumulative Calibration Error) per segment.
+
+        This is the absolute calibration error for each segment. See `ecce`
+        function for more details.
+        Use ``segment_ecce_relative`` for prevalence-normalized comparisons.
+        """
         segments = self.segments[0]
         statistics = np.zeros(
             self.total_number_segments,
@@ -1948,7 +1549,7 @@ class MulticalibrationError:
                     self.chunk_size * (i + 1),
                     self.total_number_segments,
                 )
-            ] = kuiper_calibration_per_segment(
+            ] = _ecce_per_segment(
                 labels=self.df[self.label_column].values,
                 predicted_scores=self.df[self.score_column].values,
                 sample_weight=(
@@ -1956,53 +1557,79 @@ class MulticalibrationError:
                     if self.weight_column is None
                     else self.df[self.weight_column].values
                 ),
-                normalization_method=None,
                 segments=segment[: self.total_number_segments - self.chunk_size * i,],
+                precision_dtype=self.precision_dtype,
             )
         return statistics
 
     @functools.cached_property
-    def segment_ecces(self) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
-        return self.segment_ecces_sigma_scale * self.sigma_0 / self.prevalence * 100
+    def segment_ecce_relative(
+        self,
+    ) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
+        """
+        ECCE per segment, normalized by prevalence, as percentage.
+        """
+        return self.segment_ecce_sigma * self.sigma_0 / self.prevalence * 100
 
     @functools.cached_property
     def global_ecce(self) -> float:
-        return self.segment_ecces[0]
+        """Raw ECCE for the global segment (first/worst segment)."""
+        return self.segment_ecce[0]
+
+    @functools.cached_property
+    def global_ecce_relative(self) -> float:
+        """Prevalence-normalized ECCE for the global segment, as percentage."""
+        return self.segment_ecce_relative[0]
 
     @functools.cached_property
     def global_ecce_sigma_scale(self) -> float:
-        return self.segment_ecces_sigma_scale[0]
+        """ECCE in sigma scale (z-score) for the global segment."""
+        return self.segment_ecce_sigma[0]
 
     @functools.cached_property
     def global_ecce_p_value(self) -> float:
-        return self.segment_p_values[0]
+        """P-value for the global segment."""
+        return self.segment_ecce_pvalue[0]
 
     @functools.cached_property
-    def segment_ecces_sigma_scale(
+    def segment_ecce_sigma(
         self,
     ) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
+        """
+        ECCE per segment divided by its standard deviation.
+
+        This measures statistical significance: higher values indicate
+        calibration errors that are more likely to be real rather than noise.
+        """
         with np.errstate(divide="ignore", invalid="ignore"):
             statistics = np.where(
-                (self.segment_ecces_absolute != 0) & (self.segment_sigmas == 0),
+                (self.segment_ecce != 0) & (self.segment_ecce_std == 0),
                 np.inf,
                 np.where(
-                    self.segment_sigmas == 0,
+                    self.segment_ecce_std == 0,
                     0,
-                    self.segment_ecces_absolute / self.segment_sigmas,
+                    self.segment_ecce / self.segment_ecce_std,
                 ),
             )
         return statistics
 
     @functools.cached_property
-    def segment_p_values(self) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
-        kuiper_distribution_vec = np.vectorize(kuiper_distribution)
-        p_values = np.ones_like(
-            self.segment_ecces_sigma_scale
-        ) - kuiper_distribution_vec(self.segment_ecces_sigma_scale)
+    def segment_ecce_pvalue(self) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
+        """
+        P-values for ECCE per segment.
+
+        Based on the empirical CDF of the ECCE distribution under calibration.
+        Lower values indicate stronger evidence of miscalibration.
+        """
+        ecce_pvalue_vec = np.vectorize(ecce_pvalue_from_sigma)
+        p_values = ecce_pvalue_vec(self.segment_ecce_sigma)
         return p_values
 
     @functools.cached_property
-    def segment_sigmas(self) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
+    def segment_ecce_std(self) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
+        """
+        Standard deviation of ECCE per segment.
+        """
         segments = self.segments[0]
         sigmas = np.zeros(self.total_number_segments, dtype=self.precision_dtype)
         for i, segment in enumerate(segments):
@@ -2011,7 +1638,7 @@ class MulticalibrationError:
                     self.chunk_size * (i + 1),
                     self.total_number_segments,
                 )
-            ] = self.estimate_sigma(
+            ] = _ecce_standard_deviation_per_segment(
                 predicted_scores=self.df[self.score_column].values,
                 labels=self.df[self.label_column].values,
                 sample_weight=(
@@ -2026,9 +1653,10 @@ class MulticalibrationError:
 
     @functools.cached_property
     def sigma_0(self) -> float:
-        if "segment_sigmas" in self.__dict__:
-            return self.segment_sigmas[0]
-        sigma_0 = self.estimate_sigma(
+        """Standard deviation of ECCE for the global (full dataset) segment."""
+        if "segment_ecce_std" in self.__dict__:
+            return self.segment_ecce_std[0]
+        sigma_0 = _ecce_standard_deviation_per_segment(
             predicted_scores=self.df[self.score_column].values,
             labels=self.df[self.label_column].values,
             sample_weight=(
@@ -2042,15 +1670,24 @@ class MulticalibrationError:
         return sigma_0.item()
 
     @functools.cached_property
-    def mce_sigma_scale(self) -> float:
-        return np.max(self.segment_ecces_sigma_scale)
+    def mce_sigma(self) -> float:
+        """
+        Maximum ECCE across segments in sigma scale.
+
+        Higher values indicate more statistically significant miscalibration.
+        """
+        return np.max(self.segment_ecce_sigma)
 
     @functools.cached_property
-    def mce_absolute(self) -> float:
-        return self.mce_sigma_scale * self.sigma_0
+    def mce(self) -> float:
+        """
+        Maximum Calibration Error: worst ECCE across all segments.
+        """
+        return self.mce_sigma * self.sigma_0
 
     @functools.cached_property
     def prevalence(self) -> float:
+        """Minority class prevalence, used for normalizing ECCE."""
         p = (
             (self.df[self.label_column] * self.df[self.weight_column]).sum()
             / (self.df[self.weight_column].sum())
@@ -2060,20 +1697,47 @@ class MulticalibrationError:
         return min(p, 1 - p)
 
     @functools.cached_property
-    def mce(self) -> float:
-        return self.mce_absolute / self.prevalence * 100
+    def mce_relative(self) -> float:
+        """
+        Maximum Calibration Error normalized by prevalence, as percentage.
+        """
+        return self.mce / self.prevalence * 100
 
     @functools.cached_property
     def p_value(self) -> float:
-        if "segment_p_values" in self.__dict__:
-            return np.min(self.segment_p_values)
-        return 1 - kuiper_distribution(self.mce_sigma_scale)
+        """
+        P-value for the worst segment (lowest p-value across all segments).
+
+        Indicates statistical significance of the observed miscalibration.
+        """
+        if "segment_ecce_pvalue" in self.__dict__:
+            return np.min(self.segment_ecce_pvalue)
+        return ecce_pvalue_from_sigma(self.mce_sigma)
 
     @functools.cached_property
     def mde(self) -> float:
-        # This is a rough, conservative approximation of the MDE. We divide by the prevalence
-        # and multiply by 100 to get the MDE in the same unit as the MCE metric
-        return 5 * self.sigma_0 / self.prevalence * 100
+        """
+        Minimum Detectable Effect (conservative approximation).
+
+        Estimates the smallest calibration error detectable with this sample size.
+        Expressed in absolute scale, same units as mce.
+
+        Note: This is a rough approximation based on the standard deviation under
+        the null hypothesis of perfect calibration.
+        """
+        return 5 * self.sigma_0
+
+    @functools.cached_property
+    def mde_relative(self) -> float:
+        """
+        Minimum Detectable Effect normalized by prevalence, as percentage.
+
+        Same units as mce_relative.
+
+        Note: This is a rough approximation based on the standard deviation under
+        the null hypothesis of perfect calibration.
+        """
+        return self.mde / self.prevalence * 100
 
 
 class _ScoreFunctionInterface(Protocol):
@@ -2119,32 +1783,30 @@ def wrap_sklearn_metric_func(
 def wrap_multicalibration_error_metric(
     categorical_segment_columns: list[str] | None = None,
     numerical_segment_columns: list[str] | None = None,
-    max_depth: int = DEFAULT_MULTI_KUIPER_MAX_DEPTH,
-    max_values_per_segment_feature: int = DEFAULT_MULTI_KUIPER_MAX_VALUES_PER_SEGMENT_FEATURE,
-    min_samples_per_segment: int = DEFAULT_MULTI_KUIPER_MIN_SAMPLES_PER_SEGMENT,
-    sigma_estimation_method: str = DEFAULT_MULTI_KUIPER_NORMALIZATION_METHOD,
-    max_n_segments: int | None = DEFAULT_MULTI_KUIPER_N_SEGMENTS,
+    max_depth: int = DEFAULT_MCE_MAX_DEPTH,
+    max_values_per_segment_feature: int = DEFAULT_MCE_MAX_VALUES_PER_SEGMENT_FEATURE,
+    min_samples_per_segment: int = DEFAULT_MCE_MIN_SAMPLES_PER_SEGMENT,
+    max_n_segments: int | None = DEFAULT_MCE_N_SEGMENTS,
     metric_version: str = "mce",
 ) -> _ScoreFunctionInterface:
     """
-    Create a wrapped MulticalibrationError metric for use with the evaluation framework.
+        Create a wrapped MulticalibrationError metric for use with the evaluation framework.
 
-    :param categorical_segment_columns: Columns to use for categorical segmentation.
-    :param numerical_segment_columns: Columns to use for numerical segmentation.
-    :param max_depth: Maximum depth for segment generation.
-    :param max_values_per_segment_feature: Max unique values per segment feature.
-    :param min_samples_per_segment: Minimum samples required per segment.
-    :param sigma_estimation_method: Method for sigma estimation.
-    :param max_n_segments: Maximum number of segments to generate.
-    :param metric_version: Which metric to return ('mce', 'mce_sigma_scale', 'mce_absolute', 'p_value').
-    :return: A ScoreFunctionInterface-compatible wrapper.
+        :param categorical_segment_columns: Columns to use for categorical segmentation.
+        :param numerical_segment_columns: Columns to use for numerical segmentation.
+        :param max_depth: Maximum depth for segment generation.
+        :param max_values_per_segment_feature: Max unique values per segment feature.
+        :param min_samples_per_segment: Minimum samples required per segment.
+        :param max_n_segments: Maximum number of segments to generate.
+    :param metric_version: Which metric to return ('mce_relative', 'mce_sigma', 'mce', 'p_value').
+        :return: A ScoreFunctionInterface-compatible wrapper.
     """
     if categorical_segment_columns is None and numerical_segment_columns is None:
         raise ValueError(
             "No segment columns provided. Please provide either "
             "categorical_segment_columns or numerical_segment_columns."
         )
-    valid_versions = ("mce", "mce_sigma_scale", "mce_absolute", "p_value")
+    valid_versions = ("mce_relative", "mce_sigma", "mce", "p_value")
     if metric_version not in valid_versions:
         raise ValueError(
             f"`metric_version` has to be one of {list(valid_versions)}. "
@@ -2158,18 +1820,16 @@ def wrap_multicalibration_error_metric(
             self,
             categorical_segment_columns: list[str] | None,
             numerical_segment_columns: list[str] | None,
-            max_depth: int = DEFAULT_MULTI_KUIPER_MAX_DEPTH,
-            max_values_per_segment_feature: int = DEFAULT_MULTI_KUIPER_MAX_VALUES_PER_SEGMENT_FEATURE,
-            min_samples_per_segment: int = DEFAULT_MULTI_KUIPER_MIN_SAMPLES_PER_SEGMENT,
-            sigma_estimation_method: str = DEFAULT_MULTI_KUIPER_NORMALIZATION_METHOD,
-            max_n_segments: int | None = DEFAULT_MULTI_KUIPER_N_SEGMENTS,
+            max_depth: int = DEFAULT_MCE_MAX_DEPTH,
+            max_values_per_segment_feature: int = DEFAULT_MCE_MAX_VALUES_PER_SEGMENT_FEATURE,
+            min_samples_per_segment: int = DEFAULT_MCE_MIN_SAMPLES_PER_SEGMENT,
+            max_n_segments: int | None = DEFAULT_MCE_N_SEGMENTS,
         ):
             self.categorical_segment_columns = categorical_segment_columns
             self.numerical_segment_columns = numerical_segment_columns
             self.max_depth = max_depth
             self.max_values_per_segment_feature = max_values_per_segment_feature
             self.min_samples_per_segment = min_samples_per_segment
-            self.sigma_estimation_method = sigma_estimation_method
             self.max_n_segments = max_n_segments
 
         def __call__(
@@ -2189,7 +1849,6 @@ def wrap_multicalibration_error_metric(
                 max_depth=self.max_depth,
                 max_values_per_segment_feature=self.max_values_per_segment_feature,
                 min_samples_per_segment=self.min_samples_per_segment,
-                sigma_estimation_method=self.sigma_estimation_method,
                 max_n_segments=self.max_n_segments,
             )
             return getattr(mce, metric_version)
@@ -2200,6 +1859,5 @@ def wrap_multicalibration_error_metric(
         max_depth,
         max_values_per_segment_feature,
         min_samples_per_segment,
-        sigma_estimation_method,
         max_n_segments,
     )

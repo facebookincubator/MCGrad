@@ -15,13 +15,7 @@ import scipy
 import sklearn.metrics as skmetrics
 
 from .. import _utils as utils, metrics
-from ..metrics import (
-    fpr,
-    kuiper_standard_deviation,
-    kuiper_test,
-    wrap_multicalibration_error_metric,
-    wrap_sklearn_metric_func,
-)
+from ..metrics import fpr, wrap_multicalibration_error_metric, wrap_sklearn_metric_func
 
 
 @pytest.fixture
@@ -539,13 +533,11 @@ def test_fpr():
         ([1.0, 1.0, 1.0, 1.0], [0, 1, 0, 0], None, 0.75),
     ],
 )
-def test_kuiper_calibration_gives_expected_result(
-    scores, labels, sample_weight, expected_result
-):
+def test_ecce_gives_expected_result(scores, labels, sample_weight, expected_result):
     scores, labels = np.array(scores), np.array(labels)
     if sample_weight is not None:
         sample_weight = np.array(sample_weight)
-    calibration_metric = metrics.kuiper_calibration(labels, scores, sample_weight)
+    calibration_metric = metrics.ecce(labels, scores, sample_weight)
 
     # Check that the offset is correctly calculated
     np.testing.assert_allclose(calibration_metric, expected_result)
@@ -560,18 +552,13 @@ def test_kuiper_calibration_gives_expected_result(
         ([0.6, 0.8, 0.2, 0.4], [0, 1, 0, 0], [0.4, 0.3, 0.2, 0.1], 1.289317),
     ],
 )
-def test_kuiper_calibration_standardized_gives_expected_result(
+def test_ecce_sigma_gives_expected_result(
     scores, labels, sample_weight, expected_result
 ):
     scores, labels = np.array(scores), np.array(labels)
     if sample_weight is not None:
         sample_weight = np.array(sample_weight)
-    calibration_metric = metrics.kuiper_calibration(
-        labels,
-        scores,
-        sample_weight,
-        normalization_method="kuiper_standard_deviation",
-    )
+    calibration_metric = metrics.ecce_sigma(labels, scores, sample_weight)
 
     # Check that the offset is correctly calculated
     np.testing.assert_allclose(calibration_metric, expected_result, atol=1e-5)
@@ -588,18 +575,13 @@ def test_kuiper_calibration_standardized_gives_expected_result(
         ([1.0, 1.0, 1.0, 1.0], [0, 0, 0, 0], None, np.inf),
     ],
 )
-def test_kuiper_calibration_standardized_gives_expected_result_for_scores_resulting_in_zero_kuiper_stat_variance(
+def test_ecce_sigma_gives_expected_result_for_scores_resulting_in_zero_variance(
     scores, labels, sample_weight, expected_result
 ):
     scores, labels = np.array(scores), np.array(labels)
     if sample_weight is not None:
         sample_weight = np.array(sample_weight)
-    calibration_metric = metrics.kuiper_calibration(
-        labels,
-        scores,
-        sample_weight,
-        normalization_method="kuiper_standard_deviation",
-    )
+    calibration_metric = metrics.ecce_sigma(labels, scores, sample_weight)
 
     # Check that the offset is correctly calculated
     np.testing.assert_allclose(calibration_metric, expected_result)
@@ -754,21 +736,18 @@ def test_calibration_ratio__with_unjoined_adjustment_gives_correct_results(
         (np.array([0.0, 0.0]), 0),
     ],
 )
-def test_that_kuiper_total_variance_is_correct(predicted_scores, expected):
-    assert kuiper_standard_deviation(predicted_scores) == np.sqrt(expected)
+def test_that_ecce_total_variance_is_correct(predicted_scores, expected):
+    assert metrics._ecce_standard_deviation(predicted_scores) == np.sqrt(expected)
 
 
-def test_that_kuiper_test_detects_miscalibration(rng):
-    # Test that the Kuiper test detects miscalibration
+def test_ecce_detects_miscalibration(rng):
+    # Test that ECCE detects miscalibration
     n = 100
     predictions = rng.uniform(low=0.0, high=1.0, size=n)
     miscalibrated_predictions = (predictions + 0.9) / 1.9
     labels = scipy.stats.binom.rvs(1, predictions, size=n, random_state=rng)
 
-    calibrated_stat, calibrated_p_value = kuiper_test(
-        labels=labels, predicted_scores=predictions
-    )
-    miscalibrated_stat, miscalibrated_p_value = kuiper_test(
+    miscalibrated_p_value = metrics.ecce_pvalue(
         labels=labels, predicted_scores=miscalibrated_predictions
     )
 
@@ -1009,10 +988,9 @@ def test_that_multicalibrationerror_is_equal_to_ecce_metric_on_single_segment():
         }
     )
 
-    global_kuiper_metric = metrics.kuiper_calibration(
+    global_ecce_metric = metrics.ecce(
         labels=test_df.label.values,
         predicted_scores=test_df.prediction.values,
-        normalization_method=None,
     )
 
     mce = metrics.MulticalibrationError(
@@ -1022,9 +1000,8 @@ def test_that_multicalibrationerror_is_equal_to_ecce_metric_on_single_segment():
         categorical_segment_columns=["segment_A"],
         max_depth=0,
         min_samples_per_segment=1,
-        sigma_estimation_method=None,
     )
-    assert np.isclose(mce.mce_absolute, global_kuiper_metric, rtol=1e-10, atol=1e-10)
+    assert np.isclose(mce.mce, global_ecce_metric, rtol=1e-10, atol=1e-10)
 
 
 @pytest.mark.parametrize(
@@ -1038,7 +1015,7 @@ def test_that_multicalibrationerror_is_equal_to_ecce_metric_on_single_segment():
         metrics.calibration_ratio,
         metrics.adaptive_calibration_error,
         metrics.expected_calibration_error,
-        metrics.kuiper_calibration,
+        metrics.ecce,
     ],
 )
 def test_wrap_sklearn_metric_func_does_not_raise_an_error_with_any_of_our_main_metrics(
@@ -1058,18 +1035,18 @@ def test_wrap_sklearn_metric_func_does_not_raise_an_error_with_any_of_our_main_m
     )
 
 
-def test_mce_wrapper_with_variant_mce_sigma_scale_has_the_right_name():
-    # This test is required to throw warnings when mce_sigma_scale is large after training mcgrad
+def test_mce_wrapper_with_variant_mce_sigma_has_the_right_name():
+    # This test is required to throw warnings when mce_sigma is large after training mcgrad
     # See the function determine_best_num_rounds in multicalibration.methods.py
     assert (
         wrap_multicalibration_error_metric(
             categorical_segment_columns="",
             numerical_segment_columns="",
-            metric_version="mce_sigma_scale",
+            metric_version="mce_sigma",
         ).name
-        == "Multicalibration Error<br>(mce_sigma_scale)"
+        == "Multicalibration Error<br>(mce_sigma)"
     ), (
-        "The name of the mce_sigma_scale variant should be Multicalibration Error<br>(mce_sigma_scale)."
+        "The name of the mce_sigma variant should be Multicalibration Error<br>(mce_sigma)."
     )
 
 
@@ -1187,10 +1164,8 @@ def test_mce_speedup_returns_values_equal_for_different_chunk_sizes(rng):
         chunk_size=7,
     )
 
-    assert np.equal(
-        mce_chunk25.segment_ecces_absolute, mce_chunk7.segment_ecces_absolute
-    ).all()
-    assert np.equal(mce_chunk25.segment_sigmas, mce_chunk7.segment_sigmas).all()
+    assert np.equal(mce_chunk25.segment_ecce, mce_chunk7.segment_ecce).all()
+    assert np.equal(mce_chunk25.segment_ecce_std, mce_chunk7.segment_ecce_std).all()
 
 
 def test_mce_sorting_does_not_modify_original_df(rng):
@@ -1313,12 +1288,12 @@ def test_mce_reducing_precision_dtype_returns_correct_value_upto_third_digit(rng
         precision_dtype="float64",
     )
     attrs_to_check = [
-        "segment_ecces_absolute",
-        "segment_ecces_sigma_scale",
-        "segment_sigmas",
+        "segment_ecce",
+        "segment_ecce_sigma",
+        "segment_ecce_std",
         "sigma_0",
-        "mce",
-        "mce_sigma_scale",
+        "mce_relative",
+        "mce_sigma",
         "mde",
     ]
     for attr_name in attrs_to_check:
@@ -1334,33 +1309,6 @@ def test_mce_reducing_precision_dtype_returns_correct_value_upto_third_digit(rng
             getattr(mce_float64, attr_name),
             rtol=FLOAT32_TOLERANCE,
         ).all()
-
-
-def test_equivalence_kuiper_label_based_standard_deviation_per_segment():
-    predicted_scores = np.random.rand(100)
-    labels = np.random.rand(100)
-    sample_weight = np.random.rand(100)
-
-    seg_idx_list = [
-        [1, 5, 10, 15, 20, 25, 30, 35, 40, 45],
-        [2, 6, 11, 16, 21, 26, 31, 36, 41, 46],
-        [3, 7, 12, 17, 22, 27, 32, 37, 42, 47],
-        [4, 8, 13, 18, 23, 28, 33, 38, 43, 48],
-        [5, 9, 14, 19, 24, 29, 34, 39, 44, 49],
-    ]
-
-    segments = np.zeros(shape=(5, 100), dtype=np.bool_)
-    std_dev_original = np.zeros(shape=(5,), dtype=np.float64)
-    for i, seg_idx in enumerate(seg_idx_list):
-        std_dev_original[i] = metrics.kuiper_label_based_standard_deviation(
-            predicted_scores[seg_idx], labels[seg_idx], sample_weight[seg_idx]
-        )
-        segments[i, seg_idx] = 1
-
-    std_dev_segment_based = metrics.kuiper_label_based_standard_deviation_per_segment(
-        predicted_scores, labels, sample_weight, segments
-    ).reshape(-1)
-    assert np.allclose(std_dev_original, std_dev_segment_based)
 
 
 def test_segment_feature_values_has_the_correct_features_used_for_segment_generation(
@@ -1538,21 +1486,21 @@ def test_precision_dtype_is_maintained_in_multicalibration_error_methods(rng):
         precision_dtype="float64",
     )
 
-    assert mce_float16.segment_ecces_sigma_scale.dtype == np.float16
-    assert mce_float32.segment_ecces_sigma_scale.dtype == np.float32
-    assert mce_float64.segment_ecces_sigma_scale.dtype == np.float64
+    assert mce_float16.segment_ecce_sigma.dtype == np.float16
+    assert mce_float32.segment_ecce_sigma.dtype == np.float32
+    assert mce_float64.segment_ecce_sigma.dtype == np.float64
 
-    assert mce_float16.segment_sigmas.dtype == np.float16
-    assert mce_float32.segment_sigmas.dtype == np.float32
-    assert mce_float64.segment_sigmas.dtype == np.float64
+    assert mce_float16.segment_ecce_std.dtype == np.float16
+    assert mce_float32.segment_ecce_std.dtype == np.float32
+    assert mce_float64.segment_ecce_std.dtype == np.float64
 
-    assert mce_float16.segment_ecces_absolute.dtype == np.float16
-    assert mce_float32.segment_ecces_absolute.dtype == np.float32
-    assert mce_float64.segment_ecces_absolute.dtype == np.float64
+    assert mce_float16.segment_ecce.dtype == np.float16
+    assert mce_float32.segment_ecce.dtype == np.float32
+    assert mce_float64.segment_ecce.dtype == np.float64
 
-    assert mce_float16.mce_sigma_scale.dtype == np.float16
-    assert mce_float32.mce_sigma_scale.dtype == np.float32
-    assert mce_float64.mce_sigma_scale.dtype == np.float64
+    assert mce_float16.mce_sigma.dtype == np.float16
+    assert mce_float32.mce_sigma.dtype == np.float32
+    assert mce_float64.mce_sigma.dtype == np.float64
 
 
 def test_precision_dtype_is_extended_for_large_weights(rng):
@@ -1612,27 +1560,20 @@ def test_ecce_and_standard_deviation_return_zero_for_empty_segment(rng):
         dtype=bool,
     )
 
-    c_jk = metrics.kuiper_calibration_per_segment(
+    c_jk = metrics._ecce_per_segment(
         labels=df["label"].values,
         predicted_scores=df["prediction"].values,
         sample_weight=df["weights"].values,
         segments=masks,
     )[0]
 
-    k_ub = metrics.kuiper_upper_bound_standard_deviation_per_segment(
+    k_std = metrics._ecce_standard_deviation_per_segment(
         labels=df["label"].values,
         predicted_scores=df["prediction"].values,
         sample_weight=df["weights"].values,
         segments=masks,
     )[0]
-
-    k_std = metrics.kuiper_standard_deviation_per_segment(
-        labels=df["label"].values,
-        predicted_scores=df["prediction"].values,
-        sample_weight=df["weights"].values,
-        segments=masks,
-    )[0]
-    assert c_jk == k_ub == k_std, "Expected 0 for empty segment"
+    assert c_jk == k_std == 0, "Expected 0 for empty segment"
 
 
 def test_multicalibration_error_does_not_modify_segments_df():
@@ -1697,44 +1638,22 @@ def test_rank_multicalibration_error_does_not_modify_segments_df(rng):
 
 
 @pytest.mark.parametrize(
-    "metric_func",
-    [
-        metrics.kuiper_pvalue_per_segment,
-        metrics.kuiper_statistic_per_segment,
-    ],
-)
-def test_kuiper_per_segment_does_not_modify_segments_df(rng, metric_func):
-    n_samples = 100
-    labels = rng.randint(0, 2, n_samples)
-    predictions = rng.random_sample(n_samples)
-    segments_df = pd.DataFrame({"segment": rng.choice(["A", "B"], size=n_samples)})
-
-    segments_df_original = segments_df.copy()
-
-    _ = metric_func(labels=labels, predictions=predictions, segments_df=segments_df)
-
-    pd.testing.assert_frame_equal(segments_df, segments_df_original)
-
-
-@pytest.mark.parametrize(
     "metric_func,metric_kwargs,use_sample_weight",
     [
         (metrics.expected_calibration_error, {}, True),
         (metrics.expected_calibration_error, {}, False),
         (metrics.calibration_ratio, {}, True),
         (metrics.calibration_ratio, {}, False),
-        (
-            metrics.kuiper_calibration,
-            {"normalization_method": "kuiper_standard_deviation"},
-            True,
-        ),
-        (
-            metrics.kuiper_calibration,
-            {"normalization_method": "kuiper_standard_deviation"},
-            False,
-        ),
+        (metrics.ecce_sigma, {}, True),
+        (metrics.ecce_sigma, {}, False),
         (metrics.normalized_entropy, {}, True),
         (metrics.normalized_entropy, {}, False),
+        (metrics.ecce, {}, True),
+        (metrics.ecce, {}, False),
+        (metrics.ecce_sigma, {}, True),
+        (metrics.ecce_sigma, {}, False),
+        (metrics.ecce_pvalue, {}, True),
+        (metrics.ecce_pvalue, {}, False),
     ],
 )
 def test_metric_does_not_modify_input_arrays(
@@ -1780,46 +1699,6 @@ def test_ranking_metric_does_not_modify_input_arrays(rng, metric_func, metric_kw
 
     np.testing.assert_array_equal(labels, labels_original)
     np.testing.assert_array_equal(predicted_labels, predicted_labels_original)
-
-
-@pytest.mark.parametrize(
-    "predictions,labels,sample_weight",
-    [
-        # Minimum viable case (2 points)
-        (np.array([0.1, 0.9]), np.array([0, 1]), None),
-        # Edge case: all same predictions
-        (np.array([0.5, 0.5, 0.5, 0.5]), np.array([0, 1, 0, 1]), None),
-        # Edge case: boundary values (0 and 1)
-        (np.array([0.0, 1.0, 0.5]), np.array([0, 1, 0]), None),
-        # With sample weights
-        (np.array([0.1, 0.5, 0.9]), np.array([0, 1, 1]), np.array([1.0, 2.0, 1.0])),
-        # Edge case: very small differences
-        (np.array([0.500, 0.501, 0.502]), np.array([0, 1, 0]), None),
-    ],
-)
-def test_kuiper_label_based_standard_deviation_edge_cases(
-    predictions, labels, sample_weight
-):
-    result = metrics.kuiper_label_based_standard_deviation(
-        predictions, labels, sample_weight
-    )
-    assert result >= 0
-    assert not np.isnan(result)
-
-
-def test_kuiper_label_based_standard_deviation_perfect_calibration():
-    # Perfect calibration should give near-zero deviation
-    predictions = np.array([0.0, 0.25, 0.5, 0.75, 1.0])
-    labels = np.array([0.0, 0.25, 0.5, 0.75, 1.0])
-    result = metrics.kuiper_label_based_standard_deviation(predictions, labels)
-    assert result == pytest.approx(0, abs=1e-10)
-
-
-def test_kuiper_label_based_standard_deviation_requires_labels():
-    with pytest.raises(ValueError, match="Labels are required"):
-        metrics.kuiper_label_based_standard_deviation(
-            np.array([0.1, 0.5, 0.9]), labels=None
-        )
 
 
 def test_calibration_free_normalized_entropy_higher_for_reversed_predictions():
@@ -2056,59 +1935,7 @@ def test_calculate_cumulative_differences_raises_error_with_mismatched_segments(
         )
 
 
-def test_kuiper_upper_bound_standard_deviation_per_segment_with_default_sample_weight():
-    predicted_scores = np.array([0.1, 0.5, 0.9, 0.2, 0.8])
-
-    result = metrics.kuiper_upper_bound_standard_deviation_per_segment(
-        predicted_scores=predicted_scores,
-        sample_weight=None,
-    )
-
-    assert isinstance(result, np.ndarray)
-    assert len(result) == 1
-    assert result[0] >= 0
-
-
-def test_kuiper_upper_bound_standard_deviation_per_segment_with_default_segments():
-    predicted_scores = np.array([0.1, 0.5, 0.9, 0.2, 0.8])
-    sample_weight = np.array([1.0, 1.0, 1.0, 1.0, 1.0])
-
-    result = metrics.kuiper_upper_bound_standard_deviation_per_segment(
-        predicted_scores=predicted_scores,
-        sample_weight=sample_weight,
-        segments=None,
-    )
-
-    assert isinstance(result, np.ndarray)
-    assert result.shape == (1,)
-    assert result[0] >= 0
-
-
-def test_kuiper_upper_bound_standard_deviation_wrapper_gives_expected_result():
-    predicted_scores = np.array([0.1, 0.5, 0.9, 0.2, 0.8])
-
-    result = metrics.kuiper_upper_bound_standard_deviation(
-        predicted_scores=predicted_scores,
-    )
-
-    assert isinstance(result, (float, np.floating))
-    assert result >= 0
-
-
-def test_kuiper_upper_bound_standard_deviation_with_sample_weight():
-    predicted_scores = np.array([0.1, 0.5, 0.9, 0.2, 0.8])
-    sample_weight = np.array([2.0, 1.0, 1.0, 1.0, 1.0])
-
-    result = metrics.kuiper_upper_bound_standard_deviation(
-        predicted_scores=predicted_scores,
-        sample_weight=sample_weight,
-    )
-
-    assert isinstance(result, (float, np.floating))
-    assert result >= 0
-
-
-def test_kuiper_standard_deviation_per_segment_raises_error_with_mismatched_segments():
+def test_ecce_standard_deviation_per_segment_raises_error_with_mismatched_segments():
     predicted_scores = np.array([0.1, 0.5, 0.9, 0.2, 0.8])
     # Create segments with wrong shape (3 samples instead of 5)
     segments = np.ones(shape=(2, 3), dtype=np.bool_)
@@ -2116,213 +1943,53 @@ def test_kuiper_standard_deviation_per_segment_raises_error_with_mismatched_segm
     with pytest.raises(
         ValueError, match="Segments must be the same length as labels/predictions"
     ):
-        metrics.kuiper_standard_deviation_per_segment(
+        metrics._ecce_standard_deviation_per_segment(
             predicted_scores=predicted_scores,
             segments=segments,
         )
 
 
-def test_kuiper_label_based_standard_deviation_per_segment_with_default_sample_weight():
-    predicted_scores = np.array([0.1, 0.5, 0.9, 0.2, 0.8])
-    labels = np.array([0, 1, 1, 0, 1])
-
-    result = metrics.kuiper_label_based_standard_deviation_per_segment(
-        predicted_scores=predicted_scores,
-        labels=labels,
-        sample_weight=None,
-    )
-
-    assert isinstance(result, np.ndarray)
-    assert len(result) == 1
-    assert result[0] >= 0
-
-
-def test_kuiper_label_based_standard_deviation_per_segment_with_default_segments():
-    predicted_scores = np.array([0.1, 0.5, 0.9, 0.2, 0.8])
-    labels = np.array([0, 1, 1, 0, 1])
-    sample_weight = np.array([1.0, 1.0, 1.0, 1.0, 1.0])
-
-    result = metrics.kuiper_label_based_standard_deviation_per_segment(
-        predicted_scores=predicted_scores,
-        labels=labels,
-        sample_weight=sample_weight,
-        segments=None,
-    )
-
-    assert isinstance(result, np.ndarray)
-    assert result.shape == (1,)
-    assert result[0] >= 0
-
-
-def test_kuiper_label_based_standard_deviation_per_segment_raises_error_when_labels_none():
-    predicted_scores = np.array([0.1, 0.5, 0.9, 0.2, 0.8])
-
-    with pytest.raises(ValueError, match="Labels are required for this method"):
-        metrics.kuiper_label_based_standard_deviation_per_segment(
-            predicted_scores=predicted_scores,
-            labels=None,
-        )
-
-
-def test_kuiper_distribution_returns_near_one_for_large_x():
-    result = metrics.kuiper_distribution(8.3)
+def test_ecce_cdf_returns_near_one_for_large_x():
+    result = metrics._ecce_cdf(8.3)
 
     assert result == pytest.approx(1.0)
 
-    result_large = metrics.kuiper_distribution(100.0)
+    result_large = metrics._ecce_cdf(100.0)
     assert result_large == pytest.approx(1.0)
 
 
-def test_normalization_method_assignment_raises_error_for_unknown_method():
-    with pytest.raises(
-        ValueError, match="Unknown normalization method.*Available methods"
-    ):
-        metrics._normalization_method_assignment("invalid_method")
-
-
-def test_kuiper_test_returns_pvalue_one_for_very_small_statistic():
+def test_ecce_pvalue_returns_one_for_very_small_statistic():
     # Create perfectly calibrated predictions
     labels = np.array([0.0, 0.0, 1.0, 1.0])
     predicted_scores = np.array([0.0, 0.0, 1.0, 1.0])
 
-    statistic, pval = metrics.kuiper_test(
-        labels=labels, predicted_scores=predicted_scores
-    )
+    pval = metrics.ecce_pvalue(labels=labels, predicted_scores=predicted_scores)
 
     # With perfect calibration, statistic should be very small and pval should be ~1.0
     assert pval == pytest.approx(1.0, abs=0.1)
 
 
-def test_kuiper_test_returns_epsilon_pvalue_for_very_large_statistic():
+def test_ecce_pvalue_returns_epsilon_pvalue_for_very_large_statistic():
     # Create extremely miscalibrated predictions to force large statistic
     labels = np.array([0] * 50 + [1] * 50)
     predicted_scores = np.array([0.99] * 50 + [0.01] * 50)
 
-    statistic, pval = metrics.kuiper_test(
-        labels=labels, predicted_scores=predicted_scores
-    )
+    statistic = metrics.ecce_sigma(labels=labels, predicted_scores=predicted_scores)
+    pval = metrics.ecce_pvalue_from_sigma(statistic)
 
     # With extreme miscalibration, pval should be very small
     assert pval < 0.01
     assert statistic > 5  # Should be a large statistic
 
 
-def test_kuiper_statistic_wrapper_returns_statistic_only():
+def test_ecce_pvalue_returns_pvalue_only():
     labels = np.array([0, 1, 1, 0, 1])
     predicted_scores = np.array([0.1, 0.9, 0.8, 0.2, 0.7])
 
-    statistic = metrics.kuiper_statistic(
-        labels=labels, predicted_scores=predicted_scores
-    )
-
-    assert isinstance(statistic, (float, np.floating))
-    assert statistic >= 0
-
-
-def test_kuiper_pvalue_wrapper_returns_pvalue_only():
-    labels = np.array([0, 1, 1, 0, 1])
-    predicted_scores = np.array([0.1, 0.9, 0.8, 0.2, 0.7])
-
-    pvalue = metrics.kuiper_pvalue(labels=labels, predicted_scores=predicted_scores)
+    pvalue = metrics.ecce_pvalue(labels=labels, predicted_scores=predicted_scores)
 
     assert isinstance(pvalue, (float, np.floating))
     assert 0 <= pvalue <= 1
-
-
-def test_kuiper_pvalue_per_segment_calculates_pvalues_for_each_segment():
-    labels = np.array([0, 1, 0, 1, 0, 1, 0, 1])
-    predictions = np.array([0.1, 0.9, 0.2, 0.8, 0.1, 0.9, 0.2, 0.8])
-    segments_df = pd.DataFrame({"segment": ["A", "A", "A", "A", "B", "B", "B", "B"]})
-
-    result = metrics.kuiper_pvalue_per_segment(
-        labels=labels, predictions=predictions, segments_df=segments_df
-    )
-
-    assert isinstance(result, pd.Series)
-    assert len(result) == 2
-    assert all(0 <= pval <= 1 for pval in result.values)
-
-
-def test_kuiper_statistic_per_segment_calculates_statistics_for_each_segment():
-    labels = np.array([0, 1, 0, 1, 0, 1, 0, 1])
-    predictions = np.array([0.1, 0.9, 0.2, 0.8, 0.1, 0.9, 0.2, 0.8])
-    segments_df = pd.DataFrame({"segment": ["A", "A", "A", "A", "B", "B", "B", "B"]})
-
-    result = metrics.kuiper_statistic_per_segment(
-        labels=labels, predictions=predictions, segments_df=segments_df
-    )
-
-    assert isinstance(result, pd.Series)
-    assert len(result) == 2
-    assert all(stat >= 0 for stat in result.values)
-
-
-def test_multi_segment_pvalue_geometric_mean_calculates_geometric_mean():
-    labels = np.array([0, 1, 0, 1, 0, 1, 0, 1])
-    predictions = np.array([0.1, 0.9, 0.2, 0.8, 0.1, 0.9, 0.2, 0.8])
-    segments_df = pd.DataFrame({"segment": ["A", "A", "A", "A", "B", "B", "B", "B"]})
-
-    result = metrics.multi_segment_pvalue_geometric_mean(
-        labels=labels, predictions=predictions, segments_df=segments_df
-    )
-
-    assert isinstance(result, (float, np.floating))
-    assert 0 <= result <= 1
-
-
-def test_multi_segment_inverse_sqrt_normalized_statistic_max_returns_max():
-    labels = np.array([0, 1, 0, 1, 0, 1, 0, 1])
-    predictions = np.array([0.1, 0.9, 0.2, 0.8, 0.1, 0.9, 0.2, 0.8])
-    segments_df = pd.DataFrame({"segment": ["A", "A", "A", "A", "B", "B", "B", "B"]})
-
-    result = metrics.multi_segment_inverse_sqrt_normalized_statistic_max(
-        labels=labels, predictions=predictions, segments_df=segments_df
-    )
-
-    assert isinstance(result, (float, np.floating))
-    assert result >= 0
-
-
-def test_multi_segment_kuiper_test_with_poisson_combination():
-    labels = np.array([0, 1, 0, 1, 0, 1, 0, 1])
-    predictions = np.array([0.1, 0.9, 0.2, 0.8, 0.1, 0.9, 0.2, 0.8])
-    segments_df = pd.DataFrame({"segment": ["A", "A", "A", "A", "B", "B", "B", "B"]})
-
-    result = metrics.multi_segment_kuiper_test(
-        labels=labels,
-        predictions=predictions,
-        segments_df=segments_df,
-        combination_method="poisson",
-    )
-
-    assert isinstance(result, dict)
-    assert "n_segments" in result
-    assert "statistic" in result
-    assert "p_value" in result
-    assert "segment_p_values" in result
-
-    assert result["n_segments"] == 2
-    assert 0 <= result["p_value"] <= 1
-
-
-def test_multi_segment_kuiper_test_with_fisher_combination():
-    labels = np.array([0, 1, 0, 1, 0, 1, 0, 1])
-    predictions = np.array([0.1, 0.9, 0.2, 0.8, 0.1, 0.9, 0.2, 0.8])
-    segments_df = pd.DataFrame({"segment": ["A", "A", "A", "A", "B", "B", "B", "B"]})
-
-    result = metrics.multi_segment_kuiper_test(
-        labels=labels,
-        predictions=predictions,
-        segments_df=segments_df,
-        combination_method="fisher",
-    )
-
-    assert isinstance(result, dict)
-    assert "n_segments" in result
-    assert "statistic" in result
-    assert "p_value" in result
-    assert result["n_segments"] == 2
-    assert 0 <= result["p_value"] <= 1
 
 
 def test_rank_multicalibration_error_calculates_weighted_average():
@@ -2441,7 +2108,7 @@ def test_multicalibration_error_segment_indices_returns_series(rng):
 
 
 def test_multicalibration_error_global_ecce_returns_first_segment_ecce():
-    """Test MulticalibrationError.global_ecce returns segment_ecces[0]"""
+    """Test MulticalibrationError.global_ecce returns segment_ecce_relative[0]"""
     df = pd.DataFrame(
         {
             "prediction": [0.1, 0.9, 0.2, 0.8, 0.4, 0.6],
@@ -2462,13 +2129,13 @@ def test_multicalibration_error_global_ecce_returns_first_segment_ecce():
     # Access global_ecce property
     global_ecce = mce.global_ecce
 
-    # Should equal segment_ecces[0]
-    assert global_ecce == mce.segment_ecces[0]
+    # Should equal segment_ecce_relative[0]
+    assert global_ecce == mce.segment_ecce[0]
     assert isinstance(global_ecce, (float, np.floating))
 
 
 def test_multicalibration_error_global_ecce_sigma_scale_returns_first_segment():
-    """Test MulticalibrationError.global_ecce_sigma_scale returns segment_ecces_sigma_scale[0]"""
+    """Test MulticalibrationError.global_ecce_sigma_scale returns segment_ecce_sigma[0]"""
     df = pd.DataFrame(
         {
             "prediction": [0.1, 0.9, 0.2, 0.8, 0.4, 0.6],
@@ -2488,7 +2155,7 @@ def test_multicalibration_error_global_ecce_sigma_scale_returns_first_segment():
 
     global_ecce_sigma_scale = mce.global_ecce_sigma_scale
 
-    assert global_ecce_sigma_scale == mce.segment_ecces_sigma_scale[0]
+    assert global_ecce_sigma_scale == mce.segment_ecce_sigma[0]
     assert isinstance(global_ecce_sigma_scale, (float, np.floating))
 
 
@@ -2513,12 +2180,12 @@ def test_multicalibration_error_global_ecce_p_value_returns_first_segment():
     # Access global_ecce_p_value property
     global_ecce_p_value = mce.global_ecce_p_value
 
-    # Should equal segment_p_values[0]
-    assert global_ecce_p_value == mce.segment_p_values[0]
+    # Should equal segment_ecce_pvalue[0]
+    assert global_ecce_p_value == mce.segment_ecce_pvalue[0]
     assert 0 <= global_ecce_p_value <= 1
 
 
-def test_multicalibration_error_sigma_0_fallback_when_segment_sigmas_not_computed():
+def test_multicalibration_error_sigma_0_fallback_when_segment_ecce_std_not_computed():
     df = pd.DataFrame(
         {
             "prediction": [0.1, 0.5, 0.9, 0.2, 0.8],
@@ -2536,7 +2203,7 @@ def test_multicalibration_error_sigma_0_fallback_when_segment_sigmas_not_compute
         max_depth=0,
     )
 
-    # Access sigma_0 before segment_sigmas is computed
+    # Access sigma_0 before segment_ecce_std is computed
     # This should trigger the fallback path
     sigma_0 = mce.sigma_0
 
@@ -2545,7 +2212,7 @@ def test_multicalibration_error_sigma_0_fallback_when_segment_sigmas_not_compute
     assert sigma_0 >= 0
 
 
-def test_multicalibration_error_p_value_fallback_when_segment_p_values_not_computed():
+def test_multicalibration_error_p_value_fallback_when_segment_ecce_pvalue_not_computed():
     df = pd.DataFrame(
         {
             "prediction": [0.1, 0.5, 0.9, 0.2, 0.8],
@@ -2563,8 +2230,8 @@ def test_multicalibration_error_p_value_fallback_when_segment_p_values_not_compu
         max_depth=0,
     )
 
-    # Access p_value before segment_p_values is computed
-    # This should trigger the fallback path using kuiper_distribution
+    # Access p_value before segment_ecce_pvalue is computed
+    # This should trigger the fallback path using _ecce_cdf
     p_value = mce.p_value
 
     # Should return a valid p-value
@@ -2611,3 +2278,12 @@ def test_ndcg_score_returns_nan_on_empty_arrays():
     predicted_labels = np.array([])
     result = metrics.ndcg_score(labels, predicted_labels)
     assert np.isnan(result), f"Expected NaN for empty arrays, got {result}"
+
+
+def test_ecce_pvalue_consistency_with_ecce_pvalue_from_sigma(rng):
+    labels = rng.randint(0, 2, 100)
+    predicted_scores = rng.rand(100)
+    ecce_pvalue_result = metrics.ecce_pvalue(labels, predicted_scores)
+    sigma = metrics.ecce_sigma(labels, predicted_scores)
+    ecce_pvalue_from_sigma_result = metrics.ecce_pvalue_from_sigma(sigma)
+    assert ecce_pvalue_result == pytest.approx(ecce_pvalue_from_sigma_result, rel=1e-10)
