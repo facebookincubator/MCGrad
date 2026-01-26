@@ -9,7 +9,23 @@ description: How to install MCGrad for Python. Requirements, pip installation, a
 
 MCGrad requires Python 3.10 or later.
 
-### From Source
+### Pip (recommended)
+
+Install the latest stable release from PyPI:
+```bash
+pip install mcgrad
+```
+
+Install the latest development version from GitHub:
+```bash
+pip install git+https://github.com/facebookincubator/MCGrad.git
+```
+
+See [Verification](#verification) below to confirm the install worked.
+
+### From Source (advanced/contributors)
+
+Most users should install via pip above. Installing from source is intended for advanced users who need to build locally or contributors working on the codebase.
 
 To install from source:
 
@@ -19,21 +35,21 @@ cd MCGrad
 pip install .
 ```
 
-### Development Installation
+### Development Installation (contributors only)
 
-For development, install with development dependencies:
+This is only needed if you plan to contribute to MCGrad or develop locally. It installs MCGrad in editable mode and adds development dependencies.
 
 ```bash
 pip install -e ".[dev]"
 ```
 
-This installs the package in editable mode along with:
+This includes development tooling:
 - pytest for running tests;
 - flake8 for code linting.
 
 ### Verification
 
-Verify the installation by running a minimal example:
+You can verify that MCGrad is correctly installed (regardless of the installation method used) by running a minimal example:
 
 ```python
 from mcgrad import methods
