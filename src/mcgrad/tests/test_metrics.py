@@ -15,12 +15,7 @@ import scipy
 import sklearn.metrics as skmetrics
 
 from .. import _utils as utils, metrics
-from ..metrics import (
-    fpr,
-    kuiper_test,
-    wrap_multicalibration_error_metric,
-    wrap_sklearn_metric_func,
-)
+from ..metrics import fpr, wrap_multicalibration_error_metric, wrap_sklearn_metric_func
 
 
 @pytest.fixture
@@ -745,17 +740,14 @@ def test_that_kuiper_total_variance_is_correct(predicted_scores, expected):
     assert metrics._ecce_standard_deviation(predicted_scores) == np.sqrt(expected)
 
 
-def test_that_kuiper_test_detects_miscalibration(rng):
+def test_ecce_detects_miscalibration(rng):
     # Test that the Kuiper test detects miscalibration
     n = 100
     predictions = rng.uniform(low=0.0, high=1.0, size=n)
     miscalibrated_predictions = (predictions + 0.9) / 1.9
     labels = scipy.stats.binom.rvs(1, predictions, size=n, random_state=rng)
 
-    calibrated_stat, calibrated_p_value = kuiper_test(
-        labels=labels, predicted_scores=predictions
-    )
-    miscalibrated_stat, miscalibrated_p_value = kuiper_test(
+    miscalibrated_p_value = metrics.ecce_pvalue(
         labels=labels, predicted_scores=miscalibrated_predictions
     )
 
@@ -1968,27 +1960,24 @@ def test_ecce_cdf_returns_near_one_for_large_x():
     assert result_large == pytest.approx(1.0)
 
 
-def test_kuiper_test_returns_pvalue_one_for_very_small_statistic():
+def test_ecce_pvalue_returns_one_for_very_small_statistic():
     # Create perfectly calibrated predictions
     labels = np.array([0.0, 0.0, 1.0, 1.0])
     predicted_scores = np.array([0.0, 0.0, 1.0, 1.0])
 
-    statistic, pval = metrics.kuiper_test(
-        labels=labels, predicted_scores=predicted_scores
-    )
+    pval = metrics.ecce_pvalue(labels=labels, predicted_scores=predicted_scores)
 
     # With perfect calibration, statistic should be very small and pval should be ~1.0
     assert pval == pytest.approx(1.0, abs=0.1)
 
 
-def test_kuiper_test_returns_epsilon_pvalue_for_very_large_statistic():
+def test_ecce_pvalue_returns_epsilon_pvalue_for_very_large_statistic():
     # Create extremely miscalibrated predictions to force large statistic
     labels = np.array([0] * 50 + [1] * 50)
     predicted_scores = np.array([0.99] * 50 + [0.01] * 50)
 
-    statistic, pval = metrics.kuiper_test(
-        labels=labels, predicted_scores=predicted_scores
-    )
+    statistic = metrics.ecce_sigma(labels=labels, predicted_scores=predicted_scores)
+    pval = metrics.ecce_pvalue_from_sigma(statistic)
 
     # With extreme miscalibration, pval should be very small
     assert pval < 0.01
@@ -2293,9 +2282,10 @@ def test_ndcg_score_returns_nan_on_empty_arrays():
     assert np.isnan(result), f"Expected NaN for empty arrays, got {result}"
 
 
-def test_ecce_pvalue_consistency_with_kuiper_pvalue(rng):
+def test_ecce_pvalue_consistency_with_ecce_pvalue_from_sigma(rng):
     labels = rng.randint(0, 2, 100)
     predicted_scores = rng.rand(100)
     ecce_pvalue_result = metrics.ecce_pvalue(labels, predicted_scores)
-    _, kuiper_pvalue_result = metrics.kuiper_test(labels, predicted_scores)
-    assert ecce_pvalue_result == pytest.approx(kuiper_pvalue_result, rel=1e-10)
+    sigma = metrics.ecce_sigma(labels, predicted_scores)
+    ecce_pvalue_from_sigma_result = metrics.ecce_pvalue_from_sigma(sigma)
+    assert ecce_pvalue_result == pytest.approx(ecce_pvalue_from_sigma_result, rel=1e-10)
