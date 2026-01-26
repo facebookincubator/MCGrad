@@ -539,13 +539,11 @@ def test_fpr():
         ([1.0, 1.0, 1.0, 1.0], [0, 1, 0, 0], None, 0.75),
     ],
 )
-def test_kuiper_calibration_gives_expected_result(
-    scores, labels, sample_weight, expected_result
-):
+def test_ecce_gives_expected_result(scores, labels, sample_weight, expected_result):
     scores, labels = np.array(scores), np.array(labels)
     if sample_weight is not None:
         sample_weight = np.array(sample_weight)
-    calibration_metric = metrics.kuiper_calibration(labels, scores, sample_weight)
+    calibration_metric = metrics.ecce(labels, scores, sample_weight)
 
     # Check that the offset is correctly calculated
     np.testing.assert_allclose(calibration_metric, expected_result)
@@ -560,18 +558,13 @@ def test_kuiper_calibration_gives_expected_result(
         ([0.6, 0.8, 0.2, 0.4], [0, 1, 0, 0], [0.4, 0.3, 0.2, 0.1], 1.289317),
     ],
 )
-def test_kuiper_calibration_standardized_gives_expected_result(
+def test_ecce_sigma_gives_expected_result(
     scores, labels, sample_weight, expected_result
 ):
     scores, labels = np.array(scores), np.array(labels)
     if sample_weight is not None:
         sample_weight = np.array(sample_weight)
-    calibration_metric = metrics.kuiper_calibration(
-        labels,
-        scores,
-        sample_weight,
-        normalization_method="kuiper_standard_deviation",
-    )
+    calibration_metric = metrics.ecce_sigma(labels, scores, sample_weight)
 
     # Check that the offset is correctly calculated
     np.testing.assert_allclose(calibration_metric, expected_result, atol=1e-5)
@@ -588,18 +581,13 @@ def test_kuiper_calibration_standardized_gives_expected_result(
         ([1.0, 1.0, 1.0, 1.0], [0, 0, 0, 0], None, np.inf),
     ],
 )
-def test_kuiper_calibration_standardized_gives_expected_result_for_scores_resulting_in_zero_kuiper_stat_variance(
+def test_ecce_sigma_gives_expected_result_for_scores_resulting_in_zero_variance(
     scores, labels, sample_weight, expected_result
 ):
     scores, labels = np.array(scores), np.array(labels)
     if sample_weight is not None:
         sample_weight = np.array(sample_weight)
-    calibration_metric = metrics.kuiper_calibration(
-        labels,
-        scores,
-        sample_weight,
-        normalization_method="kuiper_standard_deviation",
-    )
+    calibration_metric = metrics.ecce_sigma(labels, scores, sample_weight)
 
     # Check that the offset is correctly calculated
     np.testing.assert_allclose(calibration_metric, expected_result)
@@ -1009,10 +997,9 @@ def test_that_multicalibrationerror_is_equal_to_ecce_metric_on_single_segment():
         }
     )
 
-    global_kuiper_metric = metrics.kuiper_calibration(
+    global_ecce_metric = metrics.ecce(
         labels=test_df.label.values,
         predicted_scores=test_df.prediction.values,
-        normalization_method=None,
     )
 
     mce = metrics.MulticalibrationError(
@@ -1024,7 +1011,7 @@ def test_that_multicalibrationerror_is_equal_to_ecce_metric_on_single_segment():
         min_samples_per_segment=1,
         sigma_estimation_method=None,
     )
-    assert np.isclose(mce.mce_absolute, global_kuiper_metric, rtol=1e-10, atol=1e-10)
+    assert np.isclose(mce.mce_absolute, global_ecce_metric, rtol=1e-10, atol=1e-10)
 
 
 @pytest.mark.parametrize(
@@ -1038,7 +1025,7 @@ def test_that_multicalibrationerror_is_equal_to_ecce_metric_on_single_segment():
         metrics.calibration_ratio,
         metrics.adaptive_calibration_error,
         metrics.expected_calibration_error,
-        metrics.kuiper_calibration,
+        metrics.ecce,
     ],
 )
 def test_wrap_sklearn_metric_func_does_not_raise_an_error_with_any_of_our_main_metrics(
@@ -1723,16 +1710,8 @@ def test_kuiper_per_segment_does_not_modify_segments_df(rng, metric_func):
         (metrics.expected_calibration_error, {}, False),
         (metrics.calibration_ratio, {}, True),
         (metrics.calibration_ratio, {}, False),
-        (
-            metrics.kuiper_calibration,
-            {"normalization_method": "kuiper_standard_deviation"},
-            True,
-        ),
-        (
-            metrics.kuiper_calibration,
-            {"normalization_method": "kuiper_standard_deviation"},
-            False,
-        ),
+        (metrics.ecce_sigma, {}, True),
+        (metrics.ecce_sigma, {}, False),
         (metrics.normalized_entropy, {}, True),
         (metrics.normalized_entropy, {}, False),
         (metrics.ecce, {}, True),
@@ -2619,42 +2598,9 @@ def test_ndcg_score_returns_nan_on_empty_arrays():
     assert np.isnan(result), f"Expected NaN for empty arrays, got {result}"
 
 
-# ECCE wrapper function tests
-def test_ecce_consistency_with_kuiper_calibration(rng):
-    labels = rng.randint(0, 2, 100)
-    predicted_scores = rng.rand(100)
-    ecce_result = metrics.ecce(labels, predicted_scores)
-    kuiper_result = metrics.kuiper_calibration(
-        labels, predicted_scores, normalization_method=None
-    )
-    assert ecce_result == pytest.approx(kuiper_result, rel=1e-10)
-
-
-def test_ecce_sigma_consistency_with_kuiper_calibration(rng):
-    labels = rng.randint(0, 2, 100)
-    predicted_scores = rng.rand(100)
-    ecce_sigma_result = metrics.ecce_sigma(labels, predicted_scores)
-    kuiper_result = metrics.kuiper_calibration(
-        labels, predicted_scores, normalization_method="kuiper_standard_deviation"
-    )
-    assert ecce_sigma_result == pytest.approx(kuiper_result, rel=1e-10)
-
-
 def test_ecce_pvalue_consistency_with_kuiper_pvalue(rng):
     labels = rng.randint(0, 2, 100)
     predicted_scores = rng.rand(100)
     ecce_pvalue_result = metrics.ecce_pvalue(labels, predicted_scores)
     _, kuiper_pvalue_result = metrics.kuiper_test(labels, predicted_scores)
     assert ecce_pvalue_result == pytest.approx(kuiper_pvalue_result, rel=1e-10)
-
-
-def test_ecce_with_sample_weight(rng):
-    labels = rng.randint(0, 2, 100)
-    predicted_scores = rng.rand(100)
-    sample_weight = rng.rand(100) + 0.5
-
-    ecce_result = metrics.ecce(labels, predicted_scores, sample_weight)
-    kuiper_result = metrics.kuiper_calibration(
-        labels, predicted_scores, sample_weight, normalization_method=None
-    )
-    assert ecce_result == pytest.approx(kuiper_result, rel=1e-10)
