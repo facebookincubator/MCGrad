@@ -7,13 +7,8 @@ description: Reference for MCGrad plotting functions. Visualize global and local
 
 Visualization tools for calibration analysis.
 
-:::info Python API Documentation
-For detailed documentation, refer to the source code or use Python's help:
-
-```python
-from mcgrad import plotting
-help(plotting)
-```
+:::info Full API Reference
+For complete API documentation with all parameters, return types, and detailed docstrings, see the [Sphinx API Reference](https://mcgrad.readthedocs.io/en/latest/api/plotting.html).
 :::
 
 ## Global Calibration Curves

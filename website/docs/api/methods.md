@@ -7,13 +7,8 @@ description: Reference for MCGrad calibration methods including MCGrad, Isotonic
 
 Multicalibration methods for improving model calibration.
 
-:::info Python API Documentation
-For detailed Python API documentation with docstrings, please refer to the source code in `src/mcgrad/methods.py` or use Python's built-in help:
-
-```python
-from mcgrad import methods
-help(methods.MCGrad)
-```
+:::info Full API Reference
+For complete API documentation with all parameters, return types, and detailed docstrings, see the [Sphinx API Reference](https://mcgrad.readthedocs.io/en/latest/api/methods.html).
 :::
 
 ## MCGrad

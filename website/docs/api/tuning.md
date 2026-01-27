@@ -7,13 +7,8 @@ description: Reference for MCGrad hyperparameter tuning. Optimize MCGrad paramet
 
 Hyperparameter tuning for calibration methods.
 
-:::info Python API Documentation
-For detailed documentation, refer to the source code:
-
-```python
-from mcgrad import tuning
-help(tuning)
-```
+:::info Full API Reference
+For complete API documentation with all parameters, return types, and detailed docstrings, see the [Sphinx API Reference](https://mcgrad.readthedocs.io/en/latest/api/tuning.html).
 :::
 
 ## Overview
