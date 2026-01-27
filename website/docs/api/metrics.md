@@ -7,13 +7,8 @@ description: Reference for MCGrad metrics including MulticalibrationError (MCE) 
 
 Metrics for evaluating calibration quality.
 
-:::info Python API Documentation
-For detailed Python API documentation with docstrings, refer to the source code or use Python's help:
-
-```python
-from mcgrad import metrics
-help(metrics)
-```
+:::info Full API Reference
+For complete API documentation with all parameters, return types, and detailed docstrings, see the [Sphinx API Reference](https://mcgrad.readthedocs.io/en/latest/api/metrics.html).
 :::
 
 ## Multicalibration Metrics

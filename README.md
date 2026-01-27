@@ -10,9 +10,13 @@
 
 <p align="center">
   <a href="https://github.com/facebookincubator/MCGrad/actions/workflows/main.yaml"><img src="https://github.com/facebookincubator/MCGrad/actions/workflows/main.yaml/badge.svg" alt="CI"></a>
+  <a href="https://codecov.io/gh/facebookincubator/MCGrad"><img src="https://codecov.io/gh/facebookincubator/MCGrad/branch/main/graph/badge.svg" alt="Coverage"></a>
+  <a href="https://pypi.org/project/mcgrad/"><img src="https://img.shields.io/pypi/v/mcgrad.svg" alt="PyPI"></a>
+  <a href="https://doi.org/10.1145/3770854.3783954"><img src="https://img.shields.io/badge/DOI-10.1145%2F3770854.3783954-blue" alt="DOI"></a>
+  <a href="https://mcgrad.dev/"><img src="https://img.shields.io/badge/docs-mcgrad.dev-blue.svg" alt="Website"></a>
+  <a href="https://mcgrad.readthedocs.io/en/latest/?badge=latest"><img src="https://readthedocs.org/projects/mcgrad/badge/?version=latest" alt="API Reference"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+"></a>
-  <a href="https://mcgrad.dev/"><img src="https://img.shields.io/badge/docs-mcgrad.dev-blue.svg" alt="Documentation"></a>
 </p>
 
 ---
