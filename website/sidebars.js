@@ -21,23 +21,47 @@
 /** @type {import('@docusaurus/plugin-content-docs').SidebarsConfig} */
 const sidebars = {
   tutorialSidebar: [
-    'intro',
-    'why-mcgrad',
-    'installation',
-    'quickstart',
-    'methodology',
-    'measuring-multicalibration',
     {
       type: 'category',
-      label: 'API Reference',
+      label: 'Introduction',
+      collapsed: false,
+      collapsible: false,
       items: [
-        'api/methods',
-        'api/metrics',
-        'api/plotting',
-        'api/tuning',
+        {type: 'doc', id: 'intro', label: 'Why Multicalibration'},
+        'why-mcgrad',
       ],
     },
-    'contributing',
+    {
+      type: 'category',
+      label: 'How to use',
+      collapsed: false,
+      collapsible: false,
+      items: [
+        'installation',
+        'quickstart',
+        {
+          type: 'link',
+          label: 'API Reference (ReadTheDocs)',
+          href: 'https://mcgrad.readthedocs.io/',
+        },
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Methodology',
+      collapsed: false,
+      collapsible: false,
+      link: {type: 'doc', id: 'methodology'},
+      items: [
+        {type: 'doc', id: 'methodology', label: 'MCGrad'},
+        'measuring-multicalibration',
+      ],
+    },
+    {
+      type: 'doc',
+      id: 'contributing',
+      label: 'Contributing',
+    },
   ],
 };
 
