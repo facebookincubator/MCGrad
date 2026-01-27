@@ -18,7 +18,6 @@ keywords = [
     "machine-learning",
     "fairness",
     "probability-calibration",
-    "lightgbm",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",

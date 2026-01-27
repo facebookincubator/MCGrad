@@ -185,5 +185,4 @@ jobs:
       - name: Trigger Read the Docs build
         env:
           RTD_WEBHOOK_URL: ${{ secrets.RTD_WEBHOOK_URL }}
-        run: |
-          curl --fail -X POST -d "" "$RTD_WEBHOOK_URL"
+        run: curl --fail --silent --show-error -X POST -d "" "$RTD_WEBHOOK_URL"
