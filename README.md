@@ -1,11 +1,9 @@
 <p align="center">
-  <img src="website/static/img/logo.png" alt="MCGrad: Production-ready multicalibration for machine learning" width="120" />
+  <img src="website/static/img/logo.png" alt="MCGrad: Production-ready multicalibration" width="240" />
 </p>
 
-<h1 align="center">MCGrad</h1>
-
 <p align="center">
-  <strong>Production-ready multicalibration for machine learning</strong>
+  <strong>Production-ready multicalibration</strong>
 </p>
 
 <p align="center">
