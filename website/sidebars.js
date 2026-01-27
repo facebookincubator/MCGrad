@@ -38,7 +38,7 @@ const sidebars = {
       collapsible: false,
       items: [
         'installation',
-        'quickstart',
+        {type: 'doc', id: 'quickstart', label: 'Getting Started'},
         {
           type: 'link',
           label: 'API Reference (ReadTheDocs)',

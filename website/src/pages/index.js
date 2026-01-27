@@ -14,29 +14,29 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 const features = [
   {
-    title: 'Powerful Multicalibration',
-    content:
-      'Ensures calibration not just globally, but across virtually any segment defined by your input features.',
+    title: 'State-of-the-art multicalibration',
+    content: 'Best-in-class calibration quality across a vast number of segments.',
   },
   {
-    title: 'Data Efficient',
-    content:
-      'Leverages information from similar samples, calibrating far more segments than alternative methods.',
+    title: 'Easy to use',
+    content: 'Familiar interface. Pass features, not segments.',
   },
   {
-    title: 'Lightweight & Fast',
-    content:
-      'Built on LightGBM for orders-of-magnitude faster training and inference than neural network approaches.',
+    title: 'Highly scalable',
+    content: 'Fast to train, low inference overhead, even on web-scale data.',
   },
   {
-    title: 'Improved Performance',
-    content:
-      'A likelihood-improving procedure that can enhance model performance with significant PRAUC improvements.',
+    title: 'Safe by design',
+    content: 'Likelihood-improving updates with validation-based early stopping.',
+  },
+  {
+    title: 'Proven in production',
+    content: 'Designed for real-world deployment and validated at Meta scale.',
   },
 ];
 
 const Feature = ({title, content}) => (
-  <div className="col col--3 feature-card">
+  <div className="col feature-card">
     <div className="feature-card__body">
       <h3>{title}</h3>
       <p>{content}</p>

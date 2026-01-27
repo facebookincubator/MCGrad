@@ -160,6 +160,11 @@
   row-gap: 1.5rem;
 }
 
+.section--features .col {
+  flex: 1 1 0;
+  min-width: 180px;
+}
+
 .feature-card {
   display: flex;
 }

@@ -79,9 +79,10 @@ const config = {
         {name: 'twitter:image', content: 'https://facebookincubator.github.io/MCGrad/img/logo.png'},
       ],
       navbar: {
+        title: 'MCGrad',
         logo: {
           alt: 'MCGrad Logo',
-          src: 'img/logo.png',
+          src: 'img/logo_no_text.png',
         },
         items: [
           {
