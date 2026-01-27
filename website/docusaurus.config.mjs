@@ -17,6 +17,7 @@ const config = {
 
   url: 'https://facebookincubator.github.io',
   baseUrl: '/MCGrad/',
+  favicon: 'img/logo_no_text.png',
 
   organizationName: 'facebookincubator',
   projectName: 'MCGrad',
@@ -81,18 +82,18 @@ const config = {
         title: 'MCGrad',
         logo: {
           alt: 'MCGrad Logo',
-          src: 'img/logo.png',
+          src: 'img/logo_no_text.png',
         },
         items: [
           {
             type: 'docSidebar',
             sidebarId: 'tutorialSidebar',
+            label: 'Docs',
             position: 'left',
-            label: 'Documentation',
           },
           {
             href: 'https://mcgrad.readthedocs.io/',
-            label: 'API Reference',
+            label: 'API',
             position: 'left',
           },
           {
@@ -104,48 +105,7 @@ const config = {
       },
       footer: {
         style: 'dark',
-        links: [
-          {
-            title: 'Docs',
-            items: [
-              {
-                label: 'Getting Started',
-                to: '/docs/intro',
-              },
-              {
-                label: 'API Reference',
-                to: '/docs/api/methods',
-              },
-            ],
-          },
-          {
-            title: 'More',
-            items: [
-              {
-                label: 'GitHub',
-                href: 'https://github.com/facebookincubator/MCGrad',
-              },
-            ],
-          },
-          {
-            title: 'Legal',
-            items: [
-              {
-                label: 'Privacy',
-                href: 'https://opensource.fb.com/legal/privacy/',
-                target: '_blank',
-                rel: 'noreferrer noopener',
-              },
-              {
-                label: 'Terms',
-                href: 'https://opensource.fb.com/legal/terms/',
-                target: '_blank',
-                rel: 'noreferrer noopener',
-              },
-            ],
-          },
-        ],
-        copyright: `Copyright © ${new Date().getFullYear()} Meta Platforms, Inc.`,
+        copyright: `Copyright © ${new Date().getFullYear()} Meta Platforms, Inc. · <a href="https://opensource.fb.com/legal/privacy/" target="_blank" rel="noreferrer noopener">Privacy</a> · <a href="https://opensource.fb.com/legal/terms/" target="_blank" rel="noreferrer noopener">Terms</a>`,
       },
       prism: {
         theme: prismThemes.github,

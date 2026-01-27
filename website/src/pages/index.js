@@ -8,41 +8,41 @@
 import React from 'react';
 import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
-import useBaseUrl from '@docusaurus/useBaseUrl';
 import CodeBlock from '@theme/CodeBlock';
 import Layout from '@theme/Layout';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 
 const features = [
   {
-    content: 'Best-in-class calibration quality across a vast number of segments.',
     title: 'State-of-the-art multicalibration',
+    content: 'Best-in-class calibration quality across a vast number of segments.',
   },
   {
-    content: 'Familiar interface. Pass features, not segments.',
     title: 'Easy to use',
+    content: 'Familiar interface. Pass features, not segments.',
   },
   {
-    content: 'Fast to train, low inference overhead, even on web-scale data.',
     title: 'Highly scalable',
+    content: 'Fast to train, low inference overhead, even on web-scale data.',
   },
   {
-    content: 'Likelihood-improving updates with validation-based early stopping.',
     title: 'Safe by design',
+    content: 'Likelihood-improving updates with validation-based early stopping.',
   },
   {
-    content: 'Designed for real-world deployment and validated at Meta scale.',
     title: 'Proven in production',
+    content: 'Designed for real-world deployment and validated at Meta scale.',
   },
 ];
 
-const Feature = ({title, content}) => {
-  return (
-    <div className="col feature text--center padding--md">
+const Feature = ({title, content}) => (
+  <div className="col feature-card">
+    <div className="feature-card__body">
       <h3>{title}</h3>
       <p>{content}</p>
     </div>
-  );
-};
+  </div>
+);
 
 const codeExample = `from mcgrad import methods
 import pandas as pd
@@ -75,27 +75,26 @@ calibrated_predictions = mcgrad.predict(
 `;
 
 const QuickStart = () => (
-  <div
-    className="get-started-section padding--xl"
-    style={{'background-color': 'var(--ifm-color-emphasis-200)'}}
-    id="quickstart">
-    <h2 className="text--center padding--md">Get Started</h2>
-    <ol>
-      <li>
-        Install MCGrad:
-        <CodeBlock
-          language="bash"
-          showLineNumbers>{`pip install git+https://github.com/facebookincubator/MCGrad.git`}</CodeBlock>
-      </li>
-      <li>
-        Train MCGrad:
-        <br />
-        <br />
-        <CodeBlock language="python" showLineNumbers>
-          {codeExample}
-        </CodeBlock>
-      </li>
-    </ol>
+  <div className="section quickstart" id="quickstart">
+    <div className="container">
+      <div className="text--center">
+        <h2>Quickstart</h2>
+      </div>
+      <div className="row">
+        <div className="col col--8 col--offset-2">
+          <div className="quickstart__panel">
+            <p className="quickstart__label">Install</p>
+            <CodeBlock language="bash">pip install mcgrad</CodeBlock>
+            <details className="quickstart__details">
+              <summary>View minimal code example</summary>
+              <CodeBlock language="python" showLineNumbers>
+                {codeExample}
+              </CodeBlock>
+            </details>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 );
 
@@ -110,14 +109,13 @@ const paper_bibtex = `
 }`;
 
 const Reference = () => (
-  <div
-    className="padding--lg"
-    id="reference">
-    <h2 className='text--center'>Citing MCGrad</h2>
-    <p className='text--center'>If you use MCGrad in academic work, please cite:</p>
-    <div>
-      <a href={`https://arxiv.org/abs/2509.19884`}>{papertitle}</a>
-      <CodeBlock className='margin-vert--md'>{paper_bibtex}</CodeBlock>
+  <div className="section" id="reference">
+    <div className="container">
+      <h2 className='text--center'>Citing MCGrad</h2>
+      <div className="reference__content">
+        <a href="https://arxiv.org/abs/2509.19884">{papertitle}</a>
+        <CodeBlock className='margin-vert--md'>{paper_bibtex}</CodeBlock>
+      </div>
     </div>
   </div>
 );
@@ -126,48 +124,48 @@ const MyPage = () => {
   const {siteConfig} = useDocusaurusContext();
   return (
     <Layout title={siteConfig.title} description={siteConfig.tagline}>
-      <div className="hero text--center" style={{minHeight: '35rem', display: 'flex', alignItems: 'center'}}>
-        <div className="container">
-          <div className="padding-vert--md">
-            <img
-              src={useBaseUrl('/img/logo.png')}
-              alt="MCGrad Logo"
-              className="hero-logo"
-            />
-            <h1 className="hero__title">MCGrad</h1>
-            <p className="hero__subtitle">
-              {siteConfig.tagline}
-            </p>
+      <div className="hero hero--compact">
+        <div className="container text--center">
+          <div className="hero__logo-wrap">
+            <img src={useBaseUrl('img/logo_no_text.png')} alt="MCGrad logo" className="hero__logo" />
           </div>
-          <div>
+          <h1 className="hero__title hero__title--wordmark">MCGrad</h1>
+          <p className="hero__subtitle">Production-ready multicalibration</p>
+          <div className="hero__cta">
             <Link
-              to="/docs/intro"
-              className="button button--lg button--primary margin--sm">
+              to="/docs/installation"
+              className="button button--lg button--primary">
               Get Started
             </Link>
             <Link
+              to="/docs/intro"
+              className="button button--lg button--ghost">
+              Why Multicalibration?
+            </Link>
+            <Link
               to="/docs/why-mcgrad"
-              className="button button--lg button--outline button--secondary margin--sm">
-              Why MCGrad?
+              className="button button--lg button--ghost">
+              Why MCGrad
             </Link>
           </div>
         </div>
       </div>
-      <div className="padding-top--lg padding-bottom--xl padding-horiz--xl" style={{backgroundColor: 'var(--ifm-background-surface-color)'}}>
-        <h2 className="section-title" style={{marginTop: '0', paddingTop: '2rem'}}>Key Features</h2>
-        {features && features.length > 0 && (
+
+      <div className="section section--features" id="features">
+        <div className="container">
+          <div className="section__header text--center">
+            <h2>Key Features</h2>
+          </div>
           <div className="row">
             {features.map(({title, content}) => (
-              <Feature
-                key={title}
-                title={title}
-                content={content}
-              />
+              <Feature key={title} title={title} content={content} />
             ))}
           </div>
-        )}
+        </div>
       </div>
+
       <QuickStart />
+
       <Reference />
     </Layout>
   );
