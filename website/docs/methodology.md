@@ -23,20 +23,26 @@ Let $X$ be the input features and $Y \in \{0,1\}$ be the binary target. A predic
 ### Calibration
 A predictor $f_0$ is perfectly calibrated if, for all $p$:
 
-$$ \mathbb{P}(Y=1 \mid f_0(X)=p) = p$$
+$$
+\mathbb{P}(Y=1 \mid f_0(X)=p) = p
+$$
 
-In practice, miscalibration is measured using metrics like **ECCE (Estimated Cumulative Calibration Error)**, which quantifies the deviation between predictions and outcomes without relying on arbitrary binning.
+In practice, miscalibration is measured using metrics like **ECCE (Estimated Cumulative Calibration Error)** [3], which quantifies the deviation between predictions and outcomes without relying on arbitrary binning.
 
 ### Multicalibration
 We define a collection of segments $\mathcal{H}$ (e.g., "users in US", "users on Android"). A predictor $f_0$ is **multicalibrated** with respect to $\mathcal{H}$ if it is calibrated on every segment $h \in \mathcal{H}$.
 
 Formally, for all segments $h \in \mathcal{H}$ and all prediction values $p$, the conditional probability should match the prediction:
 
-$$ \mathbb{P}(Y=1 \mid h(X)=1, f_0(X) = p) = p$$
+$$
+\mathbb{P}(Y=1 \mid h(X)=1, f_0(X) = p) = p
+$$
 
 This is equivalent to requiring the expected residual to be zero:
 
-$$ \mathbb{E}[Y - f_0(X) \mid h(X)=1, f_0(X) = p] = 0 $$
+$$
+\mathbb{E}[Y - f_0(X) \mid h(X)=1, f_0(X) = p] = 0
+$$
 
 This residual formulation connects directly to the gradient-based approach in MCGrad (see Insight 3 below).
 
@@ -68,7 +74,9 @@ With the first two insights, we have a target (the residual $Y - f_0(X)$) and a 
 Gradient Boosted Decision Trees (GBDTs) work by iteratively training trees to predict the **negative gradient** of a loss function.
 For binary classification using **Log-Loss** $\mathcal{L}$, the negative gradient is mathematically identical to the residual:
 
-$$ - \nabla \mathcal{L} = Y - f_0(X) $$
+$$
+- \nabla \mathcal{L} = Y - f_0(X)
+$$
 
 **Implication:** No specialized "multicalibration algorithm" is needed. A standard GBDT trained to minimize Log-Loss on augmented features suffices:
 *   The GBDT automatically searches for trees that predict the residual $Y - f_0(X)$.
@@ -99,17 +107,19 @@ Rather than custom boosting logic, MCGrad delegates to **LightGBM**, a highly op
 *   **Scalability**: Large datasets and high-dimensional feature spaces are handled efficiently.
 
 ### Logit Rescaling
-GBDTs use "shrinkage" (a small learning rate) to prevent overfitting, but this can result in under-confident updates that require many trees to correct.
+GBDTs use a small learning rate to prevent overfitting, but this can result in under-confident updates that require many trees to correct.
 MCGrad adds a **rescaling step** after each round: it learns a single scalar multiplier $\theta_t$ to scale the update optimally.
 
-$$ F_t(x) = \theta_t \cdot (F_{t-1}(x) + \phi_t(\dots)) $$
+$$
+F_t(x) = \theta_t \cdot (F_{t-1}(x) + \phi_t(\dots))
+$$
 
 This approach drastically reduces the number of rounds needed for convergence.
 
 ### Safety Guardrails
 Post-processing methods risk overfitting, potentially harming the base model. MCGrad prevents this through:
 1.  **Early Stopping**: Validation loss is tracked after every round. Training stops immediately when loss ceases to improve. If the first round harms performance, MCGrad returns the original model ($T=0$).
-2.  **Min-Hessian Regularization**: In the augmented feature space $(X, f_0(X))$, some regions (e.g., $f_0(x) \approx 0$) contain minimal signal. Standard split rules can overfit in these regions. MCGrad enforces a minimum "Hessian" (second derivative sum) in leaf nodes, which naturally prevents splits in regions where the model is already confident and correct.
+2.  **Min-Hessian Regularization**: Augmenting the data with the previous round’s model necessarily gives rise to regions of the augmented feature space that are particularly prone to overfitting. As the predicted probabilities become close to 0 or 1, the Hessian in these regions becomes smaller. Enforcing a minimum Hessian ensures that these regions are no longer considered.
 
 ---
 
@@ -121,3 +131,6 @@ Post-processing methods risk overfitting, potentially harming the base model. MC
 
 [2] **Baldeschi, R. C., Di Gregorio, S., Fioravanti, S., Fusco, F., Guy, I., Haimovich, D., Leonardi, S., Linder, F., Perini, L., Russo, M., & Tax, N.** [Multicalibration yields better matchings](https://arxiv.org/abs/2511.11413).
 *ArXiv preprint, 2025.*
+
+[3] **Arrieta-Ibarra, I., Gujral, P., Tannen, J., Tygert, M., & Xu, C.** [Metrics of calibration for probabilistic predictions](https://www.jmlr.org/papers/volume23/22-0658/22-0658.pdf).
+*Journal of Machine Learning Research, 23(351), 1-54, 2022.*
