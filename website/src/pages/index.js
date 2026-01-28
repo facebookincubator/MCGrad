@@ -14,24 +14,20 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 const features = [
   {
-    title: 'State-of-the-art multicalibration',
+    title: 'State-of-the-Art Multicalibration',
     content: 'Best-in-class calibration quality across a vast number of segments.',
   },
   {
-    title: 'Easy to use',
+    title: 'Easy to Use',
     content: 'Familiar interface. Pass features, not segments.',
   },
   {
-    title: 'Highly scalable',
+    title: 'Highly Scalable',
     content: 'Fast to train, low inference overhead, even on web-scale data.',
   },
   {
-    title: 'Safe by design',
+    title: 'Safe by Design',
     content: 'Likelihood-improving updates with validation-based early stopping.',
-  },
-  {
-    title: 'Proven in production',
-    content: 'Designed for real-world deployment and validated at Meta scale.',
   },
 ];
 
@@ -145,7 +141,7 @@ const MyPage = () => {
             <Link
               to="/docs/why-mcgrad"
               className="button button--lg button--ghost">
-              Why MCGrad
+              Why MCGrad?
             </Link>
           </div>
         </div>
