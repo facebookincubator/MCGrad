@@ -16,7 +16,7 @@ Key metric families include:
 **Calibration Error Metrics**
     Standard and adaptive calibration error measures using binning approaches.
 
-**ECCE (Expected Cumulative Calibration Error) Metrics**
+**ECCE (Estimated Cumulative Calibration Error) Metrics**
     Statistical tests and metrics based on the ECCE statistic (also known as Kuiper calibration).
 
 **Ranking Metrics**
@@ -30,6 +30,7 @@ import functools
 import logging
 import math
 import sys
+import warnings
 from collections.abc import Callable
 from typing import Any, Protocol
 
@@ -41,6 +42,10 @@ from sklearn import metrics as skmetrics
 from . import _utils as utils
 from ._compat import groupby_apply
 from ._segmentation import get_segment_masks
+# @oss-disable[end= ]: from .internal._compat import (
+    # @oss-disable[end= ]: apply_mce_transition_overrides,
+    # @oss-disable[end= ]: MulticalibrationErrorCompatMixin,
+# @oss-disable[end= ]: )
 
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -1016,7 +1021,7 @@ def ecce(
     sample_weight: npt.NDArray | None = None,
 ) -> float:
     """
-    Calculate the Expected Cumulative Calibration Error (ECCE) [1].
+    Calculate the Estimated Cumulative Calibration Error (ECCE) [1].
 
     ECCE measures the maximum deviation between the cumulative distribution of
     predicted probabilities for positive and negative examples. It is equivalent
@@ -1323,7 +1328,56 @@ DEFAULT_MCE_GLOBAL_NORMALIZATION: str = "prevalence_adjusted"
 DEFAULT_MCE_N_SEGMENTS: int | None = 1000
 
 
-class MulticalibrationError:
+class MulticalibrationError(
+    # @oss-disable[end= ]: MulticalibrationErrorCompatMixin,
+):
+    """
+    Evaluates calibration quality across multiple subpopulations (segments).
+
+    Multicalibration error (MCE) (introduced in [1]) extends traditional calibration metrics by measuring
+    calibration not just globally, but across many automatically-generated segments
+    of the data. This helps identify subpopulations where a model may be poorly
+    calibrated even when global calibration appears good.
+
+    The metric is based on ECCE (Estimated Cumulative Calibration Error) [2].
+
+    [1] Guy, I., Haimovich, D., Linder, F., Okati, N., Perini, L., Tax, N., & Tygert, M.
+    (2025). Measuring multi-calibration. arXiv preprint arXiv:2506.11251.
+    (https://arxiv.org/abs/2506.11251)
+
+    [2] Arrieta-Ibarra, I., Gujral, P., Tannen, J., Tygert, M., & Xu, C. (2022).
+    Metrics of calibration for probabilistic predictions. Journal of Machine Learning
+    Research, 23(351), 1-54. (https://www.jmlr.org/papers/volume23/22-0658/22-0658.pdf)
+
+    **Key Concepts**
+
+    Segments
+        Subpopulations defined by combinations of feature values. Segments are
+        generated automatically from categorical and numerical features at various
+        depths (single features, pairs, triplets, etc.).
+
+    Scales
+        Results are available in four scales:
+
+        - **Absolute**: Raw ECCE value (same units as predictions, typically 0-1)
+        - **Relative (%)**: Percentage of prevalence, easier to interpret across datasets
+        - **Sigma**: Statistical significance, values > 2 suggest miscalibration
+        - **P-value**: Probability of seeing this ECCE under perfect calibration
+
+    MCE vs Global ECCE
+        - ``global_ecce``: ECCE computed on the entire dataset (no segmentation)
+        - ``mce``: Largest ECCE across all segments
+
+    **Interpreting Results**
+
+    - ``mce_pvalue < 0.05``: Statistically significant miscalibration detected
+    - ``mce_sigma > 2``: Miscalibration exceeds 2 standard deviations
+    - ``mce_relative``: Miscalibration as percentage of prevalence (e.g., 5% means
+      predictions are off by 5% of the base rate in the worst segment)
+    - ``mde_relative``: Approximation of the minimum detectable error - miscalibration smaller than this
+      cannot be reliably detected given the sample size
+    """
+
     def __init__(
         self,
         df: pd.DataFrame,
@@ -1340,20 +1394,31 @@ class MulticalibrationError:
         precision_dtype: str = "float32",
     ) -> None:
         """
-        Calculates the multicalibration error with respect to a set of segments for a given dataset.
+        Initialize MulticalibrationError with data and segmentation parameters.
 
-        :param df: A pandas DataFrame containing the data.
-        :param label_column: The name of the column in `df` that contains the true labels.
-        :param score_column: The name of the column in `df` that contains the predicted scores.
-        :param weight_column: An optional column in `df` that contains sample weights.
-        :param categorical_segment_columns: An optional list of column names in `df` to be used for categorical segmentation.
-        :param numerical_segment_columns: An optional list of column names in `df` to be used for numerical segmentation.
-        :param max_depth: The maximum depth for segment generation.
-        :param max_values_per_segment_feature: The maximum number of unique values per segment feature.
-        :param min_samples_per_segment: The minimum number of samples required per segment.
-        :param max_n_segments: The maximum number of segments to generate.
-        :param chunk_size: Size of chunks of segments to process per iteration of the algorithm. Larger values improve runtime but increase memory usage (OOM errors are possible).
-        :param precision_dtype: The precision type for the metric. Can be 'float16', 'float32', or 'float64'.
+        :param df: DataFrame containing predictions, labels, and segment features.
+        :param label_column: Column name containing binary labels (0 or 1).
+        :param score_column: Column name containing predicted probabilities (0 to 1).
+        :param weight_column: Optional column containing sample weights. If None,
+            all samples are weighted equally.
+        :param categorical_segment_columns: Columns with categorical values to use
+            for segmentation (e.g., country, device_type). Each unique value becomes
+            a potential segment boundary.
+        :param numerical_segment_columns: Columns with numerical values to use for
+            segmentation. Values are automatically quantile-binned.
+        :param max_depth: Maximum depth of segment combinations. Depth 0 = global only,
+            depth 1 = single features, depth 2 = pairs of features, etc. Higher depths
+            find more granular miscalibration but increase computation.
+        :param max_values_per_segment_feature: Maximum unique values per feature to
+            consider. Features with more unique values are binned.
+        :param min_samples_per_segment: Minimum samples required for a segment to be
+            included. Smaller segments are excluded to reduce noise.
+        :param max_n_segments: Maximum total segments to evaluate. Limits computation
+            time for large feature spaces. Set to None for no limit.
+        :param chunk_size: Number of segments to process per batch. Larger values
+            improve speed but increase memory usage.
+        :param precision_dtype: Floating-point precision for computations. Options:
+            'float16' (fast, less precise), 'float32' (balanced), 'float64' (precise).
         """
         self.label_column = label_column
         self.score_column = score_column
@@ -1403,18 +1468,17 @@ class MulticalibrationError:
         self.total_number_segments: int = -1  # initialized as -1
 
     def __str__(self) -> str:
-        return f"""{self.mce}% (sigmas={self.mce_sigma_scale}, p={self.p_value}, mde={self.mde})"""
+        return f"""{self.mce_relative}% (sigmas={self.mce_sigma}, p={self.mce_pvalue}, mde={self.mde_relative})"""
 
     def __format__(self, format_spec: str) -> str:
-        # Use the format specifier to format each attribute
-        formatted_mce_relative = format(self.mce, format_spec)
-        formatted_p_value = format(self.p_value, format_spec)
-        formatted_mde = format(self.mde, format_spec)
-        formatted_mce_sigma_scale = format(self.mce_sigma_scale, format_spec)
-        return f"""{formatted_mce_relative}% (sigmas={formatted_mce_sigma_scale}, p={formatted_p_value}, mde={formatted_mde})"""
+        formatted_mce_relative = format(self.mce_relative, format_spec)
+        formatted_p_value = format(self.mce_pvalue, format_spec)
+        formatted_mde = format(self.mde_relative, format_spec)
+        formatted_mce_sigma = format(self.mce_sigma, format_spec)
+        return f"""{formatted_mce_relative}% (sigmas={formatted_mce_sigma}, p={formatted_p_value}, mde={formatted_mde})"""
 
     @functools.cached_property
-    def segments(self) -> tuple[npt.NDArray[np.bool_], pd.DataFrame]:
+    def _segments(self) -> tuple[npt.NDArray[np.bool_], pd.DataFrame]:
         segments_masks = []
         segments_feature_values = pd.DataFrame(
             columns=["segment_column", "value", "idx_segment"]
@@ -1452,18 +1516,30 @@ class MulticalibrationError:
         return segments, segments_feature_values
 
     @functools.cached_property
-    def segment_indices(self) -> pd.Series:
-        segments_2d = self.segments[0].reshape(-1, self.segments[0].shape[2])
+    def _segments_indices(self) -> pd.Series:
+        segments_2d = self._segments[0].reshape(-1, self._segments[0].shape[2])
         indices = np.argwhere(segments_2d)
         index_series = pd.Series(indices[:, 1], index=indices[:, 0])
 
         return index_series
 
     @functools.cached_property
-    def segment_ecces_absolute(
+    def segments_ecce(
         self,
     ) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
-        segments = self.segments[0]
+        """
+        ECCE values per segment on absolute scale.
+
+        Returns an array where each element is the Estimated Cumulative Calibration
+        Error for one segment. The first element (index 0) is always the global
+        segment (entire dataset).
+
+        Values are in the same units as predictions (typically 0-1). Larger values
+        indicate worse calibration in that segment.
+
+        :return: Array of shape (n_segments,) with ECCE values.
+        """
+        segments = self._segments[0]
         statistics = np.zeros(
             self.total_number_segments,
             dtype=self.precision_dtype,
@@ -1489,46 +1565,117 @@ class MulticalibrationError:
         return statistics
 
     @functools.cached_property
-    def segment_ecces(self) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
-        return self.segment_ecces_sigma_scale * self.sigma_0 / self.prevalence * 100
+    def segments_ecce_relative(
+        self,
+    ) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
+        """
+        ECCE values per segment on relative (prevalence-adjusted percentage) scale.
+
+        Values are expressed as a percentage of the label prevalence, making them
+        easier to interpret across datasets with different base rates. For example,
+        a value of 10 means the calibration error is 10% of the prevalence.
+
+        :return: Array of shape (n_segments,) with relative ECCE values (%).
+        """
+        return self.segments_ecce_sigma * self._global_ecce_std / self._prevalence * 100
 
     @functools.cached_property
     def global_ecce(self) -> float:
-        return self.segment_ecces[0]
+        """
+        Global ECCE on absolute scale.
+
+        ECCE computed on the entire dataset without segmentation. This is equivalent
+        to ``segments_ecce[0]`` since the first segment is always the global segment.
+
+        Use this to assess overall model calibration before looking at segment-level
+        miscalibration.
+
+        :return: Global ECCE value.
+        """
+        return self.segments_ecce[0]
 
     @functools.cached_property
-    def global_ecce_sigma_scale(self) -> float:
-        return self.segment_ecces_sigma_scale[0]
+    def global_ecce_relative(self) -> float:
+        """
+        Global ECCE on relative (prevalence-adjusted percentage) scale.
+
+        ECCE computed on the entire dataset without segmentation. This is equivalent
+        to ``segments_ecce_relative[0]`` since the first segment is always the global segment.
+
+        Use this to assess overall model calibration before looking at segment-level
+        miscalibration.
+
+        :return: Global ECCE as percentage of prevalence.
+        """
+        return self.segments_ecce_relative[0]
 
     @functools.cached_property
-    def global_ecce_p_value(self) -> float:
-        return self.segment_p_values[0]
+    def global_ecce_sigma(self) -> float:
+        """
+        Global ECCE on sigma scale.
+
+        Indicates the statistical significance of the global ECCE value. Values above
+        5 indicate strong evidence of miscalibration.
+
+        :return: Global ECCE in standard deviations.
+        """
+        return self.segments_ecce_sigma[0]
 
     @functools.cached_property
-    def segment_ecces_sigma_scale(
+    def global_ecce_pvalue(self) -> float:
+        """
+        P-value for global ECCE calibration test.
+
+        The probability of observing this ECCE value (or larger) if the model
+        were perfectly calibrated.
+
+        :return: p-value between 0 and 1.
+        """
+        return self.segments_ecce_pvalue[0]
+
+    @functools.cached_property
+    def segments_ecce_sigma(
         self,
     ) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
+        """
+        ECCE values per segment on sigma scale.
+
+        Each value represents how many standard deviations the observed ECCE
+        is from zero (perfect calibration). Values above 5 indicate strong
+        evidence of miscalibration. You can plot the distribution of these
+        values with `plotting.plot_segment_calibration_errors`.
+
+        :return: Array of shape (n_segments,).
+        """
         with np.errstate(divide="ignore", invalid="ignore"):
             statistics = np.where(
-                (self.segment_ecces_absolute != 0) & (self.segment_sigmas == 0),
+                (self.segments_ecce != 0) & (self._segments_ecce_std == 0),
                 np.inf,
                 np.where(
-                    self.segment_sigmas == 0,
+                    self._segments_ecce_std == 0,
                     0,
-                    self.segment_ecces_absolute / self.segment_sigmas,
+                    self.segments_ecce / self._segments_ecce_std,
                 ),
             )
         return statistics
 
     @functools.cached_property
-    def segment_p_values(self) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
+    def segments_ecce_pvalue(self) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
+        """
+        p-values per segment for ECCE calibration test.
+
+        Each value is the probability of observing the corresponding ECCE
+        (or larger) if the model were perfectly calibrated in that segment.
+
+        :return: Array of shape (n_segments,) with p-values between 0 and 1.
+        """
         ecce_pvalue_vec = np.vectorize(ecce_pvalue_from_sigma)
-        p_values = ecce_pvalue_vec(self.segment_ecces_sigma_scale)
+        p_values = ecce_pvalue_vec(self.segments_ecce_sigma)
         return p_values
 
     @functools.cached_property
-    def segment_sigmas(self) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
-        segments = self.segments[0]
+    def _segments_ecce_std(self) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
+        segments = self._segments[0]
         sigmas = np.zeros(self.total_number_segments, dtype=self.precision_dtype)
         for i, segment in enumerate(segments):
             sigmas[
@@ -1550,10 +1697,10 @@ class MulticalibrationError:
         return sigmas
 
     @functools.cached_property
-    def sigma_0(self) -> float:
-        if "segment_sigmas" in self.__dict__:
-            return self.segment_sigmas[0]
-        sigma_0 = _ecce_standard_deviation_per_segment(
+    def _global_ecce_std(self) -> float:
+        if "_segments_ecce_std" in self.__dict__:
+            return self._segments_ecce_std[0]
+        std = _ecce_standard_deviation_per_segment(
             predicted_scores=self.df[self.score_column].values,
             labels=self.df[self.label_column].values,
             sample_weight=(
@@ -1564,18 +1711,53 @@ class MulticalibrationError:
             segments=np.ones(shape=(1, len(self.df)), dtype=np.bool_),
             precision_dtype=self.precision_dtype,
         )
-        return sigma_0.item()
+        return std.item()
 
     @functools.cached_property
-    def mce_sigma_scale(self) -> float:
-        return np.max(self.segment_ecces_sigma_scale)
+    def mce_sigma(self) -> float:
+        """
+        Multicalibration error on sigma scale.
+
+        The largest ECCE-sigma across all segments. This identifies the segment with
+        the most statistically significant miscalibration. Values above 5 indicate
+        significant miscalibration.
+
+        :return: Maximum segment ECCE-sigma.
+        """
+        return np.max(self.segments_ecce_sigma)
 
     @functools.cached_property
-    def mce_absolute(self) -> float:
-        return self.mce_sigma_scale * self.sigma_0
+    def mce(self) -> float:
+        """
+        Multicalibration error on absolute scale.
+
+        The largest ECCE across all segments, converted to absolute scale.
+        This represents the worst-case calibration error found in any segment.
+
+        :return: Maximum ECCE value.
+        """
+        return self.mce_sigma * self._global_ecce_std
 
     @functools.cached_property
-    def prevalence(self) -> float:
+    def mce_relative(self) -> float:
+        """
+        Multicalibration error on relative (prevalence-adjusted percentage) scale.
+
+        The MCE expressed as a percentage of label prevalence. For example, if
+        prevalence is 10% and mce_relative is 20, the worst segment has predictions
+        off by 2 percentage points (20% of 10%).
+
+        This is often the most interpretable metric for comparing calibration
+        across different datasets or use cases.
+
+        :return: MCE as percentage of prevalence.
+        """
+        # Compute directly to avoid recursion with transition override
+        mce_abs = self.mce_sigma * self._global_ecce_std
+        return mce_abs / self._prevalence * 100
+
+    @functools.cached_property
+    def _prevalence(self) -> float:
         p = (
             (self.df[self.label_column] * self.df[self.weight_column]).sum()
             / (self.df[self.weight_column].sum())
@@ -1585,20 +1767,56 @@ class MulticalibrationError:
         return min(p, 1 - p)
 
     @functools.cached_property
-    def mce(self) -> float:
-        return self.mce_absolute / self.prevalence * 100
+    def mce_pvalue(self) -> float:
+        """
+        p-value for the multicalibration error.
 
-    @functools.cached_property
-    def p_value(self) -> float:
-        if "segment_p_values" in self.__dict__:
-            return np.min(self.segment_p_values)
-        return ecce_pvalue_from_sigma(self.mce_sigma_scale)
+        The probability of observing this MCE (or larger) if the model were
+        perfectly calibrated across all segments. This is the minimum p-value
+        across all segments.
+
+        Note that this p-value is not adjusted for multiple testing, so the
+        Type I error rate (concluding there is miscalibration when there is
+        none) will be higher in practice. We expect any required adjustment to
+        be small because the hypotheses are highly correlated (many segments
+        overlap). We therefore did not apply common corrections such as
+        Bonferroni, as they would be overly conservative and could substantially
+        increase Type II errors (failing to detect miscalibration when it exists).
+
+        :return: p-value between 0 and 1.
+        """
+        if "segments_ecce_pvalue" in self.__dict__:
+            return np.min(self.segments_ecce_pvalue)
+        return ecce_pvalue_from_sigma(self.mce_sigma)
 
     @functools.cached_property
     def mde(self) -> float:
-        # This is a rough, conservative approximation of the MDE. We divide by the prevalence
-        # and multiply by 100 to get the MDE in the same unit as the MCE metric
-        return 5 * self.sigma_0 / self.prevalence * 100
+        """Minimum detectable error on absolute (probability) scale.
+
+        The MDE represents the smallest calibration error that would be
+        statistically detectable at approximately 5 sigma significance,
+        given the sample size. Expressed as an absolute probability difference.
+        """
+        return 5 * self._global_ecce_std
+
+    @functools.cached_property
+    def mde_relative(self) -> float:
+        """
+        Minimum detectable error on relative (prevalence-adjusted percentage) scale.
+
+        The smallest calibration error that can be reliably detected given the
+        sample size and variance in the data. Miscalibration smaller than this
+        value may not be statistically significant even if present.
+
+        Based on a 5-sigma detection threshold (very high confidence).
+
+        :return: MDE as percentage of prevalence.
+        """
+        return 5 * self._global_ecce_std / self._prevalence * 100
+
+
+# Apply transition period overrides for mce/global_ecce/mde (internal only)
+# @oss-disable[end= ]: apply_mce_transition_overrides(MulticalibrationError)
 
 
 class _ScoreFunctionInterface(Protocol):
@@ -1648,7 +1866,7 @@ def wrap_multicalibration_error_metric(
     max_values_per_segment_feature: int = DEFAULT_MCE_MAX_VALUES_PER_SEGMENT_FEATURE,
     min_samples_per_segment: int = DEFAULT_MCE_MIN_SAMPLES_PER_SEGMENT,
     max_n_segments: int | None = DEFAULT_MCE_N_SEGMENTS,
-    metric_version: str = "mce",
+    metric_version: str = "mce_relative",
 ) -> _ScoreFunctionInterface:
     """
     Create a wrapped MulticalibrationError metric for use with the evaluation framework.
@@ -1659,7 +1877,15 @@ def wrap_multicalibration_error_metric(
     :param max_values_per_segment_feature: Max unique values per segment feature.
     :param min_samples_per_segment: Minimum samples required per segment.
     :param max_n_segments: Maximum number of segments to generate.
-    :param metric_version: Which metric to return ('mce', 'mce_sigma_scale', 'mce_absolute', 'p_value').
+    :param metric_version: Which metric to return. Options:
+        - 'mce_relative': relative (prevalence-adjusted percentage) scale (default)
+        - 'mce': absolute scale
+        - 'mce_sigma': sigma (z-score) scale
+        - 'mce_pvalue': p-value
+        Legacy names are also supported but deprecated:
+        - 'mce_sigma_scale' -> 'mce_sigma'
+        - 'mce_absolute' -> 'mce'
+        - 'p_value' -> 'mce_pvalue'
     :return: A ScoreFunctionInterface-compatible wrapper.
     """
     if categorical_segment_columns is None and numerical_segment_columns is None:
@@ -1667,7 +1893,23 @@ def wrap_multicalibration_error_metric(
             "No segment columns provided. Please provide either "
             "categorical_segment_columns or numerical_segment_columns."
         )
-    valid_versions = ("mce", "mce_sigma_scale", "mce_absolute", "p_value")
+
+    # Map legacy names to new names
+    legacy_to_new = {
+        "mce_sigma_scale": "mce_sigma",
+        "mce_absolute": "mce",
+        "p_value": "mce_pvalue",
+    }
+    if metric_version in legacy_to_new:
+        warnings.warn(
+            f"metric_version='{metric_version}' is deprecated. "
+            f"Use '{legacy_to_new[metric_version]}' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        metric_version = legacy_to_new[metric_version]
+
+    valid_versions = ("mce", "mce_relative", "mce_sigma", "mce_pvalue")
     if metric_version not in valid_versions:
         raise ValueError(
             f"`metric_version` has to be one of {list(valid_versions)}. "

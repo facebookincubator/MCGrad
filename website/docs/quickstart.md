@@ -106,10 +106,10 @@ See the [methods API](api/methods.md) for other available global calibration met
 
 To evaluate multicalibration rigorously, use the `MulticalibrationError` class, which provides several key attributes:
 
-- **Multicalibration Error (MCE)**: The Multicalibration Error on a percentage scale. It measures the largest deviation from perfect calibration over all segments. Access via the `.mce` attribute.
-- **MCE Sigma Scale**: The Multicalibration Error normalized by its standard deviation under the null hypothesis of perfect calibration. It represents the largest segment error in standard deviations. Conceptually equivalent to a p-value, this metric assesses the statistical evidence of miscalibration. Access via the `.mce_sigma_scale` attribute.
-- **p-value**: Statistical p-value measured under the null hypothesis of perfect calibration. This helps determine whether observed miscalibration is statistically significant. Access via the `.p_value` attribute.
-- **Minimum Detectable Error (MDE)**: The approximate minimum MCE (percentage scale) detectable with the dataset. Access via the `.mde` attribute.
+- **Multicalibration Error (MCE)**: The Multicalibration Error. It measures the largest deviation from perfect calibration over all segments. Access via the `.mce` attribute.
+- **MCE Sigma Scale**: The Multicalibration Error normalized by its standard deviation under the null hypothesis of perfect calibration. It represents the largest segment error in standard deviations. Conceptually equivalent to a p-value, this metric assesses the statistical evidence of miscalibration. Access via the `.mce_sigma` attribute.
+- **p-value**: Statistical p-value measured under the null hypothesis of perfect calibration. This helps determine whether observed miscalibration is statistically significant. Access via the `.mce_pvalue` attribute.
+- **Minimum Detectable Error (MDE)**: The approximate minimum MCE detectable with the dataset. Access via the `.mde` attribute.
 
 ```python
 # Initialize the MulticalibrationError metric
@@ -123,8 +123,8 @@ mce = metrics.MulticalibrationError(
 
 # Print key calibration metrics
 print(f"Multicalibration Error (MCE): {mce.mce:.3f}%")
-print(f"MCE Sigma Scale: {mce.mce_sigma_scale:.3f}")
-print(f"MCE p-value: {mce.p_value:.4f}")
+print(f"MCE Sigma Scale: {mce.mce_sigma:.3f}")
+print(f"MCE p-value: {mce.mce_pvalue:.4f}")
 print(f"Minimum Detectable Error (MDE): {mce.mde:.3f}%")
 ```
 
@@ -154,23 +154,16 @@ for method_name, score_col in score_columns.items():
     results.append({
         'Method': method_name,
         'MCE': round(mce.mce, 2),
-        'MCE σ': round(mce.mce_sigma_scale, 2),
-        'p-value': round(mce.p_value, 4),
+        'MCE σ': round(mce.mce_sigma, 2),
+        'p-value': round(mce.mce_pvalue, 4),
     })
 
 # Display comparison table
 pd.DataFrame(results).set_index('Method')
 ```
 
-Expected output:
 
-| Method       | MCE   | MCE σ | p-value |
-|--------------|-------|-------|---------|
-| Uncalibrated | 36.33 | 28.34 | 0.0000  |
-| Isotonic     | 17.30 | 13.54 | 0.0000  |
-| MCGrad       | 2.99  | 2.38  | 0.0691  |
-
-As expected, MCGrad significantly reduces the Multicalibration Error compared to both uncalibrated predictions and Isotonic Regression. The p-value for MCGrad (0.0691) indicates no statistically significant evidence of remaining miscalibration.
+The output shows that MCGrad significantly reduces the Multicalibration Error compared to both uncalibrated predictions and Isotonic Regression. The p-value for MCGrad (0.0691) indicates no statistically significant evidence of remaining miscalibration.
 
 ### 6. Visualize (Multi)calibration Error
 
