@@ -5,7 +5,7 @@ description: How to measure multicalibration using the Multicalibration Error (M
 
 # Measuring Multicalibration
 
-The Multicalibration Error (MCE) metric quantifies how well a model is multicalibrated across relevant segments (also known as protected groups) of your data. It is used to assess the success of applying a multicalibration algorithm, like MCGrad, by measuring MCE both before and after the multicalibration step.
+The Multicalibration Error (MCE) metric quantifies how well a model is multicalibrated across relevant segments (also known as protected groups) of your data. It is used to assess the success of applying a multicalibration algorithm, like MCGrad, by measuring MCE both before and after the multicalibration step. For additional details, see [1].
 
 ## What is MCE and How Can I Use It?
 
@@ -75,7 +75,7 @@ The number of segments grows exponentially with the number of features. Therefor
 
 After defining segments, assess how well the model's predicted probabilities match the observed outcomes within each segment.
 
-For each segment, the **Estimated Cumulative Calibration Error (ECCE)** is computed, which captures the sum of deviations between predicted scores and actual labels over any interval of scores in that segment.
+For each segment, the **[Estimated Cumulative Calibration Error (ECCE)][2]** is computed, which captures the sum of deviations between predicted scores and actual labels over any interval of scores in that segment.
 
 Why ECCE?
 
@@ -118,11 +118,15 @@ The MCE (sigma scale) metric has a precise mathematical relationship to the theo
 
 The classic definition of multicalibration is straightforward: for every segment $h$ and every predicted probability $p$, the average outcome should match the prediction:
 
-$$ \mathbb{E}[Y - f(X) \mid h(X)=1, f(X) = p] = 0. $$
+$$
+\mathbb{E}[Y - f(X) \mid h(X)=1, f(X) = p] = 0.
+$$
 
 In practice, this condition rarely holds exactly. Therefore, it is relaxed to allow for small error: A predictor $f$ is **$\alpha$-multicalibrated** with respect to $\mathcal{H}$ if
 
-$$\left| \mathbb{E}\left[h(X) \cdot \mathbf{1}_{f(X) \in [a,b]} \cdot (Y-f(X))\right] \right| \leq \alpha \cdot \tau_h(f,[a,b])$$
+$$
+\left| \mathbb{E}\left[h(X) \cdot \mathbf{1}_{f(X) \in [a,b]} \cdot (Y-f(X))\right] \right| \leq \alpha \cdot \tau_h(f,[a,b])
+$$
 
 for all segments $h \in \mathcal{H}$ and all score intervals $[a,b]$, where:
 
@@ -137,7 +141,9 @@ The **key insight** is that MCE provides a finite-sample estimate of the minimal
 
 **MCE Computation:**
 
-$$\text{MCE}(f) = \max_{h \in \mathcal{H}} \frac{\text{ECCE}_h(f)}{\sigma_h(f)}$$
+$$
+\text{MCE}(f) = \max_{h \in \mathcal{H}} \frac{\text{ECCE}_h(f)}{\sigma_h(f)}
+$$
 
 where:
 - $\text{ECCE}_h(f)$ measures the range of cumulative calibration differences in segment $h$;
@@ -154,7 +160,9 @@ Under standard conditions, these are asymptotically equivalent: $\sigma_h(f) \ap
 :::tip Mathematical Connection
 A predictor $f$ is $\alpha$-multicalibrated with respect to $\mathcal{H}$ if and only if:
 
-$$\text{MCE}(f) \le \alpha \sqrt{n}$$
+$$
+\text{MCE}(f) \le \alpha \sqrt{n}
+$$
 
 where $n$ is the sample size.
 
@@ -168,12 +176,15 @@ where $n$ is the sample size.
 ---
 
 
-## Reference
+## References
 
-For full methodological details, see:
+[1] **Guy, I., Haimovich, D., Linder, F., Okati, N., Perini, L., Tax, N., & Tygert, M. (2025).** [Measuring multi-calibration](https://arxiv.org/abs/2506.11251). *arXiv:2506.11251*.
 
-**Guy, I., Haimovich, D., Linder, F., Okati, N., Perini, L., Tax, N., & Tygert, M. (2025).** [Measuring multi-calibration](https://arxiv.org/abs/2506.11251). *arXiv:2506.11251*.
 
+
+[2] **Arrieta-Ibarra, I., Gujral, P., Tannen, J., Tygert, M., & Xu, C. (2022).** [Metrics of calibration for probabilistic predictions](https://www.jmlr.org/papers/volume23/22-0658/22-0658.pdf). *Journal of Machine Learning Research, 23(351), 1-54.*
+
+If you use MCE in academic work, please cite our paper:
 ```bibtex
 @article{guy2025measuring,
   title={Measuring multi-calibration},
