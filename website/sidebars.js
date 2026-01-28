@@ -27,7 +27,7 @@ const sidebars = {
       collapsed: false,
       collapsible: false,
       items: [
-        {type: 'doc', id: 'intro', label: 'Why Multicalibration'},
+        {type: 'doc', id: 'intro', label: 'Why Multicalibration?'},
         'why-mcgrad',
       ],
     },
