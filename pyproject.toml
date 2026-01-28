@@ -53,6 +53,12 @@ dev = [
     "pytest-cov>=4.0.0",
     "flake8==7.3.0",
     "flake8-bugbear>=24.0.0",
+    "papermill>=2.4.0",
+]
+tutorials = [
+    "notebook>=7.0.0",
+    "jupyterlab>=4.0.0",
+    "folktables>=0.0.12",
 ]
 docs = [
     "sphinx>=7.0.0",

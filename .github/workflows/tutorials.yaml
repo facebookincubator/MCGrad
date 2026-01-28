@@ -1,0 +1,58 @@
+name: Tutorials
+
+on:
+  push:
+    paths:
+      - 'tutorials/**'
+      - 'src/**'
+      - 'pyproject.toml'
+  pull_request:
+    paths:
+      - 'tutorials/**'
+      - 'src/**'
+      - 'pyproject.toml'
+  workflow_dispatch:
+
+jobs:
+  test-tutorials:
+    runs-on: 4-core-ubuntu
+    strategy:
+      matrix:
+        python-version: ['3.11']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-tutorials-${{ hashFiles('pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-tutorials-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev,tutorials]"
+
+    - name: Execute tutorials
+      run: |
+        for notebook in tutorials/*.ipynb; do
+          echo "=========================================="
+          echo "Testing: $notebook"
+          echo "=========================================="
+
+          # Execute with Papermill (timeout: 10 minutes per notebook)
+          papermill "$notebook" /tmp/output.ipynb \
+            --cwd tutorials \
+            --execution-timeout 600 \
+            --log-output
+
+          echo "✓ $notebook passed"
+        done

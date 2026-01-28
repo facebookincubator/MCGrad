@@ -39,6 +39,7 @@ const sidebars = {
       items: [
         'installation',
         {type: 'doc', id: 'quickstart', label: 'Getting Started'},
+        'tutorials',
         {
           type: 'link',
           label: 'API Reference (ReadTheDocs)',
