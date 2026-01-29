@@ -29,3 +29,7 @@ coverage.xml
 
 # Metadata
 **/.DS_Store
+
+# Tutorials
+tutorials/data/
+tutorials/.ipynb_checkpoints
