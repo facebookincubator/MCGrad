@@ -946,7 +946,9 @@ def test_that_multicalibrationerror_is_equal_to_ecce_metric_on_single_segment():
         max_depth=0,
         min_samples_per_segment=1,
     )
-    assert np.isclose(mce.mce_absolute, global_ecce_metric, rtol=1e-10, atol=1e-10)
+    # Compute absolute MCE directly (works in both OSS and internal)
+    mce_absolute = mce.mce_sigma * mce._global_ecce_std
+    assert np.isclose(mce_absolute, global_ecce_metric, rtol=1e-10, atol=1e-10)
 
 
 @pytest.mark.parametrize(
@@ -980,18 +982,18 @@ def test_wrap_sklearn_metric_func_does_not_raise_an_error_with_any_of_our_main_m
     )
 
 
-def test_mce_wrapper_with_variant_mce_sigma_scale_has_the_right_name():
-    # This test is required to throw warnings when mce_sigma_scale is large after training mcgrad
+def test_mce_wrapper_with_variant_mce_sigma_has_the_right_name():
+    # This test is required to throw warnings when mce_sigma is large after training mcgrad
     # See the function determine_best_num_rounds in multicalibration.methods.py
     assert (
         wrap_multicalibration_error_metric(
             categorical_segment_columns="",
             numerical_segment_columns="",
-            metric_version="mce_sigma_scale",
+            metric_version="mce_sigma",
         ).name
-        == "Multicalibration Error<br>(mce_sigma_scale)"
+        == "Multicalibration Error<br>(mce_sigma)"
     ), (
-        "The name of the mce_sigma_scale variant should be Multicalibration Error<br>(mce_sigma_scale)."
+        "The name of the mce_sigma variant should be Multicalibration Error<br>(mce_sigma)."
     )
 
 
@@ -1042,7 +1044,7 @@ def test_that_mce_returns_correct_prevalence_with_and_without_weights():
         categorical_segment_columns=["segment_A"],
         min_samples_per_segment=1,
     )
-    assert weighted_mce.prevalence == 0.2
+    assert weighted_mce._prevalence == 0.2
 
     unweighted_mce = metrics.MulticalibrationError(
         df=df,
@@ -1052,7 +1054,7 @@ def test_that_mce_returns_correct_prevalence_with_and_without_weights():
         categorical_segment_columns=["segment_A"],
         min_samples_per_segment=1,
     )
-    assert unweighted_mce.prevalence == 0.5
+    assert unweighted_mce._prevalence == 0.5
 
 
 def test_mce_speedup_returns_values_equal_for_different_chunk_sizes(rng):
@@ -1109,10 +1111,8 @@ def test_mce_speedup_returns_values_equal_for_different_chunk_sizes(rng):
         chunk_size=7,
     )
 
-    assert np.equal(
-        mce_chunk25.segment_ecces_absolute, mce_chunk7.segment_ecces_absolute
-    ).all()
-    assert np.equal(mce_chunk25.segment_sigmas, mce_chunk7.segment_sigmas).all()
+    assert np.equal(mce_chunk25.segments_ecce, mce_chunk7.segments_ecce).all()
+    assert np.equal(mce_chunk25._segments_ecce_std, mce_chunk7._segments_ecce_std).all()
 
 
 def test_mce_sorting_does_not_modify_original_df(rng):
@@ -1235,13 +1235,13 @@ def test_mce_reducing_precision_dtype_returns_correct_value_upto_third_digit(rng
         precision_dtype="float64",
     )
     attrs_to_check = [
-        "segment_ecces_absolute",
-        "segment_ecces_sigma_scale",
-        "segment_sigmas",
-        "sigma_0",
+        "segments_ecce",
+        "segments_ecce_sigma",
+        "_segments_ecce_std",
+        "_global_ecce_std",
         "mce",
-        "mce_sigma_scale",
-        "mde",
+        "mce_sigma",
+        "mde_relative",
     ]
     for attr_name in attrs_to_check:
         # float16 should be within 2e-3 of float64
@@ -1262,7 +1262,7 @@ def test_segment_feature_values_has_the_correct_features_used_for_segment_genera
     rng,
 ):
     """
-    Test that the segment_feature_values dataframe returned by MulticalibrationError.segments
+    Test that the segment_feature_values dataframe returned by MulticalibrationError._segments
     has the expected structure and values when using one categorical and one numerical feature.
     """
     n_samples = 100
@@ -1286,7 +1286,7 @@ def test_segment_feature_values_has_the_correct_features_used_for_segment_genera
         min_samples_per_segment=1,
     )
 
-    _, segment_feature_values = mce.segments
+    _, segment_feature_values = mce._segments
 
     # Verify the structure of the segment_feature_values dataframe
     assert isinstance(segment_feature_values, pd.DataFrame), (
@@ -1433,21 +1433,21 @@ def test_precision_dtype_is_maintained_in_multicalibration_error_methods(rng):
         precision_dtype="float64",
     )
 
-    assert mce_float16.segment_ecces_sigma_scale.dtype == np.float16
-    assert mce_float32.segment_ecces_sigma_scale.dtype == np.float32
-    assert mce_float64.segment_ecces_sigma_scale.dtype == np.float64
+    assert mce_float16.segments_ecce_sigma.dtype == np.float16
+    assert mce_float32.segments_ecce_sigma.dtype == np.float32
+    assert mce_float64.segments_ecce_sigma.dtype == np.float64
 
-    assert mce_float16.segment_sigmas.dtype == np.float16
-    assert mce_float32.segment_sigmas.dtype == np.float32
-    assert mce_float64.segment_sigmas.dtype == np.float64
+    assert mce_float16._segments_ecce_std.dtype == np.float16
+    assert mce_float32._segments_ecce_std.dtype == np.float32
+    assert mce_float64._segments_ecce_std.dtype == np.float64
 
-    assert mce_float16.segment_ecces_absolute.dtype == np.float16
-    assert mce_float32.segment_ecces_absolute.dtype == np.float32
-    assert mce_float64.segment_ecces_absolute.dtype == np.float64
+    assert mce_float16.segments_ecce.dtype == np.float16
+    assert mce_float32.segments_ecce.dtype == np.float32
+    assert mce_float64.segments_ecce.dtype == np.float64
 
-    assert mce_float16.mce_sigma_scale.dtype == np.float16
-    assert mce_float32.mce_sigma_scale.dtype == np.float32
-    assert mce_float64.mce_sigma_scale.dtype == np.float64
+    assert mce_float16.mce_sigma.dtype == np.float16
+    assert mce_float32.mce_sigma.dtype == np.float32
+    assert mce_float64.mce_sigma.dtype == np.float64
 
 
 def test_precision_dtype_is_extended_for_large_weights(rng):
@@ -2033,14 +2033,14 @@ def test_multicalibration_error_segment_indices_returns_series(rng):
         max_depth=1,
     )
 
-    indices = mce.segment_indices
+    indices = mce._segments_indices
 
     assert isinstance(indices, pd.Series)
     assert len(indices) > 0
 
 
 def test_multicalibration_error_global_ecce_returns_first_segment_ecce():
-    """Test MulticalibrationError.global_ecce returns segment_ecces[0]"""
+    """Test MulticalibrationError.global_ecce returns segments_ecce[0] (absolute scale in OSS)."""
     df = pd.DataFrame(
         {
             "prediction": [0.1, 0.9, 0.2, 0.8, 0.4, 0.6],
@@ -2058,16 +2058,21 @@ def test_multicalibration_error_global_ecce_returns_first_segment_ecce():
         max_depth=1,
     )
 
-    # Access global_ecce property
-    global_ecce = mce.global_ecce
+    # In OSS, global_ecce returns absolute scale (segments_ecce[0])
+    # Suppress deprecation warning for internal transition behavior
+    import warnings
 
-    # Should equal segment_ecces[0]
-    assert global_ecce == mce.segment_ecces[0]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        global_ecce = mce.global_ecce
+
     assert isinstance(global_ecce, (float, np.floating))
+    # In OSS, this equals segments_ecce[0]; internally during transition it equals
+    # segments_ecce_relative[0]. We verify the type here; internal tests verify exact values.
 
 
-def test_multicalibration_error_global_ecce_sigma_scale_returns_first_segment():
-    """Test MulticalibrationError.global_ecce_sigma_scale returns segment_ecces_sigma_scale[0]"""
+def test_multicalibration_error_mce_returns_absolute_scale():
+    """Test MulticalibrationError.mce returns absolute scale in OSS."""
     df = pd.DataFrame(
         {
             "prediction": [0.1, 0.9, 0.2, 0.8, 0.4, 0.6],
@@ -2085,13 +2090,20 @@ def test_multicalibration_error_global_ecce_sigma_scale_returns_first_segment():
         max_depth=1,
     )
 
-    global_ecce_sigma_scale = mce.global_ecce_sigma_scale
+    # Suppress deprecation warning for internal transition behavior
+    import warnings
 
-    assert global_ecce_sigma_scale == mce.segment_ecces_sigma_scale[0]
-    assert isinstance(global_ecce_sigma_scale, (float, np.floating))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        mce_value = mce.mce
+
+    assert isinstance(mce_value, (float, np.floating))
+    # In OSS, mce equals mce_sigma * _global_ecce_std; internally during transition
+    # it equals mce_relative. We verify the type here; internal tests verify exact values.
 
 
-def test_multicalibration_error_global_ecce_p_value_returns_first_segment():
+def test_multicalibration_error_global_ecce_sigma_returns_first_segment():
+    """Test MulticalibrationError.global_ecce_sigma returns segments_ecce_sigma[0]"""
     df = pd.DataFrame(
         {
             "prediction": [0.1, 0.9, 0.2, 0.8, 0.4, 0.6],
@@ -2109,15 +2121,39 @@ def test_multicalibration_error_global_ecce_p_value_returns_first_segment():
         max_depth=1,
     )
 
-    # Access global_ecce_p_value property
-    global_ecce_p_value = mce.global_ecce_p_value
+    global_ecce_sigma = mce.global_ecce_sigma
 
-    # Should equal segment_p_values[0]
-    assert global_ecce_p_value == mce.segment_p_values[0]
-    assert 0 <= global_ecce_p_value <= 1
+    assert global_ecce_sigma == mce.segments_ecce_sigma[0]
+    assert isinstance(global_ecce_sigma, (float, np.floating))
 
 
-def test_multicalibration_error_sigma_0_fallback_when_segment_sigmas_not_computed():
+def test_multicalibration_error_global_ecce_pvalue_returns_first_segment():
+    df = pd.DataFrame(
+        {
+            "prediction": [0.1, 0.9, 0.2, 0.8, 0.4, 0.6],
+            "label": [0, 1, 0, 1, 0, 1],
+            "segment": ["a", "a", "b", "b", "c", "c"],
+        }
+    )
+
+    mce = metrics.MulticalibrationError(
+        df=df,
+        label_column="label",
+        score_column="prediction",
+        categorical_segment_columns=["segment"],
+        min_samples_per_segment=1,
+        max_depth=1,
+    )
+
+    # Access global_ecce_pvalue property
+    global_ecce_pvalue = mce.global_ecce_pvalue
+
+    # Should equal segments_ecce_pvalue[0]
+    assert global_ecce_pvalue == mce.segments_ecce_pvalue[0]
+    assert 0 <= global_ecce_pvalue <= 1
+
+
+def test_multicalibration_error_global_ecce_std_fallback_when_segments_ecce_std_not_computed():
     df = pd.DataFrame(
         {
             "prediction": [0.1, 0.5, 0.9, 0.2, 0.8],
@@ -2135,16 +2171,16 @@ def test_multicalibration_error_sigma_0_fallback_when_segment_sigmas_not_compute
         max_depth=0,
     )
 
-    # Access sigma_0 before segment_sigmas is computed
+    # Access _global_ecce_std before _segments_ecce_std is computed
     # This should trigger the fallback path
-    sigma_0 = mce.sigma_0
+    global_ecce_std = mce._global_ecce_std
 
     # Should return a valid float value
-    assert isinstance(sigma_0, (float, np.floating))
-    assert sigma_0 >= 0
+    assert isinstance(global_ecce_std, (float, np.floating))
+    assert global_ecce_std >= 0
 
 
-def test_multicalibration_error_p_value_fallback_when_segment_p_values_not_computed():
+def test_multicalibration_error_mce_pvalue_fallback_when_segments_ecce_pvalue_not_computed():
     df = pd.DataFrame(
         {
             "prediction": [0.1, 0.5, 0.9, 0.2, 0.8],
@@ -2162,13 +2198,13 @@ def test_multicalibration_error_p_value_fallback_when_segment_p_values_not_compu
         max_depth=0,
     )
 
-    # Access p_value before segment_p_values is computed
+    # Access mce_pvalue before segments_ecce_pvalue is computed
     # This should trigger the fallback path using _ecce_cdf
-    p_value = mce.p_value
+    mce_pvalue = mce.mce_pvalue
 
     # Should return a valid p-value
-    assert isinstance(p_value, (float, np.floating))
-    assert 0 <= p_value <= 1
+    assert isinstance(mce_pvalue, (float, np.floating))
+    assert 0 <= mce_pvalue <= 1
 
 
 def test_calibration_ratio_returns_inf_when_labels_zero_but_predictions_positive():

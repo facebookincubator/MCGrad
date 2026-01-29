@@ -29,11 +29,11 @@ mce = MulticalibrationError(
 )
 
 print(f"MCE: {mce.mce}%")
-print(f"P-value: {mce.p_value}")
-print(f"Sigma scale: {mce.mce_sigma_scale}")
+print(f"P-value: {mce.mce_pvalue}")
+print(f"Sigma scale: {mce.mce_sigma}")
 ```
 
-The MulticalibrationError metric is based on the Kuiper statistic and provides a principled way to measure multi-calibration quality. For details on the methodology, see:
+The MulticalibrationError metric is based on the ECCE and provides a principled way to measure multi-calibration quality. For details on the methodology, see:
 
 **Guy, I., Haimovich, D., Linder, F., Okati, N., Perini, L., Tax, N., & Tygert, M. (2025).** [Measuring multi-calibration](https://arxiv.org/abs/2506.11251). arXiv:2506.11251.
 
