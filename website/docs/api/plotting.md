@@ -63,7 +63,7 @@ mce = metrics.MulticalibrationError(
 # Plot segment calibration errors
 fig = plotting.plot_segment_calibration_errors(
     mce=mce,
-    quantity='segment_ecces_sigma_scale',
+    quantity='segments_ecce_sigma',
 )
 
 fig.show()
