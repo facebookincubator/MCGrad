@@ -20,16 +20,12 @@ Consider a model trained to predict the likelihood of a user clicking on an ad. 
 Upon closer inspection, a different picture emerges. When examining two specific segments—US and non-US markets—the reliability plots reveal significant problems. For the US market, the model underestimates, predicting lower than the actual click rates. For non-US markets, the model overestimates, consistently predicting higher probabilities than reality.
 
 <div style={{textAlign: 'center'}}>
-<img src={require('../static/img/local_miscalibration.png').default} alt="local miscalibration" width="50%" />
+<img src={require('../static/img/local_miscalibration.png').default} alt="local miscalibration" width="90%" />
 </div>
 
 This is a common pitfall: global calibration can mask significant miscalibration within segments. These hidden errors have real consequences and lead to poor business outcomes.
 
 After applying **MCGrad** instead of Isotonic Regression, the reliability plots for those same segments show curves much closer to the diagonal. Predictions for US and non-US markets now accurately reflect the true click rates. MCGrad does not just fix the model globally—it ensures every meaningful segment receives calibrated predictions.
-
-<div style={{textAlign: 'center'}}>
-<img src={require('../static/img/mcgrad.png').default} alt="mcgrad fixes local miscalibration" width="50%" />
-</div>
 
 ## MCGrad in Action
 
