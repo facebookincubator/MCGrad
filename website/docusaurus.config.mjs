@@ -15,8 +15,8 @@ const config = {
   title: 'MCGrad',
   tagline: 'Production-Ready Multicalibration',
 
-  url: 'https://facebookincubator.github.io',
-  baseUrl: '/MCGrad/',
+  url: 'https://mcgrad.dev',
+  baseUrl: '/',
   favicon: 'img/logo_no_text.png',
 
   organizationName: 'facebookincubator',
@@ -71,12 +71,12 @@ const config = {
         {name: 'keywords', content: 'multicalibration, calibration, machine learning, fairness, MCGrad, Python, LightGBM'},
         {property: 'og:title', content: 'MCGrad - Production-Ready Multicalibration'},
         {property: 'og:description', content: 'Production-ready multicalibration ensuring ML model fairness and accuracy across all segments.'},
-        {property: 'og:image', content: 'https://facebookincubator.github.io/MCGrad/img/logo.png'},
+        {property: 'og:image', content: 'https://mcgrad.dev/img/logo.png'},
         {property: 'og:type', content: 'website'},
         {name: 'twitter:card', content: 'summary_large_image'},
         {name: 'twitter:title', content: 'MCGrad - Production-Ready Multicalibration'},
         {name: 'twitter:description', content: 'Production-ready multicalibration ensuring ML model fairness and accuracy across all segments.'},
-        {name: 'twitter:image', content: 'https://facebookincubator.github.io/MCGrad/img/logo.png'},
+        {name: 'twitter:image', content: 'https://mcgrad.dev/img/logo.png'},
       ],
       navbar: {
         title: 'MCGrad',
