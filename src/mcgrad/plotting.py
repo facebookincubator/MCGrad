@@ -315,8 +315,13 @@ def plot_segment_calibration_errors(
 
     :param mce: A MulticalibrationError object containing computed segment-level metrics.
     :param highlight_feature: Optional feature name to color-code points by.
-    :param quantity: The quantity to plot. Options are "segments_ecce_relative",
-        "segments_ecce", "segments_ecce_pvalue", and "segments_ecce_sigma".
+    :param quantity: The quantity to plot. Options:
+
+        - ``segments_ecce_relative``: ECCE as percentage of prevalence (default)
+        - ``segments_ecce``: Absolute ECCE values
+        - ``segments_ecce_pvalue``: P-values for calibration test
+        - ``segments_ecce_sigma``: ECCE in standard deviations
+
     :return: A Plotly Figure object with the scatter plot of the specified quantity
         against segment size.
     """
@@ -359,10 +364,10 @@ def plot_segment_calibration_errors(
     fig.update_xaxes(title="Segment Size")
 
     y_axis_config = {
-        "segments_ecce_relative": ("ECCE", "%"),
+        "segments_ecce_relative": ("ECCE (relative)", "%"),
         "segments_ecce": ("ECCE (absolute)", None),
         "segments_ecce_pvalue": ("P-value", None),
-        "segments_ecce_sigma": ("ECCE / Standard Deviation", "\u03c3"),
+        "segments_ecce_sigma": ("ECCE (sigma)", "\u03c3"),
     }
     title, suffix = y_axis_config[quantity]
     fig.update_yaxes(title=title)
