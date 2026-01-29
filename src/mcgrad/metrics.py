@@ -30,6 +30,7 @@ import functools
 import logging
 import math
 import sys
+import warnings
 from collections.abc import Callable
 from typing import Any, Protocol
 
@@ -41,6 +42,10 @@ from sklearn import metrics as skmetrics
 from . import _utils as utils
 from ._compat import groupby_apply
 from ._segmentation import get_segment_masks
+# @oss-disable[end= ]: from .internal._compat import (
+    # @oss-disable[end= ]: apply_mce_transition_overrides,
+    # @oss-disable[end= ]: MulticalibrationErrorCompatMixin,
+# @oss-disable[end= ]: )
 
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -1234,7 +1239,9 @@ DEFAULT_MCE_GLOBAL_NORMALIZATION: str = "prevalence_adjusted"
 DEFAULT_MCE_N_SEGMENTS: int | None = 1000
 
 
-class MulticalibrationError:
+class MulticalibrationError(
+    # @oss-disable[end= ]: MulticalibrationErrorCompatMixin,
+):
     def __init__(
         self,
         df: pd.DataFrame,
@@ -1314,18 +1321,17 @@ class MulticalibrationError:
         self.total_number_segments: int = -1  # initialized as -1
 
     def __str__(self) -> str:
-        return f"""{self.mce}% (sigmas={self.mce_sigma_scale}, p={self.p_value}, mde={self.mde})"""
+        return f"""{self.mce_relative}% (sigmas={self.mce_sigma}, p={self.mce_pvalue}, mde={self.mde_relative})"""
 
     def __format__(self, format_spec: str) -> str:
-        # Use the format specifier to format each attribute
-        formatted_mce_relative = format(self.mce, format_spec)
-        formatted_p_value = format(self.p_value, format_spec)
-        formatted_mde = format(self.mde, format_spec)
-        formatted_mce_sigma_scale = format(self.mce_sigma_scale, format_spec)
-        return f"""{formatted_mce_relative}% (sigmas={formatted_mce_sigma_scale}, p={formatted_p_value}, mde={formatted_mde})"""
+        formatted_mce_relative = format(self.mce_relative, format_spec)
+        formatted_p_value = format(self.mce_pvalue, format_spec)
+        formatted_mde = format(self.mde_relative, format_spec)
+        formatted_mce_sigma = format(self.mce_sigma, format_spec)
+        return f"""{formatted_mce_relative}% (sigmas={formatted_mce_sigma}, p={formatted_p_value}, mde={formatted_mde})"""
 
     @functools.cached_property
-    def segments(self) -> tuple[npt.NDArray[np.bool_], pd.DataFrame]:
+    def _segments(self) -> tuple[npt.NDArray[np.bool_], pd.DataFrame]:
         segments_masks = []
         segments_feature_values = pd.DataFrame(
             columns=["segment_column", "value", "idx_segment"]
@@ -1363,18 +1369,19 @@ class MulticalibrationError:
         return segments, segments_feature_values
 
     @functools.cached_property
-    def segment_indices(self) -> pd.Series:
-        segments_2d = self.segments[0].reshape(-1, self.segments[0].shape[2])
+    def _segments_indices(self) -> pd.Series:
+        segments_2d = self._segments[0].reshape(-1, self._segments[0].shape[2])
         indices = np.argwhere(segments_2d)
         index_series = pd.Series(indices[:, 1], index=indices[:, 0])
 
         return index_series
 
     @functools.cached_property
-    def segment_ecces_absolute(
+    def segments_ecce(
         self,
     ) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
-        segments = self.segments[0]
+        """ECCE values per segment on absolute scale."""
+        segments = self._segments[0]
         statistics = np.zeros(
             self.total_number_segments,
             dtype=self.precision_dtype,
@@ -1400,46 +1407,59 @@ class MulticalibrationError:
         return statistics
 
     @functools.cached_property
-    def segment_ecces(self) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
-        return self.segment_ecces_sigma_scale * self.sigma_0 / self.prevalence * 100
+    def segments_ecce_relative(
+        self,
+    ) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
+        """ECCE values per segment on relative (prevalence-adjusted percentage) scale."""
+        return self.segments_ecce_sigma * self._global_ecce_std / self._prevalence * 100
 
     @functools.cached_property
     def global_ecce(self) -> float:
-        return self.segment_ecces[0]
+        """Global ECCE on absolute scale."""
+        return self.segments_ecce[0]
 
     @functools.cached_property
-    def global_ecce_sigma_scale(self) -> float:
-        return self.segment_ecces_sigma_scale[0]
+    def global_ecce_relative(self) -> float:
+        """Global ECCE on relative (prevalence-adjusted percentage) scale."""
+        return self.segments_ecce_relative[0]
 
     @functools.cached_property
-    def global_ecce_p_value(self) -> float:
-        return self.segment_p_values[0]
+    def global_ecce_sigma(self) -> float:
+        """Global ECCE on sigma (z-score) scale."""
+        return self.segments_ecce_sigma[0]
 
     @functools.cached_property
-    def segment_ecces_sigma_scale(
+    def global_ecce_pvalue(self) -> float:
+        """P-value for global ECCE calibration test."""
+        return self.segments_ecce_pvalue[0]
+
+    @functools.cached_property
+    def segments_ecce_sigma(
         self,
     ) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
+        """ECCE values per segment on sigma (z-score) scale."""
         with np.errstate(divide="ignore", invalid="ignore"):
             statistics = np.where(
-                (self.segment_ecces_absolute != 0) & (self.segment_sigmas == 0),
+                (self.segments_ecce != 0) & (self._segments_ecce_std == 0),
                 np.inf,
                 np.where(
-                    self.segment_sigmas == 0,
+                    self._segments_ecce_std == 0,
                     0,
-                    self.segment_ecces_absolute / self.segment_sigmas,
+                    self.segments_ecce / self._segments_ecce_std,
                 ),
             )
         return statistics
 
     @functools.cached_property
-    def segment_p_values(self) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
+    def segments_ecce_pvalue(self) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
+        """P-values per segment for ECCE calibration test."""
         ecce_pvalue_vec = np.vectorize(ecce_pvalue_from_sigma)
-        p_values = ecce_pvalue_vec(self.segment_ecces_sigma_scale)
+        p_values = ecce_pvalue_vec(self.segments_ecce_sigma)
         return p_values
 
     @functools.cached_property
-    def segment_sigmas(self) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
-        segments = self.segments[0]
+    def _segments_ecce_std(self) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
+        segments = self._segments[0]
         sigmas = np.zeros(self.total_number_segments, dtype=self.precision_dtype)
         for i, segment in enumerate(segments):
             sigmas[
@@ -1461,10 +1481,10 @@ class MulticalibrationError:
         return sigmas
 
     @functools.cached_property
-    def sigma_0(self) -> float:
-        if "segment_sigmas" in self.__dict__:
-            return self.segment_sigmas[0]
-        sigma_0 = _ecce_standard_deviation_per_segment(
+    def _global_ecce_std(self) -> float:
+        if "_segments_ecce_std" in self.__dict__:
+            return self._segments_ecce_std[0]
+        std = _ecce_standard_deviation_per_segment(
             predicted_scores=self.df[self.score_column].values,
             labels=self.df[self.label_column].values,
             sample_weight=(
@@ -1475,18 +1495,27 @@ class MulticalibrationError:
             segments=np.ones(shape=(1, len(self.df)), dtype=np.bool_),
             precision_dtype=self.precision_dtype,
         )
-        return sigma_0.item()
+        return std.item()
 
     @functools.cached_property
-    def mce_sigma_scale(self) -> float:
-        return np.max(self.segment_ecces_sigma_scale)
+    def mce_sigma(self) -> float:
+        """Maximum calibration error on sigma scale."""
+        return np.max(self.segments_ecce_sigma)
 
     @functools.cached_property
-    def mce_absolute(self) -> float:
-        return self.mce_sigma_scale * self.sigma_0
+    def mce(self) -> float:
+        """Maximum calibration error on absolute scale."""
+        return self.mce_sigma * self._global_ecce_std
 
     @functools.cached_property
-    def prevalence(self) -> float:
+    def mce_relative(self) -> float:
+        """Maximum calibration error on relative (prevalence-adjusted percentage) scale."""
+        # Compute directly to avoid recursion with transition override
+        mce_abs = self.mce_sigma * self._global_ecce_std
+        return mce_abs / self._prevalence * 100
+
+    @functools.cached_property
+    def _prevalence(self) -> float:
         p = (
             (self.df[self.label_column] * self.df[self.weight_column]).sum()
             / (self.df[self.weight_column].sum())
@@ -1496,20 +1525,30 @@ class MulticalibrationError:
         return min(p, 1 - p)
 
     @functools.cached_property
-    def mce(self) -> float:
-        return self.mce_absolute / self.prevalence * 100
-
-    @functools.cached_property
-    def p_value(self) -> float:
-        if "segment_p_values" in self.__dict__:
-            return np.min(self.segment_p_values)
-        return ecce_pvalue_from_sigma(self.mce_sigma_scale)
+    def mce_pvalue(self) -> float:
+        """P-value for the maximum calibration error."""
+        if "segments_ecce_pvalue" in self.__dict__:
+            return np.min(self.segments_ecce_pvalue)
+        return ecce_pvalue_from_sigma(self.mce_sigma)
 
     @functools.cached_property
     def mde(self) -> float:
-        # This is a rough, conservative approximation of the MDE. We divide by the prevalence
-        # and multiply by 100 to get the MDE in the same unit as the MCE metric
-        return 5 * self.sigma_0 / self.prevalence * 100
+        """Minimum detectable effect on absolute (probability) scale.
+
+        The MDE represents the smallest calibration error that would be
+        statistically detectable at approximately 5 sigma significance,
+        given the sample size. Expressed as an absolute probability difference.
+        """
+        return 5 * self._global_ecce_std
+
+    @functools.cached_property
+    def mde_relative(self) -> float:
+        """Minimum detectable effect on relative (prevalence-adjusted percentage) scale."""
+        return 5 * self._global_ecce_std / self._prevalence * 100
+
+
+# Apply transition period overrides for mce/global_ecce/mde (internal only)
+# @oss-disable[end= ]: apply_mce_transition_overrides(MulticalibrationError)
 
 
 class _ScoreFunctionInterface(Protocol):
@@ -1559,7 +1598,7 @@ def wrap_multicalibration_error_metric(
     max_values_per_segment_feature: int = DEFAULT_MCE_MAX_VALUES_PER_SEGMENT_FEATURE,
     min_samples_per_segment: int = DEFAULT_MCE_MIN_SAMPLES_PER_SEGMENT,
     max_n_segments: int | None = DEFAULT_MCE_N_SEGMENTS,
-    metric_version: str = "mce",
+    metric_version: str = "mce_relative",
 ) -> _ScoreFunctionInterface:
     """
     Create a wrapped MulticalibrationError metric for use with the evaluation framework.
@@ -1570,7 +1609,15 @@ def wrap_multicalibration_error_metric(
     :param max_values_per_segment_feature: Max unique values per segment feature.
     :param min_samples_per_segment: Minimum samples required per segment.
     :param max_n_segments: Maximum number of segments to generate.
-    :param metric_version: Which metric to return ('mce', 'mce_sigma_scale', 'mce_absolute', 'p_value').
+    :param metric_version: Which metric to return. Options:
+        - 'mce_relative': relative (prevalence-adjusted percentage) scale (default)
+        - 'mce': absolute scale
+        - 'mce_sigma': sigma (z-score) scale
+        - 'mce_pvalue': p-value
+        Legacy names are also supported but deprecated:
+        - 'mce_sigma_scale' -> 'mce_sigma'
+        - 'mce_absolute' -> 'mce'
+        - 'p_value' -> 'mce_pvalue'
     :return: A ScoreFunctionInterface-compatible wrapper.
     """
     if categorical_segment_columns is None and numerical_segment_columns is None:
@@ -1578,7 +1625,23 @@ def wrap_multicalibration_error_metric(
             "No segment columns provided. Please provide either "
             "categorical_segment_columns or numerical_segment_columns."
         )
-    valid_versions = ("mce", "mce_sigma_scale", "mce_absolute", "p_value")
+
+    # Map legacy names to new names
+    legacy_to_new = {
+        "mce_sigma_scale": "mce_sigma",
+        "mce_absolute": "mce",
+        "p_value": "mce_pvalue",
+    }
+    if metric_version in legacy_to_new:
+        warnings.warn(
+            f"metric_version='{metric_version}' is deprecated. "
+            f"Use '{legacy_to_new[metric_version]}' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        metric_version = legacy_to_new[metric_version]
+
+    valid_versions = ("mce", "mce_relative", "mce_sigma", "mce_pvalue")
     if metric_version not in valid_versions:
         raise ValueError(
             f"`metric_version` has to be one of {list(valid_versions)}. "
