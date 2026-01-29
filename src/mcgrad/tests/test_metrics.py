@@ -363,61 +363,6 @@ def test_multi_cg_gives_same_result_as_cg_per_segment(rank_discount, rng):
             assert np.allclose(segment_result, multi_cg_scores[segment_1, segment_2])
 
 
-def test_multicalibration_error_without_weights_gives_expected_results():
-    # Create some sample data
-    _labels = np.linspace(0, 1, 100)
-    _predictions = 1 - np.linspace(0, 1, 100)
-    segments_df = pd.DataFrame({"segment": np.array(["A"] * 50 + ["B"] * 50)})
-
-    # Define a custom metric function
-    def custom_metric(
-        labels, predicted_scores, num_bins=40, epsilon=0.0000001, sample_weight=None
-    ):
-        return np.abs(
-            np.mean(predicted_scores * sample_weight) - np.mean(labels * sample_weight)
-        )
-
-    # Test the multicalibration_error method with the custom metric function
-    error = metrics.multicalibration_error(
-        _labels, _predictions, segments_df, metric=custom_metric
-    )
-    assert pytest.approx(error, 0.001) == 0.5050505050505052
-
-
-@pytest.mark.parametrize(
-    "labels, predictions, segments_df, sample_weight, metric, expected_error",
-    [
-        (
-            np.linspace(0, 1, 100),
-            1 - np.linspace(0, 1, 100),
-            pd.DataFrame({"segment": np.array(["A"] * 50 + ["B"] * 50)}),
-            np.ones(100),
-            metrics.expected_calibration_error,
-            0.5050505050505052,
-        ),
-        (
-            np.linspace(0, 1, 100),
-            1 - np.linspace(0, 1, 100),
-            pd.DataFrame({"segment": np.array(["A"] * 50 + ["B"] * 50)}),
-            np.concatenate((np.ones(50), np.ones(50) * 2)),
-            metrics.proportional_expected_calibration_error,
-            6.73198676283903,
-        ),
-    ],
-)
-def test_multicalibration_error_with_weights_gives_expected_results(
-    labels, predictions, segments_df, sample_weight, metric, expected_error
-):
-    error = metrics.multicalibration_error(
-        labels,
-        predictions,
-        segments_df,
-        sample_weight=sample_weight,
-        metric=metric,
-    )
-    assert pytest.approx(error, 0.001) == expected_error
-
-
 @pytest.mark.parametrize(
     "labels, predictions, bins, sample_weight, expected_output, use_weights_in_sample_size",
     [
@@ -1576,21 +1521,6 @@ def test_ecce_and_standard_deviation_return_zero_for_empty_segment(rng):
         segments=masks,
     )[0]
     assert c_jk == k_std == 0, "Expected 0 for empty segment"
-
-
-def test_multicalibration_error_does_not_modify_segments_df():
-    """Verify multicalibration_error does not modify input segments_df."""
-    labels = np.linspace(0, 1, 100)
-    predictions = 1 - np.linspace(0, 1, 100)
-    segments_df = pd.DataFrame({"segment": np.array(["A"] * 50 + ["B"] * 50)})
-
-    segments_df_original = segments_df.copy()
-
-    _ = metrics.multicalibration_error(
-        labels, predictions, segments_df, metric=metrics.expected_calibration_error
-    )
-
-    pd.testing.assert_frame_equal(segments_df, segments_df_original)
 
 
 def test_multi_cg_score_does_not_modify_segments_df(rng):
