@@ -135,7 +135,7 @@ class _BaseMCGrad(
     MAX_NUM_ROUNDS_EARLY_STOPPING = 100
     NUM_ROUNDS_DEFAULT_NO_EARLY_STOPPING = 5
 
-    DEFAULT_HYPERPARAMS: dict[str, Any] = {
+    _DEFAULT_HYPERPARAMS: dict[str, Any] = {
         "monotone_t": False,
         "early_stopping": True,
         "patience": 0,
@@ -284,11 +284,13 @@ class _BaseMCGrad(
 
         self.encode_categorical_variables = encode_categorical_variables
         self.monotone_t: bool = (
-            self.DEFAULT_HYPERPARAMS["monotone_t"] if monotone_t is None else monotone_t
+            self._DEFAULT_HYPERPARAMS["monotone_t"]
+            if monotone_t is None
+            else monotone_t
         )
 
         self.early_stopping: bool = (
-            self.DEFAULT_HYPERPARAMS["early_stopping"]
+            self._DEFAULT_HYPERPARAMS["early_stopping"]
             if early_stopping is None
             else early_stopping
         )
@@ -336,7 +338,7 @@ class _BaseMCGrad(
         self.num_rounds: int = num_rounds
 
         self.patience: int = (
-            self.DEFAULT_HYPERPARAMS["patience"] if patience is None else patience
+            self._DEFAULT_HYPERPARAMS["patience"] if patience is None else patience
         )
 
         self.early_stopping_timeout: int | None = early_stopping_timeout
@@ -344,7 +346,7 @@ class _BaseMCGrad(
         self.n_folds: int = (
             1  # Because we make a single train/test split when using holdout
             if (self.early_stopping_estimation_method == _EstimationMethod.HOLDOUT)
-            else self.DEFAULT_HYPERPARAMS["n_folds"]
+            else self._DEFAULT_HYPERPARAMS["n_folds"]
             if n_folds is None
             else n_folds
         )
@@ -406,7 +408,7 @@ class _BaseMCGrad(
             pass
 
         if not hasattr(self, "lightgbm_params"):
-            params_to_set = self.DEFAULT_HYPERPARAMS.get("lightgbm_params", {}).copy()
+            params_to_set = self._DEFAULT_HYPERPARAMS.get("lightgbm_params", {}).copy()
         else:
             params_to_set = self.lightgbm_params.copy()
 
@@ -1305,9 +1307,9 @@ class MCGrad(_BaseMCGrad):
     - arXiv preprint: https://arxiv.org/abs/2509.19884
     """
 
-    UNSHRINK_LOGIT_EPSILON = 10
+    _UNSHRINK_LOGIT_EPSILON = 10
 
-    DEFAULT_HYPERPARAMS: dict[str, Any] = {
+    _DEFAULT_HYPERPARAMS: dict[str, Any] = {
         "monotone_t": False,
         "early_stopping": True,
         "patience": 0,
@@ -1340,7 +1342,7 @@ class MCGrad(_BaseMCGrad):
         y: npt.NDArray, predictions: npt.NDArray, w: npt.NDArray | None
     ) -> float:
         return utils.unshrink(
-            y, predictions, w, logit_epsilon=MCGrad.UNSHRINK_LOGIT_EPSILON
+            y, predictions, w, logit_epsilon=MCGrad._UNSHRINK_LOGIT_EPSILON
         )
 
     @property
@@ -1368,8 +1370,8 @@ class MCGrad(_BaseMCGrad):
                 f" of {len(df_train[prediction_column_name])} are null."
             )
 
-        lower_prob_bound = utils.logistic(-self.UNSHRINK_LOGIT_EPSILON)
-        upper_prob_bound = utils.logistic(self.UNSHRINK_LOGIT_EPSILON)
+        lower_prob_bound = utils.logistic(-self._UNSHRINK_LOGIT_EPSILON)
+        upper_prob_bound = utils.logistic(self._UNSHRINK_LOGIT_EPSILON)
         num_out_of_bounds = np.sum(
             (predictions < lower_prob_bound) | (predictions > upper_prob_bound)
         )
@@ -1429,7 +1431,7 @@ class RegressionMCGrad(_BaseMCGrad):
     Note that automatic determination of train/test split vs. cross validation is currently not supported for Regression.
     """
 
-    DEFAULT_HYPERPARAMS: dict[str, Any] = {
+    _DEFAULT_HYPERPARAMS: dict[str, Any] = {
         "monotone_t": False,
         "early_stopping": True,
         "patience": 0,

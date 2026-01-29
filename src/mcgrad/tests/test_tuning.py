@@ -69,7 +69,7 @@ def mock_mcgrad_model(rng):
 
 @pytest.fixture
 def hyperparams_for_tuning():
-    default_hyperparams = methods.MCGrad().DEFAULT_HYPERPARAMS
+    default_hyperparams = methods.MCGrad()._DEFAULT_HYPERPARAMS
     lightgbm_params = default_hyperparams["lightgbm_params"]
     return default_hyperparams, lightgbm_params
 

@@ -827,7 +827,7 @@ def test_mcgrad_predict_returns_correct_number_of_rounds_and_consistent_final_pr
         (
             methods.MCGrad,
             None,
-            methods.MCGrad.DEFAULT_HYPERPARAMS["lightgbm_params"],
+            methods.MCGrad._DEFAULT_HYPERPARAMS["lightgbm_params"],
             "binary",
         ),
         # if only one is passed we take the default for the others
@@ -836,7 +836,7 @@ def test_mcgrad_predict_returns_correct_number_of_rounds_and_consistent_final_pr
             {"max_depth": -1},
             {
                 k: v if k != "max_depth" else -1
-                for k, v in methods.MCGrad.DEFAULT_HYPERPARAMS[
+                for k, v in methods.MCGrad._DEFAULT_HYPERPARAMS[
                     "lightgbm_params"
                 ].items()
             },
@@ -846,14 +846,14 @@ def test_mcgrad_predict_returns_correct_number_of_rounds_and_consistent_final_pr
         (
             methods.MCGrad,
             {"_OTHER": -1},
-            methods.MCGrad.DEFAULT_HYPERPARAMS["lightgbm_params"] | {"_OTHER": -1},
+            methods.MCGrad._DEFAULT_HYPERPARAMS["lightgbm_params"] | {"_OTHER": -1},
             "binary",
         ),
         # if nothing is passed we take all defaults
         (
             methods.RegressionMCGrad,
             None,
-            methods.RegressionMCGrad.DEFAULT_HYPERPARAMS["lightgbm_params"],
+            methods.RegressionMCGrad._DEFAULT_HYPERPARAMS["lightgbm_params"],
             "regression",
         ),
         # if only one is passed we take the default for the others
@@ -862,7 +862,7 @@ def test_mcgrad_predict_returns_correct_number_of_rounds_and_consistent_final_pr
             {"max_depth": -1},
             {
                 k: v if k != "max_depth" else -1
-                for k, v in methods.RegressionMCGrad.DEFAULT_HYPERPARAMS[
+                for k, v in methods.RegressionMCGrad._DEFAULT_HYPERPARAMS[
                     "lightgbm_params"
                 ].items()
             },
@@ -872,7 +872,7 @@ def test_mcgrad_predict_returns_correct_number_of_rounds_and_consistent_final_pr
         (
             methods.RegressionMCGrad,
             {"_OTHER": -1},
-            methods.RegressionMCGrad.DEFAULT_HYPERPARAMS["lightgbm_params"]
+            methods.RegressionMCGrad._DEFAULT_HYPERPARAMS["lightgbm_params"]
             | {"_OTHER": -1},
             "regression",
         ),
@@ -904,7 +904,7 @@ def test_that_default_lightgbm_params_are_applied_correctly_for_mcgrad(
         (
             methods.MCGrad,
             None,
-            methods.MCGrad.DEFAULT_HYPERPARAMS["lightgbm_params"],
+            methods.MCGrad._DEFAULT_HYPERPARAMS["lightgbm_params"],
             "binary",
         ),
         # if only one is passed we take the default for the others
@@ -913,7 +913,7 @@ def test_that_default_lightgbm_params_are_applied_correctly_for_mcgrad(
             {"max_depth": -1},
             {
                 k: v if k != "max_depth" else -1
-                for k, v in methods.MCGrad.DEFAULT_HYPERPARAMS[
+                for k, v in methods.MCGrad._DEFAULT_HYPERPARAMS[
                     "lightgbm_params"
                 ].items()
             },
@@ -923,14 +923,14 @@ def test_that_default_lightgbm_params_are_applied_correctly_for_mcgrad(
         (
             methods.MCGrad,
             {"_OTHER": -1},
-            methods.MCGrad.DEFAULT_HYPERPARAMS["lightgbm_params"] | {"_OTHER": -1},
+            methods.MCGrad._DEFAULT_HYPERPARAMS["lightgbm_params"] | {"_OTHER": -1},
             "binary",
         ),
         # if nothing is passed we take all defaults
         (
             methods.RegressionMCGrad,
             None,
-            methods.RegressionMCGrad.DEFAULT_HYPERPARAMS["lightgbm_params"],
+            methods.RegressionMCGrad._DEFAULT_HYPERPARAMS["lightgbm_params"],
             "regression",
         ),
         # if only one is passed we take the default for the others
@@ -939,7 +939,7 @@ def test_that_default_lightgbm_params_are_applied_correctly_for_mcgrad(
             {"max_depth": -1},
             {
                 k: v if k != "max_depth" else -1
-                for k, v in methods.RegressionMCGrad.DEFAULT_HYPERPARAMS[
+                for k, v in methods.RegressionMCGrad._DEFAULT_HYPERPARAMS[
                     "lightgbm_params"
                 ].items()
             },
@@ -949,7 +949,7 @@ def test_that_default_lightgbm_params_are_applied_correctly_for_mcgrad(
         (
             methods.RegressionMCGrad,
             {"_OTHER": -1},
-            methods.RegressionMCGrad.DEFAULT_HYPERPARAMS["lightgbm_params"]
+            methods.RegressionMCGrad._DEFAULT_HYPERPARAMS["lightgbm_params"]
             | {"_OTHER": -1},
             "regression",
         ),
@@ -3797,7 +3797,7 @@ def test_segmentwise_calibrator_fit_does_not_crash_on_empty_dataframe():
 
 def test_mcgrad_subclass_defaults_missing_lightgbm_params():
     class SubMCGrad(methods._BaseMCGrad):
-        DEFAULT_HYPERPARAMS = {
+        _DEFAULT_HYPERPARAMS = {
             "monotone_t": False,
             "early_stopping": True,
             "patience": 0,
@@ -3850,7 +3850,7 @@ def test_mcgrad_subclass_defaults_missing_lightgbm_params():
 
 def test_mcgrad_default_minimization_behavior():
     class AUCCalibrator(methods._BaseMCGrad):
-        DEFAULT_HYPERPARAMS = {
+        _DEFAULT_HYPERPARAMS = {
             "monotone_t": False,
             "early_stopping": True,
             "patience": 0,

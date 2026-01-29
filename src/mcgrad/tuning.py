@@ -227,7 +227,7 @@ def tune_mcgrad_params(
     # Construct a set of parameters for the first trial which contains the defaults for every parameter that is tuned.
     # If a default is not available use the LightGBM default
     initial_trial_parameters: dict[str, float | int] = {}
-    mcgrad_defaults = methods.MCGrad.DEFAULT_HYPERPARAMS["lightgbm_params"]
+    mcgrad_defaults = methods.MCGrad._DEFAULT_HYPERPARAMS["lightgbm_params"]
     for config in parameter_configurations:
         if config.name in mcgrad_defaults:
             initial_trial_parameters[config.name] = mcgrad_defaults[config.name]
