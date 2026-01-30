@@ -98,8 +98,11 @@ const papertitle = `MCGrad: Multicalibration at Web Scale`;
 const paper_bibtex = `
 @inproceedings{tax2026mcgrad,
   title = {{MCGrad: Multicalibration at Web Scale}},
-  author = {Tax, Niek and Perini, Lorenzo and Linder, Fridolin and Haimovich, Daniel and Karamshuk, Dima and Okati, Nastaran and Vojnovic, Milan and Apostolopoulos, Pavlos Athanasios},
-  booktitle = {Proceedings of the 32nd ACM SIGKDD Conference on Knowledge Discovery and Data Mining V.1 (KDD 2026)},
+  author = {Tax, Niek and Perini, Lorenzo and Linder, Fridolin and Haimovich, Daniel
+            and Karamshuk, Dima and Okati, Nastaran and Vojnovic, Milan
+            and Apostolopoulos, Pavlos Athanasios},
+  booktitle = {Proceedings of the 32nd ACM SIGKDD Conference on
+               Knowledge Discovery and Data Mining V.1 (KDD 2026)},
   year = {2026},
   doi = {10.1145/3770854.3783954}
 }`;
@@ -107,10 +110,14 @@ const paper_bibtex = `
 const Reference = () => (
   <div className="section" id="reference">
     <div className="container">
-      <h2 className='text--center'>Citing MCGrad</h2>
-      <div className="reference__content">
-        <a href="https://arxiv.org/abs/2509.19884">{papertitle}</a>
-        <CodeBlock className='margin-vert--md'>{paper_bibtex}</CodeBlock>
+      <div className="text--center">
+        <h2>Citing MCGrad</h2>
+      </div>
+      <div className="row">
+        <div className="col col--8 col--offset-2">
+          <a href="https://arxiv.org/abs/2509.19884">{papertitle}</a>
+          <CodeBlock className='margin-vert--md'>{paper_bibtex}</CodeBlock>
+        </div>
       </div>
     </div>
   </div>
