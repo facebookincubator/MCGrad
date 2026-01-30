@@ -216,7 +216,7 @@ def tune_mcgrad_params(
         parameters=list(parameter_configurations),
     )
 
-    ax_client.configure_optimization(objective="normalized_entropy")
+    ax_client.configure_optimization(objective="-normalized_entropy")
 
     # Configure generation strategy with initialization budget
     # -1 is because we add an initial trial with default parameters
