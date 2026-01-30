@@ -23,7 +23,7 @@ from ax.api.configs import RangeParameterConfig
 from sklearn.metrics import log_loss
 from sklearn.model_selection import train_test_split
 
-from . import methods
+from . import _utils, methods
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -244,7 +244,7 @@ def tune_mcgrad_params(
         f"Adding initial configuration from defaults to trials: {initial_trial_parameters}"
     )
 
-    with _suppress_logger(methods.logger):
+    with _suppress_logger(methods.logger), _suppress_logger(_utils.logger):
         # Attach and complete the initial trial with default hyperparameters.
         # Note that we're only using the defaults for the parameters that are being tuned.
         # That is, this configuration does not necessarily correspond to the out-of-the-box defaults.
