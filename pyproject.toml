@@ -91,5 +91,5 @@ exclude_lines = [
 ]
 
 [tool.setuptools_scm]
-root = ".."
+root = "."
 fallback_version = "0.0.0"
