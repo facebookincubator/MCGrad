@@ -20,10 +20,10 @@ from typing import Any, Generator
 import pandas as pd
 from ax.api.client import Client
 from ax.api.configs import RangeParameterConfig
+from sklearn.metrics import log_loss
 from sklearn.model_selection import train_test_split
 
-from . import methods
-from .metrics import normalized_entropy
+from . import _utils, methods
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -118,6 +118,7 @@ def tune_mcgrad_params(
     parameter_configurations: list[RangeParameterConfig] | None = None,
     pass_df_val_into_tuning: bool = False,
     pass_df_val_into_final_fit: bool = False,
+    use_model_predictions: bool = False,
 ) -> tuple[methods.MCGrad | None, pd.DataFrame]:
     """
     Tune the hyperparameters of an MCGrad model using Ax.
@@ -137,10 +138,13 @@ def tune_mcgrad_params(
     :param parameter_configurations: The list of parameter configurations to tune. If None, the default parameter configurations are used.
     :param pass_df_val_into_tuning: Whether to pass the validation data into the tuning process. If True, the validation data is passed into the tuning process.
     :param pass_df_val_into_final_fit: Whether to pass the validation data into the final fit. If True, the validation data is passed into the final fit.
+    :param use_model_predictions: Whether to use the Bayesian surrogate model's predicted
+           best parameters (True) or the actual observed best trial (False). Defaults to
+           False because with few tuning trials, the surrogate model may not be well-calibrated.
 
     :returns: A tuple containing:
         - The fitted MCGrad model with the best hyperparameters found during tuning.
-        - A DataFrame containing the results of all trials, sorted by normalized entropy.
+        - A DataFrame containing the results of all trials, sorted by log loss.
     """
 
     if df_val is None:
@@ -199,9 +203,9 @@ def tune_mcgrad_params(
         )
         # pyre-ignore[16] we assert above that df_val is not None
         sample_weight = df_val[weight_column_name] if weight_column_name else None
-        return normalized_entropy(
-            labels=df_val[label_column_name],
-            predicted_scores=prediction,
+        return log_loss(
+            y_true=df_val[label_column_name],
+            y_pred=prediction,
             sample_weight=sample_weight,
         )
 
@@ -212,7 +216,7 @@ def tune_mcgrad_params(
         parameters=list(parameter_configurations),
     )
 
-    ax_client.configure_optimization(objective="normalized_entropy")
+    ax_client.configure_optimization(objective="log_loss")
 
     # Configure generation strategy with initialization budget
     # -1 is because we add an initial trial with default parameters
@@ -240,7 +244,7 @@ def tune_mcgrad_params(
         f"Adding initial configuration from defaults to trials: {initial_trial_parameters}"
     )
 
-    with _suppress_logger(methods.logger):
+    with _suppress_logger(methods.logger), _suppress_logger(_utils.logger):
         # Attach and complete the initial trial with default hyperparameters.
         # Note that we're only using the defaults for the parameters that are being tuned.
         # That is, this configuration does not necessarily correspond to the out-of-the-box defaults.
@@ -250,7 +254,7 @@ def tune_mcgrad_params(
         initial_score = _train_evaluate(initial_trial_parameters)
         ax_client.complete_trial(
             trial_index=initial_trial_index,
-            raw_data={"normalized_entropy": initial_score},
+            raw_data={"log_loss": initial_score},
         )
         logger.info(f"Initial trial completed with score: {initial_score}")
 
@@ -261,14 +265,16 @@ def tune_mcgrad_params(
                 score = _train_evaluate(dict(parameters))
                 ax_client.complete_trial(
                     trial_index=trial_index,
-                    raw_data={"normalized_entropy": score},
+                    raw_data={"log_loss": score},
                 )
 
     # Get trial results using summarize()
-    trial_results = ax_client.summarize().sort_values("normalized_entropy")
+    trial_results = ax_client.summarize().sort_values("log_loss")
 
     # get_best_parameterization returns (params, outcome, trial_idx, arm_name)
-    best_params, _, _, _ = ax_client.get_best_parameterization()
+    best_params, _, _, _ = ax_client.get_best_parameterization(
+        use_model_predictions=use_model_predictions
+    )
 
     logger.info(f"Best parameters: {best_params}")
     logger.info("Fitting model with best parameters")
