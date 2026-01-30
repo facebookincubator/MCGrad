@@ -413,6 +413,127 @@ def test_all_default_configs_are_range_parameter_configs():
 
 
 @pytest.mark.arm64_incompatible
+def test_tuning_selects_parameters_with_lowest_normalized_entropy(rng):
+    """Verify that tuning minimizes normalized entropy (optimization direction is correct).
+
+    This is the critical test for the optimization direction. We mock normalized_entropy
+    to return distinctly different scores, then verify the returned model uses parameters
+    that don't correspond to the worst (highest) score.
+
+    If optimization direction is wrong (maximizing instead of minimizing), the model
+    would use parameters from the trial with the highest score.
+    """
+    n_samples = 50
+    df_train = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.1, 0.9, n_samples),
+            "label": rng.binomial(1, 0.3, n_samples),
+            "feature": rng.normal(0, 1, n_samples),
+        }
+    )
+    df_val = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.1, 0.9, 30),
+            "label": rng.binomial(1, 0.3, 30),
+            "feature": rng.normal(0, 1, 30),
+        }
+    )
+
+    model = methods.MCGrad(
+        num_rounds=0,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+
+    # Only tune learning_rate to keep test simple and fast
+    subset_configs = [
+        RangeParameterConfig(
+            name="learning_rate",
+            bounds=(0.002, 0.2),
+            parameter_type="float",
+            scaling="log",
+        )
+    ]
+
+    # Track learning rates as they're set during training
+    learning_rates_evaluated: list[float] = []
+    original_set_lightgbm_params = methods.MCGrad._set_lightgbm_params
+
+    def tracking_set_lightgbm_params(self, params):
+        if "learning_rate" in params:
+            learning_rates_evaluated.append(params["learning_rate"])
+        return original_set_lightgbm_params(self, params)
+
+    # Return scores in sequence: 0.5, 0.3, 0.7
+    # Trial with score 0.3 should be preferred if minimizing correctly
+    # Trial with score 0.7 would be selected if incorrectly maximizing
+    scores_returned = []
+
+    def mock_ne(labels, predicted_scores, sample_weight=None) -> float:
+        scores_sequence = [0.5, 0.3, 0.7]
+        idx = len(scores_returned)
+        score = scores_sequence[idx % len(scores_sequence)]
+        scores_returned.append(score)
+        return score
+
+    with (
+        patch(f"{TUNING_MODULE}.normalized_entropy", side_effect=mock_ne),
+        patch.object(
+            methods.MCGrad, "_set_lightgbm_params", tracking_set_lightgbm_params
+        ),
+    ):
+        result_model, trial_results = tune_mcgrad_params(
+            model=model,
+            df_train=df_train,
+            prediction_column_name="prediction",
+            label_column_name="label",
+            df_val=df_val,
+            numerical_feature_column_names=["feature"],
+            n_trials=3,
+            parameter_configurations=subset_configs,
+        )
+
+    # We have 3 trials + 1 final fit = 4 calls to _set_lightgbm_params
+    assert len(learning_rates_evaluated) == 4, (
+        f"Expected 4 calls to _set_lightgbm_params (3 trials + 1 final), "
+        f"got {len(learning_rates_evaluated)}"
+    )
+
+    # Map trial learning rates to their scores
+    trial_lr_to_score = {
+        learning_rates_evaluated[0]: 0.5,
+        learning_rates_evaluated[1]: 0.3,
+        learning_rates_evaluated[2]: 0.7,
+    }
+
+    # The final model's learning_rate
+    final_lr = learning_rates_evaluated[3]
+    final_score = trial_lr_to_score.get(final_lr)
+
+    # Ensure the final learning rate matches one of the evaluated trials
+    assert final_score is not None, (
+        f"Final learning_rate {final_lr} was not found in evaluated trials. "
+        f"This is unexpected since use_model_predictions=False should return "
+        f"an observed trial. LRs evaluated: {learning_rates_evaluated}"
+    )
+
+    # With use_model_predictions=False (the default), get_best_parameterization
+    # returns the actual observed best trial. The trial with score 0.3 is the best.
+    assert final_score == 0.3, (
+        f"Final model should use learning_rate from trial with LOWEST score (0.3). "
+        f"Got score={final_score}. This suggests the optimization direction may be wrong. "
+        f"Final lr={final_lr}, lr->score mapping: {trial_lr_to_score}"
+    )
+
+    # Also verify the trial_results DataFrame is sorted correctly (ascending)
+    # The first row should have the lowest normalized_entropy
+    assert trial_results.iloc[0]["normalized_entropy"] == 0.3, (
+        f"Trial results should be sorted with lowest normalized_entropy first. "
+        f"Got {trial_results.iloc[0]['normalized_entropy']}"
+    )
+
+
+@pytest.mark.arm64_incompatible
 def test_non_default_parameters_preserved_when_not_in_tuning_configurations(
     sample_data,
 ):
