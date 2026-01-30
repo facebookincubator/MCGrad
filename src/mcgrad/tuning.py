@@ -118,6 +118,7 @@ def tune_mcgrad_params(
     parameter_configurations: list[RangeParameterConfig] | None = None,
     pass_df_val_into_tuning: bool = False,
     pass_df_val_into_final_fit: bool = False,
+    use_model_predictions: bool = False,
 ) -> tuple[methods.MCGrad | None, pd.DataFrame]:
     """
     Tune the hyperparameters of an MCGrad model using Ax.
@@ -137,6 +138,9 @@ def tune_mcgrad_params(
     :param parameter_configurations: The list of parameter configurations to tune. If None, the default parameter configurations are used.
     :param pass_df_val_into_tuning: Whether to pass the validation data into the tuning process. If True, the validation data is passed into the tuning process.
     :param pass_df_val_into_final_fit: Whether to pass the validation data into the final fit. If True, the validation data is passed into the final fit.
+    :param use_model_predictions: Whether to return the surrogate model's predicted best
+           (True) or the actual best observed trial (False). Defaults to False, which is
+           safer when running few trials.
 
     :returns: A tuple containing:
         - The fitted MCGrad model with the best hyperparameters found during tuning.
@@ -268,7 +272,9 @@ def tune_mcgrad_params(
     trial_results = ax_client.summarize().sort_values("normalized_entropy")
 
     # get_best_parameterization returns (params, outcome, trial_idx, arm_name)
-    best_params, _, _, _ = ax_client.get_best_parameterization()
+    best_params, _, _, _ = ax_client.get_best_parameterization(
+        use_model_predictions=use_model_predictions
+    )
 
     logger.info(f"Best parameters: {best_params}")
     logger.info("Fitting model with best parameters")
