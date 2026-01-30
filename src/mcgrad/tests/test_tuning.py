@@ -75,14 +75,14 @@ def hyperparams_for_tuning():
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
+@patch(f"{TUNING_MODULE}.log_loss")
 def test_tune_mcgrad_params_with_weights(
-    mock_normalized_entropy,
+    mock_log_loss,
     sample_data,
     mock_mcgrad_model,
 ):
     # Setup mocks
-    mock_normalized_entropy.return_value = 0.5
+    mock_log_loss.return_value = 0.5
 
     result_model, trial_results = tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -104,22 +104,22 @@ def test_tune_mcgrad_params_with_weights(
     for call in fit_calls:
         assert call[1]["weight_column_name"] == "weight"
 
-    # Verify that normalized_entropy was called with sample_weight
-    assert mock_normalized_entropy.call_count >= 1
-    entropy_calls = mock_normalized_entropy.call_args_list
-    for call in entropy_calls:
+    # Verify that log_loss was called with sample_weight
+    assert mock_log_loss.call_count >= 1
+    log_loss_calls = mock_log_loss.call_args_list
+    for call in log_loss_calls:
         assert "sample_weight" in call[1]
         assert call[1]["sample_weight"] is not None
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
+@patch(f"{TUNING_MODULE}.log_loss")
 def test_tune_mcgrad_params_without_weights(
-    mock_normalized_entropy,
+    mock_log_loss,
     sample_data,
     mock_mcgrad_model,
 ):
-    mock_normalized_entropy.return_value = 0.5
+    mock_log_loss.return_value = 0.5
 
     result_model, trial_results = tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -141,22 +141,22 @@ def test_tune_mcgrad_params_without_weights(
     for call in fit_calls:
         assert call[1]["weight_column_name"] is None
 
-    # Verify that normalized_entropy was called with sample_weight=None
-    assert mock_normalized_entropy.call_count >= 1
-    entropy_calls = mock_normalized_entropy.call_args_list
-    for call in entropy_calls:
+    # Verify that log_loss was called with sample_weight=None
+    assert mock_log_loss.call_count >= 1
+    log_loss_calls = mock_log_loss.call_args_list
+    for call in log_loss_calls:
         assert "sample_weight" in call[1]
         assert call[1]["sample_weight"] is None
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
+@patch(f"{TUNING_MODULE}.log_loss")
 def test_tune_mcgrad_params_default_parameters(
-    mock_normalized_entropy,
+    mock_log_loss,
     sample_data,
     mock_mcgrad_model,
 ):
-    mock_normalized_entropy.return_value = 0.5
+    mock_log_loss.return_value = 0.5
 
     result_model, trial_results = tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -180,13 +180,13 @@ def test_tune_mcgrad_params_default_parameters(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
+@patch(f"{TUNING_MODULE}.log_loss")
 def test_tune_mcgrad_params_ax_client_setup(
-    mock_normalized_entropy,
+    mock_log_loss,
     sample_data,
     mock_mcgrad_model,
 ):
-    mock_normalized_entropy.return_value = 0.5
+    mock_log_loss.return_value = 0.5
 
     result_model, trial_results = tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -206,11 +206,11 @@ def test_tune_mcgrad_params_ax_client_setup(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
+@patch(f"{TUNING_MODULE}.log_loss")
 @patch(f"{TUNING_MODULE}.train_test_split")
 def test_tune_mcgrad_params_data_splitting(
     mock_train_test_split,
-    mock_normalized_entropy,
+    mock_log_loss,
     rng,
     sample_data,
     mock_mcgrad_model,
@@ -221,7 +221,7 @@ def test_tune_mcgrad_params_data_splitting(
     )
     mock_train_test_split.return_value = (train_data, val_data)
 
-    mock_normalized_entropy.return_value = 0.5
+    mock_log_loss.return_value = 0.5
 
     tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -243,12 +243,12 @@ def test_tune_mcgrad_params_data_splitting(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
+@patch(f"{TUNING_MODULE}.log_loss")
 def test_tune_mcgrad_params_with_subset_of_parameters(
-    mock_normalized_entropy,
+    mock_log_loss,
     sample_data,
 ):
-    mock_normalized_entropy.return_value = 0.5
+    mock_log_loss.return_value = 0.5
     model = methods.MCGrad()
 
     subset_params = ["learning_rate", "max_depth"]
@@ -426,7 +426,7 @@ def test_non_default_parameters_preserved_when_not_in_tuning_configurations(
     for param, value in non_default_params.items():
         assert model.lightgbm_params[param] == value
 
-    with patch(f"{TUNING_MODULE}.normalized_entropy", return_value=0.5):
+    with patch(f"{TUNING_MODULE}.log_loss", return_value=0.5):
         # Create parameter configurations that don't include our non-default parameters
         # This will tune only num_leaves and min_child_samples
         tune_params = ["num_leaves", "min_child_samples"]
@@ -454,16 +454,16 @@ def test_non_default_parameters_preserved_when_not_in_tuning_configurations(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
+@patch(f"{TUNING_MODULE}.log_loss")
 @patch(f"{TUNING_MODULE}.train_test_split")
 def test_tune_mcgrad_params_with_explicit_validation_set(
     mock_train_test_split,
-    mock_normalized_entropy,
+    mock_log_loss,
     sample_data,
     sample_val_data,
     mock_mcgrad_model,
 ):
-    mock_normalized_entropy.return_value = 0.5
+    mock_log_loss.return_value = 0.5
 
     tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -493,11 +493,11 @@ def test_tune_mcgrad_params_with_explicit_validation_set(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
+@patch(f"{TUNING_MODULE}.log_loss")
 @patch(f"{TUNING_MODULE}.train_test_split")
 def test_tune_mcgrad_params_fallback_to_train_test_split(
     mock_train_test_split,
-    mock_normalized_entropy,
+    mock_log_loss,
     rng,
     sample_data,
     mock_mcgrad_model,
@@ -508,7 +508,7 @@ def test_tune_mcgrad_params_fallback_to_train_test_split(
         sample_data, test_size=0.2, random_state=rng
     )
     mock_train_test_split.return_value = (train_data, val_data)
-    mock_normalized_entropy.return_value = 0.5
+    mock_log_loss.return_value = 0.5
 
     tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -543,15 +543,15 @@ def test_tune_mcgrad_params_fallback_to_train_test_split(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
+@patch(f"{TUNING_MODULE}.log_loss")
 def test_tune_mcgrad_params_pass_df_val_into_tuning_true(
-    mock_normalized_entropy,
+    mock_log_loss,
     sample_data,
     sample_val_data,
     mock_mcgrad_model,
 ):
     """Test that df_val is passed to model.fit during tuning when pass_df_val_into_tuning=True."""
-    mock_normalized_entropy.return_value = 0.5
+    mock_log_loss.return_value = 0.5
 
     tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -580,15 +580,15 @@ def test_tune_mcgrad_params_pass_df_val_into_tuning_true(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
+@patch(f"{TUNING_MODULE}.log_loss")
 def test_tune_mcgrad_params_pass_df_val_into_tuning_false(
-    mock_normalized_entropy,
+    mock_log_loss,
     sample_data,
     sample_val_data,
     mock_mcgrad_model,
 ):
     """Test that df_val is not passed to model.fit during tuning when pass_df_val_into_tuning=False."""
-    mock_normalized_entropy.return_value = 0.5
+    mock_log_loss.return_value = 0.5
 
     tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -610,15 +610,15 @@ def test_tune_mcgrad_params_pass_df_val_into_tuning_false(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
+@patch(f"{TUNING_MODULE}.log_loss")
 def test_tune_mcgrad_params_pass_df_val_into_final_fit_true(
-    mock_normalized_entropy,
+    mock_log_loss,
     sample_data,
     sample_val_data,
     mock_mcgrad_model,
 ):
     """Test that df_val is passed to model.fit during final fit when pass_df_val_into_final_fit=True."""
-    mock_normalized_entropy.return_value = 0.5
+    mock_log_loss.return_value = 0.5
 
     tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -647,15 +647,15 @@ def test_tune_mcgrad_params_pass_df_val_into_final_fit_true(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
+@patch(f"{TUNING_MODULE}.log_loss")
 def test_tune_mcgrad_params_pass_df_val_into_final_fit_false(
-    mock_normalized_entropy,
+    mock_log_loss,
     sample_data,
     sample_val_data,
     mock_mcgrad_model,
 ):
     """Test that df_val is not passed to model.fit during final fit when pass_df_val_into_final_fit=False."""
-    mock_normalized_entropy.return_value = 0.5
+    mock_log_loss.return_value = 0.5
 
     tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -677,15 +677,15 @@ def test_tune_mcgrad_params_pass_df_val_into_final_fit_false(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
+@patch(f"{TUNING_MODULE}.log_loss")
 def test_tune_mcgrad_params_pass_df_val_into_both_tuning_and_final_fit(
-    mock_normalized_entropy,
+    mock_log_loss,
     sample_data,
     sample_val_data,
     mock_mcgrad_model,
 ):
     """Test that df_val is passed to both tuning and final fit when both flags are True."""
-    mock_normalized_entropy.return_value = 0.5
+    mock_log_loss.return_value = 0.5
 
     tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -716,9 +716,9 @@ def test_tune_mcgrad_params_pass_df_val_into_both_tuning_and_final_fit(
         (True, True),
     ],
 )
-@patch(f"{TUNING_MODULE}.normalized_entropy")
+@patch(f"{TUNING_MODULE}.log_loss")
 def test_tune_mcgrad_params_df_val_passing_defaults_to_false(
-    mock_normalized_entropy,
+    mock_log_loss,
     sample_data,
     sample_val_data,
     mock_mcgrad_model,
@@ -726,7 +726,7 @@ def test_tune_mcgrad_params_df_val_passing_defaults_to_false(
     pass_df_val_into_final_fit,
 ):
     """Test all combinations of pass_df_val_into_tuning and pass_df_val_into_final_fit flags."""
-    mock_normalized_entropy.return_value = 0.5
+    mock_log_loss.return_value = 0.5
 
     tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -756,14 +756,14 @@ def test_tune_mcgrad_params_df_val_passing_defaults_to_false(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
+@patch(f"{TUNING_MODULE}.log_loss")
 def test_tune_mcboost_params_does_not_modify_input_dataframes(
-    mock_normalized_entropy,
+    mock_log_loss,
     sample_data,
     sample_val_data,
     mock_mcgrad_model,
 ):
-    mock_normalized_entropy.return_value = 0.5
+    mock_log_loss.return_value = 0.5
 
     df_train_original = sample_data.copy()
     df_val_original = sample_val_data.copy()
@@ -785,11 +785,11 @@ def test_tune_mcboost_params_does_not_modify_input_dataframes(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
+@patch(f"{TUNING_MODULE}.log_loss")
 @patch(f"{TUNING_MODULE}.train_test_split")
 def test_tune_mcboost_params_does_not_modify_input_dataframe_when_no_df_val(
     mock_train_test_split,
-    mock_normalized_entropy,
+    mock_log_loss,
     rng,
     sample_data,
     mock_mcgrad_model,
@@ -798,7 +798,7 @@ def test_tune_mcboost_params_does_not_modify_input_dataframe_when_no_df_val(
         sample_data, test_size=0.2, random_state=rng
     )
     mock_train_test_split.return_value = (train_data, val_data)
-    mock_normalized_entropy.return_value = 0.5
+    mock_log_loss.return_value = 0.5
 
     df_train_original = sample_data.copy()
 
