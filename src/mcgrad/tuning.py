@@ -267,6 +267,7 @@ def tune_mcgrad_params(
                     trial_index=trial_index,
                     raw_data={"log_loss": score},
                 )
+                logger.info(f"Trial {trial_index} completed with score: {score}")
 
     # Get trial results using summarize()
     trial_results = ax_client.summarize().sort_values("log_loss")
