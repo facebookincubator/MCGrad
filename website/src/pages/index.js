@@ -44,29 +44,32 @@ const codeExample = `from mcgrad import methods
 import pandas as pd
 import numpy as np
 
-# Prepare your data in a DataFrame
-df = pd.DataFrame({
+# Prepare your training data
+df_train = pd.DataFrame({
     'prediction': np.array([...]),  # Base model predictions
-    'label': np.array([...]),        # Ground truth labels
-    'country': [...],                 # Categorical features
-    'content_type': [...],            # defining segments
-    'surface': [...],
+    'label': np.array([...]),       # Ground truth labels
+    # Several attributes that define segments (can be categorical or numerical)
+    'country': [...],
+    'content_type': [...],
+    'age': [...],
 })
 
 # Train MCGrad
 mcgrad = methods.MCGrad()
 mcgrad.fit(
-    df_train=df,
+    df_train=df_train,
     prediction_column_name='prediction',
     label_column_name='label',
-    categorical_feature_column_names=['country', 'content_type', 'surface']
+    categorical_feature_column_names=['country', 'content_type'],
+    numerical_feature_column_names=['age'],
 )
 
-# Get multicalibrated predictions
+# Get multicalibrated predictions on test data
 calibrated_predictions = mcgrad.predict(
-    df=df,
+    df=df_test,  # Your test DataFrame with same columns
     prediction_column_name='prediction',
-    categorical_feature_column_names=['country', 'content_type', 'surface']
+    categorical_feature_column_names=['country', 'content_type'],
+    numerical_feature_column_names=['age'],
 )
 `;
 
@@ -81,12 +84,10 @@ const QuickStart = () => (
           <div className="quickstart__panel">
             <p className="quickstart__label">Install</p>
             <CodeBlock language="bash">pip install mcgrad</CodeBlock>
-            <details className="quickstart__details">
-              <summary>View minimal code example</summary>
-              <CodeBlock language="python" showLineNumbers>
-                {codeExample}
-              </CodeBlock>
-            </details>
+            <p className="quickstart__label">Minimal code example</p>
+            <CodeBlock language="python" showLineNumbers>
+              {codeExample}
+            </CodeBlock>
           </div>
         </div>
       </div>
