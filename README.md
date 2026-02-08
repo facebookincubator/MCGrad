@@ -6,16 +6,20 @@
   <strong>Production-ready multicalibration</strong>
 </p>
 
-<p align="center">
-  <a href="https://github.com/facebookincubator/MCGrad/actions/workflows/main.yaml"><img src="https://github.com/facebookincubator/MCGrad/actions/workflows/main.yaml/badge.svg" alt="CI"></a>
-  <a href="https://codecov.io/gh/facebookincubator/MCGrad"><img src="https://codecov.io/gh/facebookincubator/MCGrad/branch/main/graph/badge.svg" alt="Coverage"></a>
-  <a href="https://pypi.org/project/mcgrad/"><img src="https://img.shields.io/pypi/v/mcgrad.svg" alt="PyPI"></a>
-  <a href="https://doi.org/10.1145/3770854.3783954"><img src="https://img.shields.io/badge/DOI-10.1145%2F3770854.3783954-blue" alt="DOI"></a>
-  <a href="https://mcgrad.dev/"><img src="https://img.shields.io/badge/docs-mcgrad.dev-blue.svg" alt="Website"></a>
-  <a href="https://mcgrad.readthedocs.io/en/latest/?badge=latest"><img src="https://readthedocs.org/projects/mcgrad/badge/?version=latest" alt="API Reference"></a>
-  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
-  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+"></a>
-</p>
+<div align="center">
+
+[![CI](https://github.com/facebookincubator/MCGrad/actions/workflows/main.yaml/badge.svg)](https://github.com/facebookincubator/MCGrad/actions)
+[![Coverage](https://codecov.io/gh/facebookincubator/MCGrad/branch/main/graph/badge.svg)](https://codecov.io/gh/facebookincubator/MCGrad)
+[![Documentation Status](https://readthedocs.org/projects/mcgrad/badge/?version=latest)](https://mcgrad.dev)
+
+[![PyPI version](https://img.shields.io/pypi/v/mcgrad.svg)](https://pypi.org/project/mcgrad/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://pypi.org/project/mcgrad/)
+[![Downloads](https://static.pepy.tech/badge/mcgrad)](https://pepy.tech/project/mcgrad)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/facebookincubator/MCGrad/blob/main/tutorials/01_mcgrad_core.ipynb)
+
+</div>
 
 ---
 
@@ -113,6 +117,8 @@ calibrated_predictions = mcgrad.predict(
 ## 📖 Citation
 
 If you use MCGrad in your research, please cite [our paper](https://arxiv.org/abs/2509.19884).
+
+[![DOI](https://img.shields.io/badge/DOI-10.1145%2F3770854.3783954-blue)](https://doi.org/10.1145/3770854.3783954)
 
 ```bibtex
 @inproceedings{tax2026mcgrad,
