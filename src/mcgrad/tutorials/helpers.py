@@ -45,7 +45,6 @@ class ElapsedFormatter(logging.Formatter):
             # pyre-ignore[16]: Dynamic attribute for elapsed time formatting
             record.elapsed = f"[{hours:02d}:{minutes:02d}:{seconds:02d}]"
         else:
-            # pyre-ignore[16]: Dynamic attribute for elapsed time formatting
             record.elapsed = ""
 
         return super().format(record)
