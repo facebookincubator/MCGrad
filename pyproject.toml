@@ -45,6 +45,7 @@ dependencies = [
     "cffi>=1.15.0",
     "ax-platform>=1.2.1",
     "psutil>=7.1.0",
+    "folktables>=0.0.12",
 ]
 
 [project.optional-dependencies]
@@ -58,7 +59,6 @@ dev = [
 tutorials = [
     "notebook>=7.0.0",
     "jupyterlab>=4.0.0",
-    "folktables>=0.0.12",
 ]
 docs = [
     "sphinx>=7.0.0",

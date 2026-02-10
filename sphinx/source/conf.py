@@ -70,6 +70,18 @@ autodoc_default_options = {
 autodoc_typehints = "description"
 autodoc_typehints_description_target = "documented"
 
+
+# Exclude the tutorials submodule from API documentation
+def _autodoc_skip_tutorials(app, what, name, obj, skip, options):
+    if name == "tutorials":
+        return True
+    return skip
+
+
+def setup(app):
+    app.connect("autodoc-skip-member", _autodoc_skip_tutorials)
+
+
 # Intersphinx mapping
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
