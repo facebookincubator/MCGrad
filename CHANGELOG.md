@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-02-11
+
 ### Changed
 - Lowered psutil dependency to 5.9.0 to fix compatibility with Google Colab (#210)
 
