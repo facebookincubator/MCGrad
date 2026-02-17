@@ -3901,3 +3901,58 @@ def test_mcgrad_default_minimization_behavior():
     # The tuple return type ensures minimize_score is set correctly from the metric
     cal = AUCCalibrator(early_stopping=True)
     assert cal.early_stopping_minimize_score is False
+
+
+@pytest.mark.parametrize(
+    "labels,predictions,expected_result",
+    [
+        (
+            np.array([False, True, False, True, True]),
+            np.array([0.1, 0.2, 0.3, 0.4, 0.5]),
+            2.8354,
+        ),
+        (np.array([0, 1, 0, 1, 1]), np.array([0.1, 0.2, 0.3, 0.4, 0.5]), 2.8354),
+        (np.array([0, 1, 0, 1, 1]), np.array([0.1, 0.2, 0.3, 0.4, 0.5]), 2.8354),
+    ],
+)
+def test_compute_unshrink_factor_gives_expected_result(
+    labels, predictions, expected_result
+):
+    assert (
+        pytest.approx(
+            methods.MCGrad._compute_unshrink_factor(labels, predictions, None), 0.0001
+        )
+        == expected_result
+    )
+
+
+def test_weighted_unshrink_gives_expected_result():
+    y = np.array([0, 1, 0, 0, 0, 0])
+    t = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
+    weights = np.array([1, 3, 1, 1, 1, 2])
+
+    y_unweighted = np.repeat(y, weights)
+    t_unweighted = np.repeat(t, weights)
+
+    unshrink_factor_weighted = methods.MCGrad._compute_unshrink_factor(y, t, weights)
+    unshrink_factor_unweighted = methods.MCGrad._compute_unshrink_factor(
+        y_unweighted, t_unweighted, None
+    )
+
+    assert np.isclose(unshrink_factor_weighted, unshrink_factor_unweighted)
+
+
+def test_compute_unshrink_factor_does_not_modify_input_arrays(rng):
+    y = rng.randint(0, 2, 50).astype(float)
+    logits = rng.uniform(-2, 2, 50)
+    w = rng.uniform(0.5, 2.0, 50)
+
+    y_original = y.copy()
+    logits_original = logits.copy()
+    w_original = w.copy()
+
+    _ = methods.MCGrad._compute_unshrink_factor(y, logits, w)
+
+    np.testing.assert_array_equal(y, y_original)
+    np.testing.assert_array_equal(logits, logits_original)
+    np.testing.assert_array_equal(w, w_original)
