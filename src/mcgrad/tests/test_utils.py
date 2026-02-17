@@ -69,22 +69,6 @@ def test_make_equispaced_bins_gives_similar_results_for_data_with_similar_range_
 
 
 @pytest.mark.parametrize(
-    "labels,predictions,expected_result",
-    [
-        (
-            np.array([False, True, False, True, True]),
-            np.array([0.1, 0.2, 0.3, 0.4, 0.5]),
-            2.8354,
-        ),
-        (np.array([0, 1, 0, 1, 1]), np.array([0.1, 0.2, 0.3, 0.4, 0.5]), 2.8354),
-        (np.array([0, 1, 0, 1, 1]), np.array([0.1, 0.2, 0.3, 0.4, 0.5]), 2.8354),
-    ],
-)
-def test_unshrink(labels, predictions, expected_result):
-    assert pytest.approx(utils.unshrink(labels, predictions), 0.0001) == expected_result
-
-
-@pytest.mark.parametrize(
     "log_odds, expected",
     [
         (0, 0.5),
@@ -334,21 +318,6 @@ def test_encoder_serialize_deserialize_preserves_numeric_string_keys():
     deserialized_transformed = deserialized.transform(df_test)
     np.testing.assert_array_equal(deserialized_transformed, original_transformed)
     assert deserialized_transformed[1, 0] == -1
-
-
-def test_weighted_unshrink_gives_expected_result():
-    # unshrink with duplicates should give same result as without duplicates but with weights
-    y = np.array([0, 1, 0, 0, 0, 0])
-    t = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
-    weights = np.array([1, 3, 1, 1, 1, 2])
-
-    y_unweighted = np.repeat(y, weights)
-    t_unweighted = np.repeat(t, weights)
-
-    unshrink_factor_weighted = utils.unshrink(y, t, weights)
-    unshrink_factor_unweighted = utils.unshrink(y_unweighted, t_unweighted)
-
-    assert np.isclose(unshrink_factor_weighted, unshrink_factor_unweighted)
 
 
 @pytest.mark.parametrize(
@@ -633,22 +602,6 @@ def test_make_equisized_bins_does_not_modify_input_array(rng):
     _ = utils.make_equisized_bins(predicted_scores, num_bins=5)
 
     np.testing.assert_array_equal(predicted_scores, predicted_scores_original)
-
-
-def test_unshrink_does_not_modify_input_arrays(rng):
-    y = rng.randint(0, 2, 50).astype(float)
-    logits = rng.uniform(-2, 2, 50)
-    w = rng.uniform(0.5, 2.0, 50)
-
-    y_original = y.copy()
-    logits_original = logits.copy()
-    w_original = w.copy()
-
-    _ = utils.unshrink(y, logits, w)
-
-    np.testing.assert_array_equal(y, y_original)
-    np.testing.assert_array_equal(logits, logits_original)
-    np.testing.assert_array_equal(w, w_original)
 
 
 def test_logit_does_not_modify_input_array(rng):
