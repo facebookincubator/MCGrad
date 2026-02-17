@@ -23,7 +23,7 @@ from ax.api.configs import RangeParameterConfig
 from sklearn.model_selection import train_test_split
 
 from . import methods
-from .metrics import normalized_entropy
+from .metrics import _ScoreFunctionInterface
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -105,7 +105,7 @@ def _suppress_logger(logger: logging.Logger) -> Generator[None, None, None]:
 
 
 def tune_mcgrad_params(
-    model: methods.MCGrad,
+    model: methods._BaseMCGrad,
     df_train: pd.DataFrame,
     prediction_column_name: str,
     label_column_name: str,
@@ -119,7 +119,7 @@ def tune_mcgrad_params(
     pass_df_val_into_tuning: bool = False,
     pass_df_val_into_final_fit: bool = False,
     use_model_predictions: bool = False,
-) -> tuple[methods.MCGrad | None, pd.DataFrame]:
+) -> tuple[methods._BaseMCGrad | None, pd.DataFrame]:
     """
     Tune the hyperparameters of an MCGrad model using Ax.
 
@@ -144,15 +144,28 @@ def tune_mcgrad_params(
 
     :returns: A tuple containing:
         - The fitted MCGrad model with the best hyperparameters found during tuning.
-        - A DataFrame containing the results of all trials, sorted by normalized entropy.
+        - A DataFrame containing the results of all trials, sorted by the evaluation metric.
     """
 
+    if (
+        not hasattr(model, "early_stopping_score_func")
+        or model.early_stopping_score_func is None
+    ):
+        raise ValueError(
+            "Model must have an early_stopping_score_func configured to be used "
+            "as the tuning objective. When early_stopping is disabled, set one "
+            "explicitly via the early_stopping_score_func constructor parameter."
+        )
+
     if df_val is None:
+        stratify = (
+            df_train[label_column_name] if isinstance(model, methods.MCGrad) else None
+        )
         df_train, df_val = train_test_split(
             df_train,
             test_size=0.2,
             random_state=42,
-            stratify=df_train[label_column_name],
+            stratify=stratify,
         )
     if df_val is None:
         raise ValueError(
@@ -180,6 +193,10 @@ def tune_mcgrad_params(
 
     model = copy.copy(model)
 
+    score_func: _ScoreFunctionInterface = model.early_stopping_score_func
+    metric_name = score_func.name
+    minimize_score = model.early_stopping_minimize_score
+
     def _train_evaluate(parameterization: dict[str, Any]) -> float:
         # suppressing logger to avoid expected warning about setting lightgbm params on a (potentially) fitted model
         with _suppress_logger(logger):
@@ -202,11 +219,20 @@ def tune_mcgrad_params(
             numerical_feature_column_names=numerical_feature_column_names,
         )
         # pyre-ignore[16] we assert above that df_val is not None
-        sample_weight = df_val[weight_column_name] if weight_column_name else None
-        return normalized_entropy(
-            labels=df_val[label_column_name],
-            predicted_scores=prediction,
-            sample_weight=sample_weight,
+        eval_df = pd.DataFrame(
+            {
+                "label": df_val[label_column_name],  # pyre-ignore[16]
+                "prediction": prediction,
+            },
+            copy=False,
+        )
+        if weight_column_name:
+            eval_df["weight"] = df_val[weight_column_name]  # pyre-ignore[16]
+        return score_func(
+            df=eval_df,
+            label_column="label",
+            score_column="prediction",
+            weight_column="weight" if weight_column_name else None,
         )
 
     ax_client = Client()
@@ -216,7 +242,8 @@ def tune_mcgrad_params(
         parameters=list(parameter_configurations),
     )
 
-    ax_client.configure_optimization(objective="-normalized_entropy")
+    ax_objective = f"-{metric_name}" if minimize_score else metric_name
+    ax_client.configure_optimization(objective=ax_objective)
 
     # Configure generation strategy with initialization budget
     # -1 is because we add an initial trial with default parameters
@@ -231,7 +258,7 @@ def tune_mcgrad_params(
     # Construct a set of parameters for the first trial which contains the defaults for every parameter that is tuned.
     # If a default is not available use the LightGBM default
     initial_trial_parameters: dict[str, float | int] = {}
-    mcgrad_defaults = methods.MCGrad.DEFAULT_HYPERPARAMS["lightgbm_params"]
+    mcgrad_defaults = model.DEFAULT_HYPERPARAMS["lightgbm_params"]
     for config in parameter_configurations:
         if config.name in mcgrad_defaults:
             initial_trial_parameters[config.name] = mcgrad_defaults[config.name]
@@ -254,7 +281,7 @@ def tune_mcgrad_params(
         initial_score = _train_evaluate(initial_trial_parameters)
         ax_client.complete_trial(
             trial_index=initial_trial_index,
-            raw_data={"normalized_entropy": initial_score},
+            raw_data={metric_name: initial_score},
         )
         logger.info(f"Initial trial completed with score: {initial_score}")
 
@@ -265,12 +292,12 @@ def tune_mcgrad_params(
                 score = _train_evaluate(dict(parameters))
                 ax_client.complete_trial(
                     trial_index=trial_index,
-                    raw_data={"normalized_entropy": score},
+                    raw_data={metric_name: score},
                 )
                 logger.info(f"Trial {trial_index} completed with score: {score}")
 
     # Get trial results using summarize()
-    trial_results = ax_client.summarize().sort_values("normalized_entropy")
+    trial_results = ax_client.summarize().sort_values(metric_name)
 
     # get_best_parameterization returns (params, outcome, trial_idx, arm_name)
     best_params, _, _, _ = ax_client.get_best_parameterization(

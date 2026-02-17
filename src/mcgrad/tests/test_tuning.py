@@ -13,7 +13,7 @@ import pytest
 from ax.api.configs import RangeParameterConfig
 from sklearn.model_selection import train_test_split
 
-from .. import methods, tuning as tuning_module
+from .. import methods, metrics, tuning as tuning_module
 from ..tuning import (
     default_parameter_configurations,
     ORIGINAL_LIGHTGBM_PARAMS,
@@ -62,8 +62,15 @@ def sample_val_data(rng):
 @pytest.fixture
 def mock_mcgrad_model(rng):
     model = Mock(spec=methods.MCGrad)
-    model.predict = Mock(return_value=rng.uniform(0.1, 0.9, 80))
+    model.predict = Mock(
+        side_effect=lambda df, **kwargs: rng.uniform(0.1, 0.9, len(df))
+    )
     model.early_stopping_estimation_method = methods._EstimationMethod.HOLDOUT
+    score_func = Mock(return_value=0.5)
+    score_func.name = "log_loss"
+    model.early_stopping_score_func = score_func
+    model.early_stopping_minimize_score = True
+    model.DEFAULT_HYPERPARAMS = methods.MCGrad.DEFAULT_HYPERPARAMS
     return model
 
 
@@ -75,15 +82,10 @@ def hyperparams_for_tuning():
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcgrad_params_with_weights(
-    mock_normalized_entropy,
     sample_data,
     mock_mcgrad_model,
 ):
-    # Setup mocks
-    mock_normalized_entropy.return_value = 0.5
-
     result_model, trial_results = tune_mcgrad_params(
         model=mock_mcgrad_model,
         df_train=sample_data,
@@ -104,23 +106,18 @@ def test_tune_mcgrad_params_with_weights(
     for call in fit_calls:
         assert call[1]["weight_column_name"] == "weight"
 
-    # Verify that normalized_entropy was called with sample_weight
-    assert mock_normalized_entropy.call_count >= 1
-    entropy_calls = mock_normalized_entropy.call_args_list
-    for call in entropy_calls:
-        assert "sample_weight" in call[1]
-        assert call[1]["sample_weight"] is not None
+    # Verify that score_func was called with weight_column
+    score_func = mock_mcgrad_model.early_stopping_score_func
+    assert score_func.call_count >= 1
+    for call in score_func.call_args_list:
+        assert call.kwargs["weight_column"] == "weight"
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcgrad_params_without_weights(
-    mock_normalized_entropy,
     sample_data,
     mock_mcgrad_model,
 ):
-    mock_normalized_entropy.return_value = 0.5
-
     result_model, trial_results = tune_mcgrad_params(
         model=mock_mcgrad_model,
         df_train=sample_data,
@@ -141,23 +138,18 @@ def test_tune_mcgrad_params_without_weights(
     for call in fit_calls:
         assert call[1]["weight_column_name"] is None
 
-    # Verify that normalized_entropy was called with sample_weight=None
-    assert mock_normalized_entropy.call_count >= 1
-    entropy_calls = mock_normalized_entropy.call_args_list
-    for call in entropy_calls:
-        assert "sample_weight" in call[1]
-        assert call[1]["sample_weight"] is None
+    # Verify that score_func was called with weight_column=None
+    score_func = mock_mcgrad_model.early_stopping_score_func
+    assert score_func.call_count >= 1
+    for call in score_func.call_args_list:
+        assert call.kwargs["weight_column"] is None
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcgrad_params_default_parameters(
-    mock_normalized_entropy,
     sample_data,
     mock_mcgrad_model,
 ):
-    mock_normalized_entropy.return_value = 0.5
-
     result_model, trial_results = tune_mcgrad_params(
         model=mock_mcgrad_model,
         df_train=sample_data,
@@ -180,14 +172,10 @@ def test_tune_mcgrad_params_default_parameters(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcgrad_params_ax_client_setup(
-    mock_normalized_entropy,
     sample_data,
     mock_mcgrad_model,
 ):
-    mock_normalized_entropy.return_value = 0.5
-
     result_model, trial_results = tune_mcgrad_params(
         model=mock_mcgrad_model,
         df_train=sample_data,
@@ -206,11 +194,9 @@ def test_tune_mcgrad_params_ax_client_setup(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
 @patch(f"{TUNING_MODULE}.train_test_split")
 def test_tune_mcgrad_params_data_splitting(
     mock_train_test_split,
-    mock_normalized_entropy,
     rng,
     sample_data,
     mock_mcgrad_model,
@@ -220,8 +206,6 @@ def test_tune_mcgrad_params_data_splitting(
         sample_data, test_size=0.2, random_state=rng
     )
     mock_train_test_split.return_value = (train_data, val_data)
-
-    mock_normalized_entropy.return_value = 0.5
 
     tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -243,12 +227,9 @@ def test_tune_mcgrad_params_data_splitting(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcgrad_params_with_subset_of_parameters(
-    mock_normalized_entropy,
     sample_data,
 ):
-    mock_normalized_entropy.return_value = 0.5
     model = methods.MCGrad()
 
     subset_params = ["learning_rate", "max_depth"]
@@ -413,12 +394,13 @@ def test_all_default_configs_are_range_parameter_configs():
 
 
 @pytest.mark.arm64_incompatible
-def test_tuning_selects_parameters_with_lowest_normalized_entropy(rng):
-    """Verify that tuning minimizes normalized entropy (optimization direction is correct).
+def test_tuning_selects_parameters_with_lowest_score(rng):
+    """Verify that tuning minimizes the score (optimization direction is correct).
 
-    This is the critical test for the optimization direction. We mock normalized_entropy
-    to return distinctly different scores, then verify the returned model uses parameters
-    that don't correspond to the worst (highest) score.
+    This is the critical test for the optimization direction. We mock the model's
+    early_stopping_score_func to return distinctly different scores, then verify
+    the returned model uses parameters that don't correspond to the worst (highest)
+    score.
 
     If optimization direction is wrong (maximizing instead of minimizing), the model
     would use parameters from the trial with the highest score.
@@ -469,18 +451,20 @@ def test_tuning_selects_parameters_with_lowest_normalized_entropy(rng):
     # Trial with score 0.7 would be selected if incorrectly maximizing
     scores_returned = []
 
-    def mock_ne(labels, predicted_scores, sample_weight=None) -> float:
+    def mock_score_func(df, label_column, score_column, weight_column) -> float:
         scores_sequence = [0.5, 0.3, 0.7]
         idx = len(scores_returned)
         score = scores_sequence[idx % len(scores_sequence)]
         scores_returned.append(score)
         return score
 
-    with (
-        patch(f"{TUNING_MODULE}.normalized_entropy", side_effect=mock_ne),
-        patch.object(
-            methods.MCGrad, "_set_lightgbm_params", tracking_set_lightgbm_params
-        ),
+    score_func_mock = Mock(side_effect=mock_score_func)
+    score_func_mock.name = "log_loss"
+    model.early_stopping_score_func = score_func_mock
+    model.early_stopping_minimize_score = True
+
+    with patch.object(
+        methods.MCGrad, "_set_lightgbm_params", tracking_set_lightgbm_params
     ):
         result_model, trial_results = tune_mcgrad_params(
             model=model,
@@ -526,10 +510,9 @@ def test_tuning_selects_parameters_with_lowest_normalized_entropy(rng):
     )
 
     # Also verify the trial_results DataFrame is sorted correctly (ascending)
-    # The first row should have the lowest normalized_entropy
-    assert trial_results.iloc[0]["normalized_entropy"] == 0.3, (
-        f"Trial results should be sorted with lowest normalized_entropy first. "
-        f"Got {trial_results.iloc[0]['normalized_entropy']}"
+    assert trial_results.iloc[0]["log_loss"] == 0.3, (
+        f"Trial results should be sorted with lowest score first. "
+        f"Got {trial_results.iloc[0]['log_loss']}"
     )
 
 
@@ -547,27 +530,26 @@ def test_non_default_parameters_preserved_when_not_in_tuning_configurations(
     for param, value in non_default_params.items():
         assert model.lightgbm_params[param] == value
 
-    with patch(f"{TUNING_MODULE}.normalized_entropy", return_value=0.5):
-        # Create parameter configurations that don't include our non-default parameters
-        # This will tune only num_leaves and min_child_samples
-        tune_params = ["num_leaves", "min_child_samples"]
-        parameter_configs = [
-            config
-            for config in default_parameter_configurations
-            if config.name in tune_params
-        ]
+    # Create parameter configurations that don't include our non-default parameters
+    # This will tune only num_leaves and min_child_samples
+    tune_params = ["num_leaves", "min_child_samples"]
+    parameter_configs = [
+        config
+        for config in default_parameter_configurations
+        if config.name in tune_params
+    ]
 
-        # Run tuning with these limited configurations
-        result_model, _ = tune_mcgrad_params(
-            model=model,
-            df_train=sample_data,
-            prediction_column_name="prediction",
-            label_column_name="label",
-            categorical_feature_column_names=["cat_feature"],
-            numerical_feature_column_names=["num_feature"],
-            n_trials=2,
-            parameter_configurations=parameter_configs,
-        )
+    # Run tuning with these limited configurations
+    result_model, _ = tune_mcgrad_params(
+        model=model,
+        df_train=sample_data,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=["num_feature"],
+        n_trials=2,
+        parameter_configurations=parameter_configs,
+    )
 
     assert result_model.lightgbm_params["learning_rate"] == 0.05
     assert result_model.lightgbm_params["max_depth"] == 8
@@ -575,17 +557,13 @@ def test_non_default_parameters_preserved_when_not_in_tuning_configurations(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
 @patch(f"{TUNING_MODULE}.train_test_split")
 def test_tune_mcgrad_params_with_explicit_validation_set(
     mock_train_test_split,
-    mock_normalized_entropy,
     sample_data,
     sample_val_data,
     mock_mcgrad_model,
 ):
-    mock_normalized_entropy.return_value = 0.5
-
     tune_mcgrad_params(
         model=mock_mcgrad_model,
         df_train=sample_data,
@@ -614,11 +592,9 @@ def test_tune_mcgrad_params_with_explicit_validation_set(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
 @patch(f"{TUNING_MODULE}.train_test_split")
 def test_tune_mcgrad_params_fallback_to_train_test_split(
     mock_train_test_split,
-    mock_normalized_entropy,
     rng,
     sample_data,
     mock_mcgrad_model,
@@ -629,7 +605,6 @@ def test_tune_mcgrad_params_fallback_to_train_test_split(
         sample_data, test_size=0.2, random_state=rng
     )
     mock_train_test_split.return_value = (train_data, val_data)
-    mock_normalized_entropy.return_value = 0.5
 
     tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -664,16 +639,12 @@ def test_tune_mcgrad_params_fallback_to_train_test_split(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcgrad_params_pass_df_val_into_tuning_true(
-    mock_normalized_entropy,
     sample_data,
     sample_val_data,
     mock_mcgrad_model,
 ):
     """Test that df_val is passed to model.fit during tuning when pass_df_val_into_tuning=True."""
-    mock_normalized_entropy.return_value = 0.5
-
     tune_mcgrad_params(
         model=mock_mcgrad_model,
         df_train=sample_data,
@@ -701,16 +672,12 @@ def test_tune_mcgrad_params_pass_df_val_into_tuning_true(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcgrad_params_pass_df_val_into_tuning_false(
-    mock_normalized_entropy,
     sample_data,
     sample_val_data,
     mock_mcgrad_model,
 ):
     """Test that df_val is not passed to model.fit during tuning when pass_df_val_into_tuning=False."""
-    mock_normalized_entropy.return_value = 0.5
-
     tune_mcgrad_params(
         model=mock_mcgrad_model,
         df_train=sample_data,
@@ -731,16 +698,12 @@ def test_tune_mcgrad_params_pass_df_val_into_tuning_false(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcgrad_params_pass_df_val_into_final_fit_true(
-    mock_normalized_entropy,
     sample_data,
     sample_val_data,
     mock_mcgrad_model,
 ):
     """Test that df_val is passed to model.fit during final fit when pass_df_val_into_final_fit=True."""
-    mock_normalized_entropy.return_value = 0.5
-
     tune_mcgrad_params(
         model=mock_mcgrad_model,
         df_train=sample_data,
@@ -768,16 +731,12 @@ def test_tune_mcgrad_params_pass_df_val_into_final_fit_true(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcgrad_params_pass_df_val_into_final_fit_false(
-    mock_normalized_entropy,
     sample_data,
     sample_val_data,
     mock_mcgrad_model,
 ):
     """Test that df_val is not passed to model.fit during final fit when pass_df_val_into_final_fit=False."""
-    mock_normalized_entropy.return_value = 0.5
-
     tune_mcgrad_params(
         model=mock_mcgrad_model,
         df_train=sample_data,
@@ -798,16 +757,12 @@ def test_tune_mcgrad_params_pass_df_val_into_final_fit_false(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcgrad_params_pass_df_val_into_both_tuning_and_final_fit(
-    mock_normalized_entropy,
     sample_data,
     sample_val_data,
     mock_mcgrad_model,
 ):
     """Test that df_val is passed to both tuning and final fit when both flags are True."""
-    mock_normalized_entropy.return_value = 0.5
-
     tune_mcgrad_params(
         model=mock_mcgrad_model,
         df_train=sample_data,
@@ -837,9 +792,7 @@ def test_tune_mcgrad_params_pass_df_val_into_both_tuning_and_final_fit(
         (True, True),
     ],
 )
-@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcgrad_params_df_val_passing_defaults_to_false(
-    mock_normalized_entropy,
     sample_data,
     sample_val_data,
     mock_mcgrad_model,
@@ -847,8 +800,6 @@ def test_tune_mcgrad_params_df_val_passing_defaults_to_false(
     pass_df_val_into_final_fit,
 ):
     """Test all combinations of pass_df_val_into_tuning and pass_df_val_into_final_fit flags."""
-    mock_normalized_entropy.return_value = 0.5
-
     tune_mcgrad_params(
         model=mock_mcgrad_model,
         df_train=sample_data,
@@ -877,15 +828,11 @@ def test_tune_mcgrad_params_df_val_passing_defaults_to_false(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
 def test_tune_mcboost_params_does_not_modify_input_dataframes(
-    mock_normalized_entropy,
     sample_data,
     sample_val_data,
     mock_mcgrad_model,
 ):
-    mock_normalized_entropy.return_value = 0.5
-
     df_train_original = sample_data.copy()
     df_val_original = sample_val_data.copy()
 
@@ -906,11 +853,9 @@ def test_tune_mcboost_params_does_not_modify_input_dataframes(
 
 
 @pytest.mark.arm64_incompatible
-@patch(f"{TUNING_MODULE}.normalized_entropy")
 @patch(f"{TUNING_MODULE}.train_test_split")
 def test_tune_mcboost_params_does_not_modify_input_dataframe_when_no_df_val(
     mock_train_test_split,
-    mock_normalized_entropy,
     rng,
     sample_data,
     mock_mcgrad_model,
@@ -919,7 +864,6 @@ def test_tune_mcboost_params_does_not_modify_input_dataframe_when_no_df_val(
         sample_data, test_size=0.2, random_state=rng
     )
     mock_train_test_split.return_value = (train_data, val_data)
-    mock_normalized_entropy.return_value = 0.5
 
     df_train_original = sample_data.copy()
 
@@ -936,3 +880,662 @@ def test_tune_mcboost_params_does_not_modify_input_dataframe_when_no_df_val(
     )
 
     pd.testing.assert_frame_equal(sample_data, df_train_original)
+
+
+# --- Regression support tests ---
+
+
+@pytest.fixture
+def regression_sample_data(rng):
+    n_samples = 50
+    return pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.0, 10.0, n_samples),
+            "label": rng.normal(5.0, 2.0, n_samples),
+            "weight": rng.uniform(0.5, 2.0, n_samples),
+            "num_feature": rng.normal(0, 1, n_samples),
+        }
+    )
+
+
+@pytest.fixture
+def regression_val_data(rng):
+    n_samples = 30
+    return pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.0, 10.0, n_samples),
+            "label": rng.normal(5.0, 2.0, n_samples),
+            "weight": rng.uniform(0.5, 2.0, n_samples),
+            "num_feature": rng.normal(0, 1, n_samples),
+        }
+    )
+
+
+@pytest.fixture
+def mock_regression_model(rng):
+    model = Mock(spec=methods.RegressionMCGrad)
+    model.predict = Mock(
+        side_effect=lambda df, **kwargs: rng.uniform(0.0, 10.0, len(df))
+    )
+    model.early_stopping_estimation_method = methods._EstimationMethod.HOLDOUT
+    score_func = Mock(return_value=1.5)
+    score_func.name = "mean_squared_error"
+    model.early_stopping_score_func = score_func
+    model.early_stopping_minimize_score = True
+    model.DEFAULT_HYPERPARAMS = methods.RegressionMCGrad.DEFAULT_HYPERPARAMS
+    return model
+
+
+@pytest.mark.arm64_incompatible
+def test_tune_mcgrad_params_with_regression_model_returns_trial_results(
+    regression_sample_data,
+    regression_val_data,
+    mock_regression_model,
+):
+    result_model, trial_results = tune_mcgrad_params(
+        model=mock_regression_model,
+        df_train=regression_sample_data,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        df_val=regression_val_data,
+        numerical_feature_column_names=["num_feature"],
+        n_trials=2,
+    )
+
+    assert result_model is not None
+    assert isinstance(trial_results, pd.DataFrame)
+    assert len(trial_results) == 2
+    assert "mean_squared_error" in trial_results.columns
+
+
+@pytest.mark.arm64_incompatible
+def test_tune_mcgrad_params_with_regression_model_passes_weights_to_score_func(
+    regression_sample_data,
+    regression_val_data,
+    mock_regression_model,
+):
+    result_model, trial_results = tune_mcgrad_params(
+        model=mock_regression_model,
+        df_train=regression_sample_data,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        df_val=regression_val_data,
+        weight_column_name="weight",
+        numerical_feature_column_names=["num_feature"],
+        n_trials=2,
+    )
+
+    assert result_model is not None
+
+    score_func = mock_regression_model.early_stopping_score_func
+    assert score_func.call_count >= 1
+    for call in score_func.call_args_list:
+        assert call.kwargs["weight_column"] == "weight"
+
+
+@pytest.mark.arm64_incompatible
+@patch(f"{TUNING_MODULE}.train_test_split")
+def test_regression_model_does_not_stratify(
+    mock_train_test_split,
+    rng,
+    regression_sample_data,
+    mock_regression_model,
+):
+    train_data, val_data = train_test_split(
+        regression_sample_data, test_size=0.2, random_state=rng
+    )
+    mock_train_test_split.return_value = (train_data, val_data)
+
+    tune_mcgrad_params(
+        model=mock_regression_model,
+        df_train=regression_sample_data,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        df_val=None,
+        numerical_feature_column_names=["num_feature"],
+        n_trials=2,
+    )
+
+    mock_train_test_split.assert_called_once()
+    call_args = mock_train_test_split.call_args
+    assert call_args[1]["stratify"] is None
+
+
+@pytest.mark.arm64_incompatible
+@patch(f"{TUNING_MODULE}.train_test_split")
+def test_classification_model_does_stratify(
+    mock_train_test_split,
+    rng,
+    sample_data,
+    mock_mcgrad_model,
+):
+    train_data, val_data = train_test_split(
+        sample_data, test_size=0.2, random_state=rng
+    )
+    mock_train_test_split.return_value = (train_data, val_data)
+
+    tune_mcgrad_params(
+        model=mock_mcgrad_model,
+        df_train=sample_data,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        df_val=None,
+        categorical_feature_column_names=["cat_feature"],
+        n_trials=2,
+    )
+
+    mock_train_test_split.assert_called_once()
+    call_args = mock_train_test_split.call_args
+    pd.testing.assert_series_equal(call_args[1]["stratify"], sample_data["label"])
+
+
+@pytest.mark.arm64_incompatible
+def test_tune_mcgrad_params_uses_model_score_func(
+    sample_data,
+    sample_val_data,
+):
+    """Verify that tuning uses the model's early_stopping_score_func, not a hardcoded metric."""
+    model = Mock(spec=methods.MCGrad)
+    model.predict = Mock(
+        side_effect=lambda df, **kwargs: np.random.default_rng(0).uniform(
+            0.1, 0.9, len(df)
+        )
+    )
+    model.early_stopping_estimation_method = methods._EstimationMethod.HOLDOUT
+    model.DEFAULT_HYPERPARAMS = methods.MCGrad.DEFAULT_HYPERPARAMS
+
+    custom_func = Mock(return_value=0.42)
+    custom_func.name = "custom_metric"
+    model.early_stopping_score_func = custom_func
+    model.early_stopping_minimize_score = False
+
+    result_model, trial_results = tune_mcgrad_params(
+        model=model,
+        df_train=sample_data,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        df_val=sample_val_data,
+        categorical_feature_column_names=["cat_feature"],
+        n_trials=2,
+    )
+
+    assert result_model is not None
+    assert "custom_metric" in trial_results.columns
+    assert custom_func.call_count >= 1
+
+
+@pytest.mark.arm64_incompatible
+def test_regression_tuning_selects_parameters_with_lowest_score(rng):
+    """Verify that tuning minimizes the regression score (optimization direction is correct).
+
+    Same logic as test_tuning_selects_parameters_with_lowest_score but using
+    RegressionMCGrad to confirm the regression path works end-to-end.
+    """
+    n_samples = 50
+    df_train = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.0, 10.0, n_samples),
+            "label": rng.normal(5.0, 2.0, n_samples),
+            "feature": rng.normal(0, 1, n_samples),
+        }
+    )
+    df_val = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.0, 10.0, 30),
+            "label": rng.normal(5.0, 2.0, 30),
+            "feature": rng.normal(0, 1, 30),
+        }
+    )
+
+    model = methods.RegressionMCGrad(
+        num_rounds=0,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+
+    subset_configs = [
+        RangeParameterConfig(
+            name="learning_rate",
+            bounds=(0.002, 0.2),
+            parameter_type="float",
+            scaling="log",
+        )
+    ]
+
+    learning_rates_evaluated: list[float] = []
+    original_set_lightgbm_params = methods.RegressionMCGrad._set_lightgbm_params
+
+    def tracking_set_lightgbm_params(self, params):
+        if "learning_rate" in params:
+            learning_rates_evaluated.append(params["learning_rate"])
+        return original_set_lightgbm_params(self, params)
+
+    scores_returned = []
+
+    def mock_score_func(df, label_column, score_column, weight_column) -> float:
+        scores_sequence = [2.0, 0.8, 3.5]
+        idx = len(scores_returned)
+        score = scores_sequence[idx % len(scores_sequence)]
+        scores_returned.append(score)
+        return score
+
+    score_func_mock = Mock(side_effect=mock_score_func)
+    score_func_mock.name = "mean_squared_error"
+    model.early_stopping_score_func = score_func_mock
+    model.early_stopping_minimize_score = True
+
+    with patch.object(
+        methods.RegressionMCGrad,
+        "_set_lightgbm_params",
+        tracking_set_lightgbm_params,
+    ):
+        result_model, trial_results = tune_mcgrad_params(
+            model=model,
+            df_train=df_train,
+            prediction_column_name="prediction",
+            label_column_name="label",
+            df_val=df_val,
+            numerical_feature_column_names=["feature"],
+            n_trials=3,
+            parameter_configurations=subset_configs,
+        )
+
+    assert len(learning_rates_evaluated) == 4, (
+        f"Expected 4 calls to _set_lightgbm_params (3 trials + 1 final), "
+        f"got {len(learning_rates_evaluated)}"
+    )
+
+    trial_lr_to_score = {
+        learning_rates_evaluated[0]: 2.0,
+        learning_rates_evaluated[1]: 0.8,
+        learning_rates_evaluated[2]: 3.5,
+    }
+
+    final_lr = learning_rates_evaluated[3]
+    final_score = trial_lr_to_score.get(final_lr)
+
+    assert final_score is not None, (
+        f"Final learning_rate {final_lr} was not found in evaluated trials. "
+        f"LRs evaluated: {learning_rates_evaluated}"
+    )
+
+    assert final_score == 0.8, (
+        f"Final model should use learning_rate from trial with LOWEST score (0.8). "
+        f"Got score={final_score}. "
+        f"Final lr={final_lr}, lr->score mapping: {trial_lr_to_score}"
+    )
+
+    assert trial_results.iloc[0]["mean_squared_error"] == 0.8, (
+        f"Trial results should be sorted with lowest score first. "
+        f"Got {trial_results.iloc[0]['mean_squared_error']}"
+    )
+
+
+# --- Early stopping configuration tests ---
+
+
+def test_tune_mcgrad_params_raises_without_score_func(sample_data, sample_val_data):
+    model = Mock(spec=methods.MCGrad)
+    model.early_stopping_score_func = None
+
+    with pytest.raises(ValueError, match="early_stopping_score_func configured"):
+        tune_mcgrad_params(
+            model=model,
+            df_train=sample_data,
+            prediction_column_name="prediction",
+            label_column_name="label",
+            df_val=sample_val_data,
+            n_trials=2,
+        )
+
+
+_SINGLE_PARAM_CONFIG = [
+    RangeParameterConfig(
+        name="learning_rate",
+        bounds=(0.002, 0.2),
+        parameter_type="float",
+        scaling="log",
+    )
+]
+
+
+def _make_deterministic_score_func(
+    scores: list[float], name: str
+) -> tuple[Mock, list[float]]:
+    """Create a mock score function that returns scores from a predetermined sequence."""
+    scores_returned: list[float] = []
+
+    def _score_func(df, label_column, score_column, weight_column) -> float:
+        idx = len(scores_returned)
+        score = scores[idx % len(scores)]
+        scores_returned.append(score)
+        return score
+
+    mock = Mock(side_effect=_score_func)
+    mock.name = name
+    return mock, scores_returned
+
+
+@pytest.mark.arm64_incompatible
+@pytest.mark.parametrize(
+    "model_class",
+    [methods.MCGrad, methods.RegressionMCGrad],
+    ids=["MCGrad", "RegressionMCGrad"],
+)
+def test_tune_mcgrad_params_with_early_stopping_disabled_returns_results(
+    rng, model_class
+):
+    n_samples = 50
+    is_classification = model_class is methods.MCGrad
+    labels = (
+        rng.binomial(1, 0.3, n_samples)
+        if is_classification
+        else rng.normal(5.0, 2.0, n_samples)
+    )
+    predictions = (
+        rng.uniform(0.1, 0.9, n_samples)
+        if is_classification
+        else rng.uniform(0.0, 10.0, n_samples)
+    )
+
+    df_train = pd.DataFrame(
+        {
+            "prediction": predictions,
+            "label": labels,
+            "feature": rng.normal(0, 1, n_samples),
+        }
+    )
+    df_val = pd.DataFrame(
+        {
+            "prediction": (
+                rng.uniform(0.1, 0.9, 20)
+                if is_classification
+                else rng.uniform(0.0, 10.0, 20)
+            ),
+            "label": (
+                rng.binomial(1, 0.3, 20)
+                if is_classification
+                else rng.normal(5.0, 2.0, 20)
+            ),
+            "feature": rng.normal(0, 1, 20),
+        }
+    )
+
+    model = model_class(
+        num_rounds=0,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+
+    score_func_mock, _ = _make_deterministic_score_func([0.5, 0.3], "test_metric")
+    model.early_stopping_score_func = score_func_mock
+    model.early_stopping_minimize_score = True
+
+    result_model, trial_results = tune_mcgrad_params(
+        model=model,
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        df_val=df_val,
+        numerical_feature_column_names=["feature"],
+        n_trials=2,
+        parameter_configurations=_SINGLE_PARAM_CONFIG,
+    )
+
+    assert result_model is not None
+    assert len(trial_results) == 2
+    assert "test_metric" in trial_results.columns
+
+
+@pytest.mark.arm64_incompatible
+@pytest.mark.parametrize(
+    "model_class",
+    [methods.MCGrad, methods.RegressionMCGrad],
+    ids=["MCGrad", "RegressionMCGrad"],
+)
+def test_tune_mcgrad_params_with_custom_score_func_uses_custom_metric_in_results(
+    rng, model_class
+):
+    """Verify tuning uses a custom early_stopping_score_func set on the model."""
+    n_samples = 50
+    is_classification = model_class is methods.MCGrad
+    labels = (
+        rng.binomial(1, 0.3, n_samples)
+        if is_classification
+        else rng.normal(5.0, 2.0, n_samples)
+    )
+
+    df_train = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.1, 0.9, n_samples),
+            "label": labels,
+            "feature": rng.normal(0, 1, n_samples),
+        }
+    )
+    df_val = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.1, 0.9, 20),
+            "label": (
+                rng.binomial(1, 0.3, 20)
+                if is_classification
+                else rng.normal(5.0, 2.0, 20)
+            ),
+            "feature": rng.normal(0, 1, 20),
+        }
+    )
+
+    from sklearn.metrics import mean_absolute_error
+
+    custom_func = metrics.wrap_sklearn_metric_func(mean_absolute_error)
+
+    model = model_class(
+        num_rounds=0,
+        early_stopping_score_func=custom_func,
+        early_stopping_minimize_score=True,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+
+    result_model, trial_results = tune_mcgrad_params(
+        model=model,
+        df_train=df_train,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        df_val=df_val,
+        numerical_feature_column_names=["feature"],
+        n_trials=2,
+        parameter_configurations=_SINGLE_PARAM_CONFIG,
+    )
+
+    assert result_model is not None
+    assert "mean_absolute_error" in trial_results.columns
+
+
+@pytest.mark.arm64_incompatible
+@pytest.mark.parametrize(
+    "model_class",
+    [methods.MCGrad, methods.RegressionMCGrad],
+    ids=["MCGrad", "RegressionMCGrad"],
+)
+def test_tuning_maximization_direction(rng, model_class):
+    """Verify that tuning correctly maximizes when early_stopping_minimize_score=False.
+
+    Mock score func returns [0.3, 0.8, 0.5]. With maximization, the trial with
+    score 0.8 should be selected. If direction were wrong, 0.3 would be selected.
+    """
+    n_samples = 50
+    is_classification = model_class is methods.MCGrad
+    labels = (
+        rng.binomial(1, 0.3, n_samples)
+        if is_classification
+        else rng.normal(5.0, 2.0, n_samples)
+    )
+
+    df_train = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.1, 0.9, n_samples),
+            "label": labels,
+            "feature": rng.normal(0, 1, n_samples),
+        }
+    )
+    df_val = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.1, 0.9, 20),
+            "label": (
+                rng.binomial(1, 0.3, 20)
+                if is_classification
+                else rng.normal(5.0, 2.0, 20)
+            ),
+            "feature": rng.normal(0, 1, 20),
+        }
+    )
+
+    model = model_class(
+        num_rounds=0,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+
+    score_func_mock, _ = _make_deterministic_score_func([0.3, 0.8, 0.5], "r2_score")
+    model.early_stopping_score_func = score_func_mock
+    model.early_stopping_minimize_score = False
+
+    learning_rates_evaluated: list[float] = []
+    original_set_lgbm = model_class._set_lightgbm_params
+
+    def tracking_set_lightgbm_params(self, params):
+        if "learning_rate" in params:
+            learning_rates_evaluated.append(params["learning_rate"])
+        return original_set_lgbm(self, params)
+
+    with patch.object(
+        model_class, "_set_lightgbm_params", tracking_set_lightgbm_params
+    ):
+        result_model, trial_results = tune_mcgrad_params(
+            model=model,
+            df_train=df_train,
+            prediction_column_name="prediction",
+            label_column_name="label",
+            df_val=df_val,
+            numerical_feature_column_names=["feature"],
+            n_trials=3,
+            parameter_configurations=_SINGLE_PARAM_CONFIG,
+        )
+
+    assert len(learning_rates_evaluated) == 4
+
+    trial_lr_to_score = {
+        learning_rates_evaluated[0]: 0.3,
+        learning_rates_evaluated[1]: 0.8,
+        learning_rates_evaluated[2]: 0.5,
+    }
+
+    final_lr = learning_rates_evaluated[3]
+    final_score = trial_lr_to_score.get(final_lr)
+
+    assert final_score is not None, (
+        f"Final learning_rate {final_lr} not found in evaluated trials. "
+        f"LRs evaluated: {learning_rates_evaluated}"
+    )
+
+    assert final_score == 0.8, (
+        f"With maximization, final model should use trial with HIGHEST score (0.8). "
+        f"Got score={final_score}. lr->score: {trial_lr_to_score}"
+    )
+
+    # Results should be sorted ascending; best (highest) is last for maximization
+    assert trial_results.iloc[-1]["r2_score"] == 0.8
+
+
+@pytest.mark.arm64_incompatible
+@pytest.mark.parametrize(
+    "model_class",
+    [methods.MCGrad, methods.RegressionMCGrad],
+    ids=["MCGrad", "RegressionMCGrad"],
+)
+def test_tuning_minimization_direction(rng, model_class):
+    """Verify that tuning correctly minimizes when early_stopping_minimize_score=True.
+
+    Mock score func returns [0.5, 0.2, 0.9]. With minimization, the trial with
+    score 0.2 should be selected.
+    """
+    n_samples = 50
+    is_classification = model_class is methods.MCGrad
+    labels = (
+        rng.binomial(1, 0.3, n_samples)
+        if is_classification
+        else rng.normal(5.0, 2.0, n_samples)
+    )
+
+    df_train = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.1, 0.9, n_samples),
+            "label": labels,
+            "feature": rng.normal(0, 1, n_samples),
+        }
+    )
+    df_val = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.1, 0.9, 20),
+            "label": (
+                rng.binomial(1, 0.3, 20)
+                if is_classification
+                else rng.normal(5.0, 2.0, 20)
+            ),
+            "feature": rng.normal(0, 1, 20),
+        }
+    )
+
+    model = model_class(
+        num_rounds=0,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+
+    score_func_mock, _ = _make_deterministic_score_func([0.5, 0.2, 0.9], "mse")
+    model.early_stopping_score_func = score_func_mock
+    model.early_stopping_minimize_score = True
+
+    learning_rates_evaluated: list[float] = []
+    original_set_lgbm = model_class._set_lightgbm_params
+
+    def tracking_set_lightgbm_params(self, params):
+        if "learning_rate" in params:
+            learning_rates_evaluated.append(params["learning_rate"])
+        return original_set_lgbm(self, params)
+
+    with patch.object(
+        model_class, "_set_lightgbm_params", tracking_set_lightgbm_params
+    ):
+        result_model, trial_results = tune_mcgrad_params(
+            model=model,
+            df_train=df_train,
+            prediction_column_name="prediction",
+            label_column_name="label",
+            df_val=df_val,
+            numerical_feature_column_names=["feature"],
+            n_trials=3,
+            parameter_configurations=_SINGLE_PARAM_CONFIG,
+        )
+
+    assert len(learning_rates_evaluated) == 4
+
+    trial_lr_to_score = {
+        learning_rates_evaluated[0]: 0.5,
+        learning_rates_evaluated[1]: 0.2,
+        learning_rates_evaluated[2]: 0.9,
+    }
+
+    final_lr = learning_rates_evaluated[3]
+    final_score = trial_lr_to_score.get(final_lr)
+
+    assert final_score is not None, (
+        f"Final learning_rate {final_lr} not found in evaluated trials. "
+        f"LRs evaluated: {learning_rates_evaluated}"
+    )
+
+    assert final_score == 0.2, (
+        f"With minimization, final model should use trial with LOWEST score (0.2). "
+        f"Got score={final_score}. lr->score: {trial_lr_to_score}"
+    )
+
+    assert trial_results.iloc[0]["mse"] == 0.2
