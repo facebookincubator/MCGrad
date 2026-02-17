@@ -1418,11 +1418,11 @@ class MCGrad(_BaseMCGrad):
             )
             fallback_solver.fit(logits, y, sample_weight=w)
         if not np.isnan(fallback_solver.coef_).any():
-            if primary_solver.coef_[0][0] < 0.95 or primary_solver.coef_[0][0] > 1.05:
+            if fallback_solver.coef_[0][0] < 0.95 or fallback_solver.coef_[0][0] > 1.05:
                 logger.warning(
                     "Unshrink is not close to 1: %s. This may create a problem "
                     "with the multicalibration of the model.",
-                    primary_solver.coef_[0][0],
+                    fallback_solver.coef_[0][0],
                 )
             return fallback_solver.coef_[0][0]
 
