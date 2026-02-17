@@ -4,7 +4,9 @@
 # LICENSE file in the root directory of this source tree.
 # pyre-unsafe
 
-from unittest.mock import Mock
+import logging
+import warnings
+from unittest.mock import Mock, patch
 
 import numpy as np
 import pandas as pd
@@ -3901,3 +3903,163 @@ def test_mcgrad_default_minimization_behavior():
     # The tuple return type ensures minimize_score is set correctly from the metric
     cal = AUCCalibrator(early_stopping=True)
     assert cal.early_stopping_minimize_score is False
+
+
+@pytest.mark.parametrize(
+    "labels,predictions,expected_result",
+    [
+        (
+            np.array([False, True, False, True, True]),
+            np.array([0.1, 0.2, 0.3, 0.4, 0.5]),
+            2.8354,
+        ),
+        (np.array([0, 1, 0, 1, 1]), np.array([0.1, 0.2, 0.3, 0.4, 0.5]), 2.8354),
+    ],
+)
+def test_compute_unshrink_factor_gives_expected_result(
+    labels, predictions, expected_result
+):
+    assert (
+        pytest.approx(
+            methods.MCGrad._compute_unshrink_factor(labels, predictions, None), 0.0001
+        )
+        == expected_result
+    )
+
+
+def test_weighted_unshrink_gives_expected_result():
+    y = np.array([0, 1, 0, 0, 0, 0])
+    t = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
+    weights = np.array([1, 3, 1, 1, 1, 2])
+
+    y_unweighted = np.repeat(y, weights)
+    t_unweighted = np.repeat(t, weights)
+
+    unshrink_factor_weighted = methods.MCGrad._compute_unshrink_factor(y, t, weights)
+    unshrink_factor_unweighted = methods.MCGrad._compute_unshrink_factor(
+        y_unweighted, t_unweighted, None
+    )
+
+    assert np.isclose(unshrink_factor_weighted, unshrink_factor_unweighted)
+
+
+def test_compute_unshrink_factor_does_not_modify_input_arrays(rng):
+    y = rng.randint(0, 2, 50).astype(float)
+    logits = rng.uniform(-2, 2, 50)
+    w = rng.uniform(0.5, 2.0, 50)
+
+    y_original = y.copy()
+    logits_original = logits.copy()
+    w_original = w.copy()
+
+    _ = methods.MCGrad._compute_unshrink_factor(y, logits, w)
+
+    np.testing.assert_array_equal(y, y_original)
+    np.testing.assert_array_equal(logits, logits_original)
+    np.testing.assert_array_equal(w, w_original)
+
+
+def test_compute_unshrink_factor_falls_back_to_lbfgs_when_primary_returns_nan():
+    y = np.array([0, 1, 0, 1, 1])
+    predictions = np.array([0.1, 0.2, 0.3, 0.4, 0.5])
+
+    nan_solver = Mock()
+    nan_solver.coef_ = np.array([[np.nan]])
+    lbfgs_solver = Mock()
+    lbfgs_solver.coef_ = np.array([[1.0]])
+
+    with patch.object(
+        methods, "LogisticRegression", side_effect=[nan_solver, lbfgs_solver]
+    ):
+        result = methods.MCGrad._compute_unshrink_factor(y, predictions, None)
+
+    assert result == 1.0
+    lbfgs_solver.fit.assert_called_once()
+
+
+def test_compute_unshrink_factor_returns_1_when_both_solvers_return_nan():
+    y = np.array([0, 1, 0, 1, 1])
+    predictions = np.array([0.1, 0.2, 0.3, 0.4, 0.5])
+
+    nan_solver1 = Mock()
+    nan_solver1.coef_ = np.array([[np.nan]])
+    nan_solver2 = Mock()
+    nan_solver2.coef_ = np.array([[np.nan]])
+
+    with patch.object(
+        methods, "LogisticRegression", side_effect=[nan_solver1, nan_solver2]
+    ):
+        result = methods.MCGrad._compute_unshrink_factor(y, predictions, None)
+
+    assert result == 1
+
+
+def test_compute_unshrink_factor_logs_line_search_warning(caplog):
+    from scipy.optimize._linesearch import LineSearchWarning
+
+    y = np.array([0, 1, 0, 1, 1])
+    predictions = np.array([0.1, 0.2, 0.3, 0.4, 0.5])
+
+    solver = Mock()
+    solver.coef_ = np.array([[1.0]])
+    solver.fit = Mock(
+        side_effect=lambda *a, **kw: warnings.warn(
+            "step size", LineSearchWarning, stacklevel=2
+        )
+    )
+
+    with patch.object(methods, "LogisticRegression", return_value=solver):
+        with caplog.at_level(logging.INFO, logger=methods.__name__):
+            methods.MCGrad._compute_unshrink_factor(y, predictions, None)
+
+    assert "Line search warning (unshrink)" in caplog.text
+
+
+def test_compute_unshrink_factor_reemits_non_line_search_warnings():
+    y = np.array([0, 1, 0, 1, 1])
+    predictions = np.array([0.1, 0.2, 0.3, 0.4, 0.5])
+
+    solver = Mock()
+    solver.coef_ = np.array([[1.0]])
+    solver.fit = Mock(
+        side_effect=lambda *a, **kw: warnings.warn(
+            "convergence issue", RuntimeWarning, stacklevel=2
+        )
+    )
+
+    with patch.object(methods, "LogisticRegression", return_value=solver):
+        with pytest.warns(RuntimeWarning, match="convergence issue"):
+            methods.MCGrad._compute_unshrink_factor(y, predictions, None)
+
+
+def test_compute_unshrink_factor_warns_when_primary_not_close_to_1(caplog):
+    y = np.array([0, 1, 0, 1, 1])
+    predictions = np.array([0.1, 0.2, 0.3, 0.4, 0.5])
+
+    solver = Mock()
+    solver.coef_ = np.array([[0.5]])
+
+    with patch.object(methods, "LogisticRegression", return_value=solver):
+        with caplog.at_level(logging.WARNING, logger=methods.__name__):
+            methods.MCGrad._compute_unshrink_factor(y, predictions, None)
+
+    assert "Unshrink is not close to 1" in caplog.text
+
+
+def test_compute_unshrink_factor_warns_when_fallback_not_close_to_1(caplog):
+    y = np.array([0, 1, 0, 1, 1])
+    predictions = np.array([0.1, 0.2, 0.3, 0.4, 0.5])
+
+    nan_solver = Mock()
+    nan_solver.coef_ = np.array([[np.nan]])
+    fallback_solver = Mock()
+    fallback_solver.coef_ = np.array([[0.5]])
+
+    with patch.object(
+        methods, "LogisticRegression", side_effect=[nan_solver, fallback_solver]
+    ):
+        with caplog.at_level(logging.WARNING, logger=methods.__name__):
+            result = methods.MCGrad._compute_unshrink_factor(y, predictions, None)
+
+    assert result == 0.5
+    assert "Unshrink is not close to 1" in caplog.text
