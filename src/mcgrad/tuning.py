@@ -209,6 +209,7 @@ def tune_mcgrad_params(
             numerical_feature_column_names=numerical_feature_column_names,
             weight_column_name=weight_column_name,
             df_val=df_param_val,
+            # @oss-disable[end= ]: _disable_telemetry=True,
         )
 
         prediction = model.predict(
@@ -218,7 +219,7 @@ def tune_mcgrad_params(
             categorical_feature_column_names=categorical_feature_column_names,
             numerical_feature_column_names=numerical_feature_column_names,
         )
-        # pyre-ignore[16] we assert above that df_val is not None
+
         eval_df = pd.DataFrame(
             {
                 "label": df_val[label_column_name],  # pyre-ignore[16]
@@ -227,7 +228,7 @@ def tune_mcgrad_params(
             copy=False,
         )
         if weight_column_name:
-            eval_df["weight"] = df_val[weight_column_name]  # pyre-ignore[16]
+            eval_df["weight"] = df_val[weight_column_name]
         return score_func(
             df=eval_df,
             label_column="label",
