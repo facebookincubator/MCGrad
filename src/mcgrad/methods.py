@@ -45,6 +45,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 from ._compat import create_kbins_discretizer, groupby_apply
 # @oss-disable[end= ]: from .internal._compat import DeprecatedAttributesMixin
+# @oss-disable[end= ]: from .internal.cas_logger import log_usage
 
 
 @dataclass(frozen=True, slots=True)
@@ -610,7 +611,6 @@ class _BaseMCGrad(
         :param df_val: Optional validation dataframe for early stopping. When provided with early stopping enabled,
             this validation set will be used instead of a holdout from the training data. early_stopping_use_crossvalidation has
             to be set to False for this to work.
-        :param kwargs: Additional keyword arguments
         :return: The fitted calibrator instance
         """
         self._check_input_data(
@@ -694,6 +694,11 @@ class _BaseMCGrad(
                 categorical_feature_column_names=preprocessed_data.categorical_feature_names,
                 numerical_feature_column_names=preprocessed_data.numerical_feature_names,
             )
+
+        # @oss-disable[end= ]: if not kwargs.pop("_disable_telemetry", False):
+            # @oss-disable[end= ]: overrides = kwargs.pop("_telemetry_overrides", None)
+            # @oss-disable[end= ]: log_usage(self, overrides)
+
         return self
 
     def _fit_single_round(
