@@ -2255,3 +2255,344 @@ def test_ecce_pvalue_consistency_with_ecce_pvalue_from_sigma(rng):
     sigma = metrics.ecce_sigma(labels, predicted_scores)
     ecce_pvalue_from_sigma_result = metrics.ecce_pvalue_from_sigma(sigma)
     assert ecce_pvalue_result == pytest.approx(ecce_pvalue_from_sigma_result, rel=1e-10)
+
+
+def test_regression_mce_returns_zero_for_perfectly_calibrated_data():
+    test_df = pd.DataFrame(
+        {
+            "prediction": [0.5, 1.5, 2.5, 3.5],
+            "label": [0.5, 1.5, 2.5, 3.5],
+            "segment_A": ["a", "a", "b", "b"],
+        }
+    )
+
+    mce = metrics.MulticalibrationError(
+        df=test_df,
+        label_column="label",
+        score_column="prediction",
+        categorical_segment_columns=["segment_A"],
+        min_samples_per_segment=1,
+        outcome_type="regression",
+    )
+    assert mce.segments_ecce[0] == 0
+    assert mce._segments_ecce_std[0] == 0
+
+
+def test_regression_mce_equals_global_ecce_at_depth_zero():
+    test_df = pd.DataFrame(
+        {
+            "prediction": [0.1, 0.8, 0.3, 0.7],
+            "label": [0.2, 0.9, 0.1, 0.8],
+            "segment_A": ["a", "a", "b", "b"],
+        }
+    )
+
+    global_ecce_metric = metrics.ecce(
+        labels=test_df.label.values,
+        predicted_scores=test_df.prediction.values,
+    )
+
+    mce = metrics.MulticalibrationError(
+        df=test_df,
+        label_column="label",
+        score_column="prediction",
+        categorical_segment_columns=["segment_A"],
+        max_depth=0,
+        min_samples_per_segment=1,
+        outcome_type="regression",
+        precision_dtype="float64",
+    )
+    mce_absolute = mce.mce_sigma * mce._global_ecce_std
+    assert np.isclose(mce_absolute, global_ecce_metric, rtol=1e-10, atol=1e-10)
+
+
+def test_regression_mce_sigma_detects_miscalibration(rng):
+    n = 200
+    predictions = rng.uniform(low=0.0, high=10.0, size=n)
+    labels = predictions + rng.normal(0, 0.1, size=n)
+    miscalibrated_predictions = predictions + 3.0
+
+    df_calibrated = pd.DataFrame(
+        {
+            "prediction": predictions,
+            "label": labels,
+            "segment": rng.choice(["A", "B"], size=n),
+        }
+    )
+
+    df_miscalibrated = pd.DataFrame(
+        {
+            "prediction": miscalibrated_predictions,
+            "label": labels,
+            "segment": rng.choice(["A", "B"], size=n),
+        }
+    )
+
+    mce_calibrated = metrics.MulticalibrationError(
+        df=df_calibrated,
+        label_column="label",
+        score_column="prediction",
+        categorical_segment_columns=["segment"],
+        min_samples_per_segment=5,
+        max_depth=1,
+        outcome_type="regression",
+    )
+
+    mce_miscalibrated = metrics.MulticalibrationError(
+        df=df_miscalibrated,
+        label_column="label",
+        score_column="prediction",
+        categorical_segment_columns=["segment"],
+        min_samples_per_segment=5,
+        max_depth=1,
+        outcome_type="regression",
+    )
+
+    assert mce_miscalibrated.mce_sigma > mce_calibrated.mce_sigma
+
+
+@pytest.mark.parametrize("scale_factor", [0.1, 2.0, 100.0])
+def test_regression_mce_sigma_is_scale_invariant(scale_factor, rng):
+    n = 100
+    predictions = rng.uniform(0, 10, size=n)
+    labels = predictions + rng.normal(0, 1, size=n)
+    segments = rng.choice(["A", "B"], size=n)
+
+    def make_mce(preds, labs):
+        df = pd.DataFrame(
+            {
+                "prediction": preds,
+                "label": labs,
+                "segment": segments,
+            }
+        )
+        return metrics.MulticalibrationError(
+            df=df,
+            label_column="label",
+            score_column="prediction",
+            categorical_segment_columns=["segment"],
+            min_samples_per_segment=5,
+            max_depth=1,
+            outcome_type="regression",
+            precision_dtype="float64",
+        )
+
+    mce_original = make_mce(predictions, labels)
+    mce_scaled = make_mce(predictions * scale_factor, labels * scale_factor)
+
+    np.testing.assert_allclose(mce_original.mce_sigma, mce_scaled.mce_sigma, rtol=1e-10)
+
+
+@pytest.mark.parametrize(
+    "attr",
+    ["mce_relative", "mde_relative", "segments_ecce_relative", "global_ecce_relative"],
+)
+def test_regression_mce_relative_raises_for_regression(attr):
+    test_df = pd.DataFrame(
+        {
+            "prediction": [0.5, 1.5, 2.5, 3.5],
+            "label": [0.5, 1.5, 2.5, 3.5],
+            "segment_A": ["a", "a", "b", "b"],
+        }
+    )
+
+    mce = metrics.MulticalibrationError(
+        df=test_df,
+        label_column="label",
+        score_column="prediction",
+        categorical_segment_columns=["segment_A"],
+        min_samples_per_segment=1,
+        outcome_type="regression",
+    )
+    with pytest.raises(NotImplementedError, match="not available for regression"):
+        getattr(mce, attr)
+
+
+def test_regression_ecce_std_uses_adjacent_differences():
+    # Hand-computed example:
+    # scores (already sorted): [1, 2, 3, 4]
+    # labels:                   [1.5, 2.5, 2.5, 4.5]
+    # residuals: r = labels - scores = [0.5, 0.5, -0.5, 0.5]
+    # weights: all 1
+    # diff_r = [0, -1, 1]
+    # sum_w_adjacent = [2, 2, 2]
+    # numerator = (0*4 + 1*4 + 1*4) = 8
+    # total_w = 4
+    # denominator_weight = w[0] + w[3] + 2*(w[1]+w[2]) = 1 + 1 + 2*2 = 6
+    # denominator = 4 * 4 * 6 = 96
+    # std = sqrt(8/96) = sqrt(1/12)
+    predicted_scores = np.array([1.0, 2.0, 3.0, 4.0])
+    labels = np.array([1.5, 2.5, 2.5, 4.5])
+    segments = np.ones(shape=(1, 4), dtype=np.bool_)
+
+    result = metrics._ecce_regression_standard_deviation_per_segment(
+        predicted_scores=predicted_scores,
+        labels=labels,
+        segments=segments,
+    )
+
+    expected = np.sqrt(8.0 / 96.0)
+    np.testing.assert_allclose(result[0], expected, rtol=1e-10)
+
+
+def test_regression_ecce_std_defaults_to_single_segment_when_segments_is_none():
+    predicted_scores = np.array([1.0, 2.0, 3.0, 4.0])
+    labels = np.array([1.5, 2.5, 2.5, 4.5])
+
+    result_no_segments = metrics._ecce_regression_standard_deviation_per_segment(
+        predicted_scores=predicted_scores,
+        labels=labels,
+    )
+    result_explicit = metrics._ecce_regression_standard_deviation_per_segment(
+        predicted_scores=predicted_scores,
+        labels=labels,
+        segments=np.ones(shape=(1, 4), dtype=np.bool_),
+    )
+
+    assert len(result_no_segments) == 1
+    np.testing.assert_allclose(result_no_segments[0], result_explicit[0])
+
+
+def test_regression_ecce_std_raises_error_with_mismatched_segments():
+    predicted_scores = np.array([1.0, 2.0, 3.0])
+    labels = np.array([1.5, 2.5, 3.5])
+    segments = np.ones(shape=(1, 5), dtype=np.bool_)
+
+    with pytest.raises(
+        ValueError, match="Segments must be the same length as labels/predictions"
+    ):
+        metrics._ecce_regression_standard_deviation_per_segment(
+            predicted_scores=predicted_scores,
+            labels=labels,
+            segments=segments,
+        )
+
+
+def test_regression_mce_does_not_modify_input_df(rng):
+    n_samples = 50
+    df = pd.DataFrame(
+        {
+            "segment_A": rng.choice(["a", "b"], size=n_samples),
+            "prediction": rng.rand(n_samples) * 10,
+            "label": rng.rand(n_samples) * 10,
+        }
+    )
+
+    df_original = df.copy(deep=True)
+
+    metrics.MulticalibrationError(
+        df=df,
+        label_column="label",
+        score_column="prediction",
+        categorical_segment_columns=["segment_A"],
+        min_samples_per_segment=1,
+        outcome_type="regression",
+    )
+
+    assert df.equals(df_original)
+
+
+def test_regression_ecce_std_handles_single_element_segments():
+    predicted_scores = np.array([1.0, 2.0, 3.0])
+    labels = np.array([1.5, 2.0, 3.5])
+    # Segment with only one element (index 0)
+    segments = np.array(
+        [
+            [True, False, False],
+            [False, True, True],
+        ],
+        dtype=np.bool_,
+    )
+
+    result = metrics._ecce_regression_standard_deviation_per_segment(
+        predicted_scores=predicted_scores,
+        labels=labels,
+        segments=segments,
+    )
+
+    assert result[0] == 0.0
+    # Second segment has residuals [0, 0.5], diff = [0.5], so std > 0
+    assert result[1] > 0.0
+
+
+def test_outcome_type_validation():
+    df = pd.DataFrame(
+        {
+            "prediction": [0.1, 0.9],
+            "label": [0, 1],
+            "segment": ["a", "b"],
+        }
+    )
+
+    with pytest.raises(ValueError, match="Invalid outcome_type"):
+        metrics.MulticalibrationError(
+            df=df,
+            label_column="label",
+            score_column="prediction",
+            categorical_segment_columns=["segment"],
+            outcome_type="invalid",
+        )
+
+
+def test_regression_str_and_format_use_absolute_scale():
+    test_df = pd.DataFrame(
+        {
+            "prediction": [0.5, 1.5, 2.5, 3.5],
+            "label": [0.6, 1.4, 2.6, 3.4],
+            "segment_A": ["a", "a", "b", "b"],
+        }
+    )
+
+    mce = metrics.MulticalibrationError(
+        df=test_df,
+        label_column="label",
+        score_column="prediction",
+        categorical_segment_columns=["segment_A"],
+        min_samples_per_segment=1,
+        outcome_type="regression",
+    )
+
+    result_str = str(mce)
+    assert "%" not in result_str
+    assert "sigmas=" in result_str
+    assert "p=" in result_str
+    assert "mde=" in result_str
+
+    result_format = format(mce, ".2f")
+    assert "%" not in result_format
+    assert "sigmas=" in result_format
+
+
+def test_wrap_multicalibration_error_metric_rejects_mce_relative_for_regression():
+    with pytest.raises(ValueError, match="not available for regression"):
+        wrap_multicalibration_error_metric(
+            categorical_segment_columns=["seg"],
+            metric_version="mce_relative",
+            outcome_type="regression",
+        )
+
+
+def test_wrap_multicalibration_error_metric_passes_outcome_type():
+    wrapped = wrap_multicalibration_error_metric(
+        categorical_segment_columns=["segment_A"],
+        metric_version="mce_sigma",
+        outcome_type="regression",
+    )
+
+    n = 50
+    rng = np.random.RandomState(42)
+    df = pd.DataFrame(
+        {
+            "prediction": rng.rand(n) * 10,
+            "label": rng.rand(n) * 10,
+            "segment_A": rng.choice(["a", "b"], size=n),
+        }
+    )
+
+    result = wrapped(
+        df=df,
+        label_column="label",
+        score_column="prediction",
+        weight_column=None,
+    )
+    assert isinstance(result, (float, np.floating))
