@@ -846,6 +846,70 @@ def _ecce_standard_deviation_per_segment(
     return ecce_std_dev
 
 
+def _ecce_regression_standard_deviation_per_segment(
+    predicted_scores: npt.NDArray,
+    labels: npt.NDArray,
+    sample_weight: npt.NDArray | None = None,
+    segments: npt.NDArray | None = None,
+    precision_dtype: type[np.float16]
+    | type[np.float32]
+    | type[np.float64] = DEFAULT_PRECISION_DTYPE,
+) -> npt.NDArray:
+    """
+    Calculate ECCE standard deviation per segment for regression outcomes.
+
+    Uses successive differences of residuals (equation 6 from [1]) to estimate
+    the conditional variance without knowing the true Var(Y|f(X)).
+
+    [1] Guy, I., Haimovich, D., Linder, F., Okati, N., Perini, L., Tax, N., & Tygert, M.
+    (2025). Measuring multi-calibration. arXiv preprint arXiv:2506.11251.
+
+    :param predicted_scores: Array of predicted scores.
+    :param labels: Array of regression labels.
+    :param sample_weight: Optional array of sample weights.
+    :param segments: Optional array of segment masks.
+    :param precision_dtype: Data type for precision of computation.
+    :return: Array of standard deviations per segment.
+    """
+    if sample_weight is None:
+        sample_weight = np.ones_like(predicted_scores)
+    if segments is None:
+        segments = np.ones(shape=(1, len(predicted_scores)), dtype=np.bool_)
+
+    if segments.shape[1] != predicted_scores.shape[0]:
+        raise ValueError("Segments must be the same length as labels/predictions.")
+
+    n_segments = segments.shape[0]
+    ecce_std_dev = np.zeros(n_segments, dtype=precision_dtype)
+    residuals = labels - predicted_scores
+
+    for k in range(n_segments):
+        mask = segments[k]
+        indices = np.where(mask)[0]
+        n_k = len(indices)
+
+        if n_k < 2:
+            ecce_std_dev[k] = 0
+            continue
+
+        r_segment = residuals[indices]
+        w_segment = sample_weight[indices]
+
+        diff_r = np.diff(r_segment)
+        sum_w_adjacent = w_segment[:-1] + w_segment[1:]
+
+        numerator = np.sum(diff_r**2 * sum_w_adjacent**2)
+        total_w = np.sum(w_segment)
+        # W_1 + W_{n_k} + 2 * sum(W_2..W_{n_k-1})
+        denominator_weight = w_segment[0] + w_segment[-1] + 2 * np.sum(w_segment[1:-1])
+        denominator = 4 * total_w * denominator_weight
+
+        if denominator > 0:
+            ecce_std_dev[k] = np.sqrt(numerator / denominator)
+
+    return ecce_std_dev
+
+
 def _ecce_per_segment(
     labels: npt.NDArray,
     predicted_scores: npt.NDArray,
@@ -1250,6 +1314,12 @@ class MulticalibrationError(
     of the data. This helps identify subpopulations where a model may be poorly
     calibrated even when global calibration appears good.
 
+    Supports both classification (binary outcomes) and regression (continuous outcomes)
+    via the ``outcome_type`` parameter. For classification, the variance estimator uses
+    the Bernoulli variance ``p(1-p)``. For regression, a successive-differences estimator
+    (Appendix C, equation 6 of [1]) is used instead, which does not require knowing the
+    true conditional variance of the outcome.
+
     The metric is based on ECCE (Estimated Cumulative Calibration Error) [2].
 
     [1] Guy, I., Haimovich, D., Linder, F., Okati, N., Perini, L., Tax, N., & Tygert, M.
@@ -1303,13 +1373,16 @@ class MulticalibrationError(
         max_n_segments: int | None = DEFAULT_MCE_N_SEGMENTS,
         chunk_size: int = 50,
         precision_dtype: str = "float32",
+        outcome_type: str = "classification",
     ) -> None:
         """
         Initialize MulticalibrationError with data and segmentation parameters.
 
         :param df: DataFrame containing predictions, labels, and segment features.
-        :param label_column: Column name containing binary labels (0 or 1).
-        :param score_column: Column name containing predicted probabilities (0 to 1).
+        :param label_column: Column name containing labels. For classification, binary
+            labels (0 or 1). For regression, continuous outcome values.
+        :param score_column: Column name containing predicted scores. For classification,
+            predicted probabilities (0 to 1). For regression, continuous predictions.
         :param weight_column: Optional column containing sample weights. If None,
             all samples are weighted equally.
         :param categorical_segment_columns: Columns with categorical values to use
@@ -1330,7 +1403,16 @@ class MulticalibrationError(
             improve speed but increase memory usage.
         :param precision_dtype: Floating-point precision for computations. Options:
             'float16' (fast, less precise), 'float32' (balanced), 'float64' (precise).
+        :param outcome_type: Type of outcome variable. Options: 'classification' for
+            binary outcomes with Bernoulli variance, 'regression' for continuous outcomes
+            using successive-differences variance estimation.
         """
+        if outcome_type not in ("classification", "regression"):
+            raise ValueError(
+                f"Invalid outcome_type: '{outcome_type}'. "
+                "Must be 'classification' or 'regression'."
+            )
+        self.outcome_type = outcome_type
         self.label_column = label_column
         self.score_column = score_column
         self.weight_column = weight_column
@@ -1379,9 +1461,21 @@ class MulticalibrationError(
         self.total_number_segments: int = -1  # initialized as -1
 
     def __str__(self) -> str:
+        if self.outcome_type == "regression":
+            mce_abs = self.mce_sigma * self._global_ecce_std
+            mde_abs = 5 * self._global_ecce_std
+            return f"""{mce_abs} (sigmas={self.mce_sigma}, p={self.mce_pvalue}, mde={mde_abs})"""
         return f"""{self.mce_relative}% (sigmas={self.mce_sigma}, p={self.mce_pvalue}, mde={self.mde_relative})"""
 
     def __format__(self, format_spec: str) -> str:
+        if self.outcome_type == "regression":
+            mce_abs = self.mce_sigma * self._global_ecce_std
+            mde_abs = 5 * self._global_ecce_std
+            formatted_mce = format(mce_abs, format_spec)
+            formatted_p_value = format(self.mce_pvalue, format_spec)
+            formatted_mde = format(mde_abs, format_spec)
+            formatted_mce_sigma = format(self.mce_sigma, format_spec)
+            return f"""{formatted_mce} (sigmas={formatted_mce_sigma}, p={formatted_p_value}, mde={formatted_mde})"""
         formatted_mce_relative = format(self.mce_relative, format_spec)
         formatted_p_value = format(self.mce_pvalue, format_spec)
         formatted_mde = format(self.mde_relative, format_spec)
@@ -1488,6 +1582,11 @@ class MulticalibrationError(
 
         :return: Array of shape (n_segments,) with relative ECCE values (%).
         """
+        if self.outcome_type == "regression":
+            raise NotImplementedError(
+                "Relative scale is not available for regression outcomes. "
+                "Use segments_ecce (absolute) or segments_ecce_sigma (sigma) instead."
+            )
         return self.segments_ecce_sigma * self._global_ecce_std / self._prevalence * 100
 
     @functools.cached_property
@@ -1588,13 +1687,18 @@ class MulticalibrationError(
     def _segments_ecce_std(self) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
         segments = self._segments[0]
         sigmas = np.zeros(self.total_number_segments, dtype=self.precision_dtype)
+        std_func = (
+            _ecce_regression_standard_deviation_per_segment
+            if self.outcome_type == "regression"
+            else _ecce_standard_deviation_per_segment
+        )
         for i, segment in enumerate(segments):
             sigmas[
                 self.chunk_size * i : min(
                     self.chunk_size * (i + 1),
                     self.total_number_segments,
                 )
-            ] = _ecce_standard_deviation_per_segment(
+            ] = std_func(
                 predicted_scores=self.df[self.score_column].values,
                 labels=self.df[self.label_column].values,
                 sample_weight=(
@@ -1611,7 +1715,12 @@ class MulticalibrationError(
     def _global_ecce_std(self) -> float:
         if "_segments_ecce_std" in self.__dict__:
             return self._segments_ecce_std[0]
-        std = _ecce_standard_deviation_per_segment(
+        std_func = (
+            _ecce_regression_standard_deviation_per_segment
+            if self.outcome_type == "regression"
+            else _ecce_standard_deviation_per_segment
+        )
+        std = std_func(
             predicted_scores=self.df[self.score_column].values,
             labels=self.df[self.label_column].values,
             sample_weight=(
@@ -1663,12 +1772,22 @@ class MulticalibrationError(
 
         :return: MCE as percentage of prevalence.
         """
+        if self.outcome_type == "regression":
+            raise NotImplementedError(
+                "Relative scale is not available for regression outcomes. "
+                "Use mce (absolute) or mce_sigma (sigma) instead."
+            )
         # Compute directly to avoid recursion with transition override
         mce_abs = self.mce_sigma * self._global_ecce_std
         return mce_abs / self._prevalence * 100
 
     @functools.cached_property
     def _prevalence(self) -> float:
+        if self.outcome_type == "regression":
+            raise NotImplementedError(
+                "Prevalence is not defined for regression outcomes. "
+                "Use absolute or sigma scale metrics instead of relative scale."
+            )
         p = (
             (self.df[self.label_column] * self.df[self.weight_column]).sum()
             / (self.df[self.weight_column].sum())
@@ -1723,6 +1842,11 @@ class MulticalibrationError(
 
         :return: MDE as percentage of prevalence.
         """
+        if self.outcome_type == "regression":
+            raise NotImplementedError(
+                "Relative scale is not available for regression outcomes. "
+                "Use mde (absolute) instead."
+            )
         return 5 * self._global_ecce_std / self._prevalence * 100
 
 
@@ -1778,6 +1902,7 @@ def wrap_multicalibration_error_metric(
     min_samples_per_segment: int = DEFAULT_MCE_MIN_SAMPLES_PER_SEGMENT,
     max_n_segments: int | None = DEFAULT_MCE_N_SEGMENTS,
     metric_version: str = "mce_relative",
+    outcome_type: str = "classification",
 ) -> _ScoreFunctionInterface:
     """
     Create a wrapped MulticalibrationError metric for use with the evaluation framework.
@@ -1789,7 +1914,8 @@ def wrap_multicalibration_error_metric(
     :param min_samples_per_segment: Minimum samples required per segment.
     :param max_n_segments: Maximum number of segments to generate.
     :param metric_version: Which metric to return. Options:
-        - 'mce_relative': relative (prevalence-adjusted percentage) scale (default)
+        - 'mce_relative': relative (prevalence-adjusted percentage) scale (default,
+          classification only)
         - 'mce': absolute scale
         - 'mce_sigma': sigma (z-score) scale
         - 'mce_pvalue': p-value
@@ -1797,6 +1923,8 @@ def wrap_multicalibration_error_metric(
         - 'mce_sigma_scale' -> 'mce_sigma'
         - 'mce_absolute' -> 'mce'
         - 'p_value' -> 'mce_pvalue'
+    :param outcome_type: Type of outcome variable. Options: 'classification' (default)
+        or 'regression'. When 'regression', 'mce_relative' is not available.
     :return: A ScoreFunctionInterface-compatible wrapper.
     """
     if categorical_segment_columns is None and numerical_segment_columns is None:
@@ -1827,6 +1955,12 @@ def wrap_multicalibration_error_metric(
             f"Got `{metric_version}`."
         )
 
+    if outcome_type == "regression" and metric_version == "mce_relative":
+        raise ValueError(
+            "metric_version='mce_relative' is not available for regression outcomes. "
+            "Use 'mce', 'mce_sigma', or 'mce_pvalue' instead."
+        )
+
     class WrappedFuncMCE(_ScoreFunctionInterface):
         name = f"Multicalibration Error<br>({metric_version})"
 
@@ -1838,6 +1972,7 @@ def wrap_multicalibration_error_metric(
             max_values_per_segment_feature: int = DEFAULT_MCE_MAX_VALUES_PER_SEGMENT_FEATURE,
             min_samples_per_segment: int = DEFAULT_MCE_MIN_SAMPLES_PER_SEGMENT,
             max_n_segments: int | None = DEFAULT_MCE_N_SEGMENTS,
+            outcome_type: str = "classification",
         ):
             self.categorical_segment_columns = categorical_segment_columns
             self.numerical_segment_columns = numerical_segment_columns
@@ -1845,6 +1980,7 @@ def wrap_multicalibration_error_metric(
             self.max_values_per_segment_feature = max_values_per_segment_feature
             self.min_samples_per_segment = min_samples_per_segment
             self.max_n_segments = max_n_segments
+            self.outcome_type = outcome_type
 
         def __call__(
             self,
@@ -1864,6 +2000,7 @@ def wrap_multicalibration_error_metric(
                 max_values_per_segment_feature=self.max_values_per_segment_feature,
                 min_samples_per_segment=self.min_samples_per_segment,
                 max_n_segments=self.max_n_segments,
+                outcome_type=self.outcome_type,
             )
             return getattr(mce, metric_version)
 
@@ -1874,4 +2011,5 @@ def wrap_multicalibration_error_metric(
         max_values_per_segment_feature,
         min_samples_per_segment,
         max_n_segments,
+        outcome_type,
     )

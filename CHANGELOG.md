@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Regression support in `MulticalibrationError` — new `outcome_type="regression"` parameter uses successive-differences variance estimation (equation 6, appendix C from the [MCE paper](https://arxiv.org/abs/2506.11251)) instead of Bernoulli variance (#218)
 - Regression support in `tune_mcgrad_params` — now accepts `RegressionMCGrad` models, uses the model's `early_stopping_score_func` instead of hardcoded `normalized_entropy` (#213)
 
 ## [0.1.3] - 2026-02-11
