@@ -119,6 +119,7 @@ def tune_mcgrad_params(
     pass_df_val_into_tuning: bool = False,
     pass_df_val_into_final_fit: bool = False,
     use_model_predictions: bool = False,
+    # @oss-disable[end= ]: _telemetry_overrides: dict[str, Any] | None = None,
 ) -> tuple[methods._BaseMCGrad | None, pd.DataFrame]:
     """
     Tune the hyperparameters of an MCGrad model using Ax.
@@ -324,10 +325,12 @@ def tune_mcgrad_params(
         numerical_feature_column_names=numerical_feature_column_names,
         weight_column_name=weight_column_name,
         df_val=df_final_val,
+        # @oss-disable[end= ]: _telemetry_overrides=_telemetry_overrides,
     )
 
     return model, trial_results
 
 
 # @oss-disable: # Alias for backward compatibility and internal use.
+# @oss-disable: # pyre-ignore[5] ignoring because this is a direct alias,
 # @oss-disable[end= ]: tune_mcboost_params = tune_mcgrad_params
