@@ -1331,6 +1331,230 @@ def test_predict_before_fit_with_numerical_features_raises(calibrator_class):
         methods.RegressionMCGrad,
     ],
 )
+def test_predict_with_different_features_than_fit_raises(calibrator_class, rng):
+    df = pd.DataFrame(
+        {
+            "prediction": rng.rand(30),
+            "label": rng.randint(0, 2, 30),
+            "cat_a": rng.choice(["x", "y"], 30),
+            "cat_b": rng.choice(["p", "q"], 30),
+        }
+    )
+    model = calibrator_class(
+        num_rounds=1,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+    model.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["cat_a"],
+    )
+    with pytest.raises(ValueError, match="Feature mismatch"):
+        model.predict(
+            df=df,
+            prediction_column_name="prediction",
+            categorical_feature_column_names=["cat_b"],
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCGrad,
+        methods.RegressionMCGrad,
+    ],
+)
+def test_predict_with_extra_features_not_in_fit_raises(calibrator_class, rng):
+    df = pd.DataFrame(
+        {
+            "prediction": rng.rand(30),
+            "label": rng.randint(0, 2, 30),
+            "cat_a": rng.choice(["x", "y"], 30),
+        }
+    )
+    model = calibrator_class(
+        num_rounds=1,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+    model.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+    )
+    with pytest.raises(ValueError, match="Feature mismatch"):
+        model.predict(
+            df=df,
+            prediction_column_name="prediction",
+            categorical_feature_column_names=["cat_a"],
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCGrad,
+        methods.RegressionMCGrad,
+    ],
+)
+def test_predict_with_swapped_feature_order_raises(calibrator_class, rng):
+    df = pd.DataFrame(
+        {
+            "prediction": rng.rand(30),
+            "label": rng.randint(0, 2, 30),
+            "cat_a": rng.choice(["x", "y"], 30),
+            "cat_b": rng.choice(["p", "q"], 30),
+        }
+    )
+    model = calibrator_class(
+        num_rounds=1,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+    model.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["cat_a", "cat_b"],
+    )
+    with pytest.raises(ValueError, match="Feature mismatch"):
+        model.predict(
+            df=df,
+            prediction_column_name="prediction",
+            categorical_feature_column_names=["cat_b", "cat_a"],
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCGrad,
+        methods.RegressionMCGrad,
+    ],
+)
+def test_feature_consistency_preserved_after_serialize_deserialize(
+    calibrator_class, rng
+):
+    df = pd.DataFrame(
+        {
+            "prediction": rng.rand(30),
+            "label": rng.randint(0, 2, 30),
+            "cat_a": rng.choice(["x", "y"], 30),
+        }
+    )
+    model = calibrator_class(
+        num_rounds=1,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+    model.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["cat_a"],
+    )
+    restored = calibrator_class.deserialize(model.serialize())
+    with pytest.raises(ValueError, match="Feature mismatch"):
+        restored.predict(
+            df=df,
+            prediction_column_name="prediction",
+            numerical_feature_column_names=["cat_a"],
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCGrad,
+        methods.RegressionMCGrad,
+    ],
+)
+def test_predict_with_matching_features_succeeds(calibrator_class, rng):
+    df = pd.DataFrame(
+        {
+            "prediction": rng.rand(30),
+            "label": rng.randint(0, 2, 30),
+            "cat_a": rng.choice(["x", "y"], 30),
+            "num_a": rng.rand(30),
+        }
+    )
+    model = calibrator_class(
+        num_rounds=1,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+    model.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["cat_a"],
+        numerical_feature_column_names=["num_a"],
+    )
+    result = model.predict(
+        df=df,
+        prediction_column_name="prediction",
+        categorical_feature_column_names=["cat_a"],
+        numerical_feature_column_names=["num_a"],
+    )
+    assert result.shape == (30,)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCGrad,
+        methods.RegressionMCGrad,
+    ],
+)
+def test_feature_consistency_skipped_for_legacy_serialized_models(
+    calibrator_class, rng
+):
+    df = pd.DataFrame(
+        {
+            "prediction": rng.rand(30),
+            "label": rng.randint(0, 2, 30),
+            "cat_a": rng.choice(["x", "y"], 30),
+        }
+    )
+    model = calibrator_class(
+        num_rounds=1,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+    model.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["cat_a"],
+    )
+    # Simulate a legacy serialized model without feature names
+    import json
+
+    json_obj = json.loads(model.serialize())
+    json_obj.pop("categorical_feature_names", None)
+    json_obj.pop("numerical_feature_names", None)
+    legacy_model = calibrator_class.deserialize(json.dumps(json_obj))
+
+    # Should not raise the feature mismatch error, since check is skipped
+    assert legacy_model.categorical_feature_names is None
+    assert legacy_model.numerical_feature_names is None
+    result = legacy_model.predict(
+        df=df,
+        prediction_column_name="prediction",
+        categorical_feature_column_names=["cat_a"],
+    )
+    assert result.shape == (30,)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCGrad,
+        methods.RegressionMCGrad,
+    ],
+)
 def test_mcgrad_feature_importance_returns_correct_dataframe(calibrator_class, rng):
     df_train = pd.DataFrame(
         {
@@ -1917,10 +2141,18 @@ def test_mcgrad_predict_with_num_rounds_0(calibrator_class, rng):
         numerical_feature_column_names=["feature2"],
     )
     predictions_all_rounds = mcgrad.predict(
-        df_train, "prediction", return_all_rounds=True
+        df_train,
+        "prediction",
+        categorical_feature_column_names=["feature1"],
+        numerical_feature_column_names=["feature2"],
+        return_all_rounds=True,
     )
     predictions_final_round = mcgrad.predict(
-        df_train, "prediction", return_all_rounds=False
+        df_train,
+        "prediction",
+        categorical_feature_column_names=["feature1"],
+        numerical_feature_column_names=["feature2"],
+        return_all_rounds=False,
     )
 
     # Check that the predictions are the same as the original prediction column in both cases
