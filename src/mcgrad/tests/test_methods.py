@@ -1291,6 +1291,46 @@ def test_mcgrad_extract_features_raises_when_encoder_not_fit(calibrator_class):
         methods.RegressionMCGrad,
     ],
 )
+def test_predict_before_fit_with_categorical_features_raises(calibrator_class):
+    model = calibrator_class()
+    df = pd.DataFrame(
+        {"prediction": [0.5, 0.6], "cat_feature": ["A", "B"]},
+    )
+    with pytest.raises(ValueError, match="predict.*before fit"):
+        model.predict(
+            df=df,
+            prediction_column_name="prediction",
+            categorical_feature_column_names=["cat_feature"],
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCGrad,
+        methods.RegressionMCGrad,
+    ],
+)
+def test_predict_before_fit_with_numerical_features_raises(calibrator_class):
+    model = calibrator_class()
+    df = pd.DataFrame(
+        {"prediction": [0.5, 0.6], "num_feature": [1.0, 2.0]},
+    )
+    with pytest.raises(ValueError, match="predict.*before fit"):
+        model.predict(
+            df=df,
+            prediction_column_name="prediction",
+            numerical_feature_column_names=["num_feature"],
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCGrad,
+        methods.RegressionMCGrad,
+    ],
+)
 def test_mcgrad_feature_importance_returns_correct_dataframe(calibrator_class, rng):
     df_train = pd.DataFrame(
         {

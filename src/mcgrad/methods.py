@@ -354,6 +354,7 @@ class _BaseMCGrad(
         self.mr: list[lgb.Booster] = []
         self.unshrink_factors: list[float] = []
         self.enc: utils.OrdinalEncoderWithUnknownSupport | None = None
+        self._is_fitted: bool = False
 
         self.save_training_performance = save_training_performance
         self._performance_metrics: Dict[str, list[float]] = defaultdict(list)
@@ -467,6 +468,7 @@ class _BaseMCGrad(
         self.enc: utils.OrdinalEncoderWithUnknownSupport | None = None
         self.categorical_feature_names = None
         self.numerical_feature_names = None
+        self._is_fitted: bool = False
 
     @property
     def _mce_is_satisfactory(self) -> bool | None:
@@ -699,6 +701,7 @@ class _BaseMCGrad(
             # @oss-disable[end= ]: overrides = kwargs.pop("_telemetry_overrides", None)
             # @oss-disable[end= ]: log_usage(self, overrides)
 
+        self._is_fitted = True
         return self
 
     def _fit_single_round(
@@ -816,6 +819,12 @@ class _BaseMCGrad(
         :param kwargs: Additional keyword arguments
         :return: Array of calibrated predictions. Shape depends on return_all_rounds parameter
         """
+        if not self._is_fitted:
+            raise ValueError(
+                f"predict() was called on {self.__class__.__name__} object before fit(). "
+                "It needs to be fit first."
+            )
+
         preprocessed_data = self._preprocess_input_data(
             df=df,
             prediction_column_name=prediction_column_name,
@@ -1251,6 +1260,7 @@ class _BaseMCGrad(
                 json_obj["encoder"]
             )
 
+        model._is_fitted = True
         return model
 
     def _compute_effective_sample_size(self, weights: npt.NDArray) -> int:
