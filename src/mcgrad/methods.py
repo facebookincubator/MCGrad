@@ -525,6 +525,36 @@ class _BaseMCGrad(
             numerical_feature_column_names or [],
         )
 
+    def _check_feature_consistency(
+        self,
+        categorical_feature_column_names: list[str],
+        numerical_feature_column_names: list[str],
+    ) -> None:
+        # Models serialized before feature name tracking was added will have
+        # both attributes set to None after deserialization; skip the check
+        # for backward compatibility.
+        if (
+            self.categorical_feature_names is None
+            and self.numerical_feature_names is None
+        ):
+            return
+        if (
+            categorical_feature_column_names != self.categorical_feature_names
+            or numerical_feature_column_names != self.numerical_feature_names
+        ):
+            raise ValueError(
+                f"Feature mismatch between fit() and predict(). "
+                f"fit() was called with categorical_feature_column_names="
+                f"{self.categorical_feature_names} and "
+                f"numerical_feature_column_names="
+                f"{self.numerical_feature_names}, but predict() received "
+                f"categorical_feature_column_names="
+                f"{categorical_feature_column_names} and "
+                f"numerical_feature_column_names="
+                f"{numerical_feature_column_names}. "
+                f"Note that the order of feature names has to be the same in both calls."
+            )
+
     def _preprocess_input_data(
         self,
         df: pd.DataFrame,
@@ -625,7 +655,6 @@ class _BaseMCGrad(
 
         self._reset_training_state()
 
-        # Store feature names to be used in feature importance later
         self.categorical_feature_names = categorical_feature_column_names or []
         self.numerical_feature_names = numerical_feature_column_names or []
 
@@ -824,6 +853,11 @@ class _BaseMCGrad(
                 f"predict() was called on {self.__class__.__name__} object before fit(). "
                 "It needs to be fit first."
             )
+
+        self._check_feature_consistency(
+            categorical_feature_column_names or [],
+            numerical_feature_column_names or [],
+        )
 
         preprocessed_data = self._preprocess_input_data(
             df=df,
@@ -1227,6 +1261,8 @@ class _BaseMCGrad(
         json_obj["has_encoder"] = self.encode_categorical_variables
         if hasattr(self, "enc") and self.enc is not None:
             json_obj["encoder"] = self.enc.serialize()
+        json_obj["categorical_feature_names"] = self.categorical_feature_names
+        json_obj["numerical_feature_names"] = self.numerical_feature_names
         return json.dumps(json_obj)
 
     @classmethod
@@ -1261,6 +1297,8 @@ class _BaseMCGrad(
             )
 
         model._is_fitted = True
+        model.categorical_feature_names = json_obj.get("categorical_feature_names")
+        model.numerical_feature_names = json_obj.get("numerical_feature_names")
         return model
 
     def _compute_effective_sample_size(self, weights: npt.NDArray) -> int:
