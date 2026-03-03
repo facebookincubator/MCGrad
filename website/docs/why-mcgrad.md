@@ -32,7 +32,11 @@ MCGrad is a scalable multicalibration algorithm that overcomes these barriers:
 
 ### When Should You Use MCGrad?
 
-Traditional calibration methods like *Isotonic Regression*, *Platt Scaling*, or *Temperature Scaling* work well for global calibration—but they fail to maintain calibration across specific segments of your data.
+Traditional calibration methods like *Isotonic Regression*, *Platt Scaling*, or *Temperature Scaling* work well for global calibration—but they fall short in important ways:
+
+- **No segment awareness**: These methods only see a one-dimensional score. They cannot detect or correct miscalibration within segments defined by features like country, device type, or content type. Even a perfectly globally calibrated model can be severely miscalibrated for specific subpopulations.
+- **Ranking degradation**: Isotonic Regression is a monotonic transformation of the score, which means it cannot change the ranking order—but in practice it can harm ranking metrics like PRAUC. MCGrad, by contrast, almost always improves PRAUC because it learns a richer correction that leverages feature information.
+- **No safety guarantees**: Traditional methods can overfit or harm model performance. MCGrad is a likelihood-improving procedure with early stopping, ensuring it does not degrade the base model.
 
 Use MCGrad when:
 
@@ -42,6 +46,7 @@ Use MCGrad when:
 - You want to *improve overall performance*—multicalibration often improves log-loss and PRAUC.
 - Predictions feed into *downstream optimization* (e.g., matching, ranking, auctions)—even unbiased predictors can lead to [poor decisions without multicalibration](https://arxiv.org/abs/2511.11413).
 - You need *robustness to distribution shifts*—multicalibrated models generalize better ([Kim et al., 2022](https://www.pnas.org/doi/10.1073/pnas.2108097119); [Wu et al., 2024](https://proceedings.neurips.cc/paper_files/paper/2024/hash/859b6564b04959833fdf52ae6f726f84-Abstract-Conference.html)).
+- You care about *fairness and responsible AI*—multicalibration ensures predictions are equally reliable across demographic and interest segments, preventing systematic over- or under-estimation for specific groups.
 
 
 ### Results at Scale

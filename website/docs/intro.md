@@ -59,6 +59,8 @@ calibrated_predictions = mcgrad.predict(
 
 The result: predictions calibrated globally AND for virtually any segment defined by your features.
 
+MCGrad doesn't just improve calibration: it typically also improves predictive performance metrics like log-loss and PRAUC. Unlike Isotonic Regression, which can harm ranking metrics, MCGrad is a likelihood-improving procedure that preserves or improves overall model quality. See [Why MCGrad?](why-mcgrad.md) for details.
+
 ## Get Started
 
 - [Why MCGrad?](why-mcgrad.md) — Learn about the challenges MCGrad solves and see results.
