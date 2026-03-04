@@ -83,4 +83,4 @@ mcgrad.fit(
 ### Next Steps
 
 - [Quick Start](quickstart.md) — Start using MCGrad.
-- [API Reference](api/methods.md) — Explore the API.
+- [API Reference](https://mcgrad.readthedocs.io/) — Explore the API.
