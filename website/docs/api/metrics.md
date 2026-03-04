@@ -28,7 +28,7 @@ mce = MulticalibrationError(
     numerical_segment_columns=['numeric_feature']
 )
 
-print(f"MCE: {mce.mce}%")
+print(f"MCE: {mce.mce}")
 print(f"P-value: {mce.mce_pvalue}")
 print(f"Sigma scale: {mce.mce_sigma}")
 ```
