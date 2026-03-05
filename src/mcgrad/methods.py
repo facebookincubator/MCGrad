@@ -1647,8 +1647,8 @@ class RegressionMCGrad(_BaseMCGrad):
             )
         if np.isinf(labels).any():
             raise ValueError(
-                f"{self.__class__.__name__} does not support infinite values in the prediction column, but {np.sum(np.isinf(labels))}"
-                f" of {len(labels)} are null."
+                f"{self.__class__.__name__} does not support infinite values in the label column, but {np.sum(np.isinf(labels))}"
+                f" of {len(labels)} are infinite."
             )
         if labels.nunique() < 2:
             raise ValueError(
