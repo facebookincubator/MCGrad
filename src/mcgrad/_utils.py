@@ -56,9 +56,22 @@ def logistic(logits: float) -> float:
         return math.exp(logits) / (1.0 + math.exp(logits))
 
 
-logistic_vectorized: Callable[[npt.NDArray[Any]], npt.NDArray[Any]] = np.vectorize(
-    logistic
-)
+def logistic_vectorized(logits: npt.NDArray[Any]) -> npt.NDArray[Any]:
+    """
+    Compute the logistic (sigmoid) function element-wise on an array in a
+    numerically stable way using native NumPy operations.
+
+    Uses ``np.where`` to select the appropriate formulation based on the sign
+    of each element, avoiding overflow/underflow without a Python-level loop.
+
+    :param logits: Array of input values in log-odds space.
+    :return: Array of probability values in (0, 1).
+    """
+    return np.where(
+        logits >= 0,
+        1.0 / (1.0 + np.exp(-logits)),
+        np.exp(logits) / (1.0 + np.exp(logits)),
+    )
 
 
 def logit(
