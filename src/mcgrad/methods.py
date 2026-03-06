@@ -1025,6 +1025,18 @@ class _BaseMCGrad(
 
         best_score = -np.inf
 
+        (
+            fold_splits,
+            fold_data_train,
+            fold_data_valid,
+            valid_metric_dfs,
+            train_metric_dfs,
+        ) = self._precompute_fold_data(
+            train_test_splitter,
+            data_train,
+            data_val,
+        )
+
         start_time = time.time()
 
         while num_rounds <= self.num_rounds and patience_counter <= self.patience:
@@ -1051,12 +1063,9 @@ class _BaseMCGrad(
                 dtype=float,
             )
 
-            fold_num = 0
-            for train_index, valid_index in train_test_splitter.split(
-                data_train.features, data_train.labels
-            ):
-                data_train_cv = data_train[train_index]
-                data_valid_cv = data_val or data_train[valid_index]
+            for fold_num in range(len(fold_splits)):
+                data_train_cv = fold_data_train[fold_num]
+                data_valid_cv = fold_data_valid[fold_num]
 
                 if num_rounds == 0:
                     train_fold_preds = self._inverse_transform_predictions(
@@ -1101,27 +1110,35 @@ class _BaseMCGrad(
                         return_all_rounds=False,
                     )
 
+                # Reuse pre-built DataFrames — only update the prediction column
+                valid_metric_dfs[fold_num]["prediction"] = valid_fold_preds
+                if self.save_training_performance:
+                    train_metric_dfs[fold_num]["prediction"] = (
+                        train_fold_preds  # pyre-ignore[61]: train_fold_preds is not None whenever self.save_training_performance is True
+                    )
+
                 for metric_idx, monitored_metric in enumerate(
                     self.monitored_metrics_during_training
                 ):
                     valid_monitored_metrics_per_round[metric_idx, fold_num] = (
-                        self._compute_metric_on_internal_data(
-                            monitored_metric,
-                            data_valid_cv,
-                            valid_fold_preds,
+                        monitored_metric(
+                            df=valid_metric_dfs[fold_num],
+                            label_column="label",
+                            score_column="prediction",
+                            weight_column="weight",
                         )
                     )
                     if self.save_training_performance:
                         train_monitored_metrics_per_round[metric_idx, fold_num] = (
-                            self._compute_metric_on_internal_data(
-                                monitored_metric,
-                                data_train_cv,
-                                train_fold_preds,  # pyre-ignore[61]: train_fold_preds is not None whenever self.save_training_performance is True
+                            monitored_metric(
+                                df=train_metric_dfs[fold_num],
+                                label_column="label",
+                                score_column="prediction",
+                                weight_column="weight",
                             )
                         )
 
                 logger.debug(f"Evaluated on fold {fold_num}")
-                fold_num += 1
 
             valid_mean_scores = np.mean(valid_monitored_metrics_per_round, axis=1)
             train_mean_scores = np.mean(train_monitored_metrics_per_round, axis=1)
@@ -1205,14 +1222,70 @@ class _BaseMCGrad(
 
         return best_num_rounds
 
-    def _compute_metric_on_internal_data(
+    def _precompute_fold_data(
         self,
-        metric: _ScoreFunctionInterface,
-        data: _MCGradProcessedData,
-        predictions: npt.NDArray,
-    ) -> float:
+        train_test_splitter: (
+            KFold
+            | StratifiedKFold
+            | utils.TrainTestSplitWrapper
+            | utils.NoopSplitterWrapper
+        ),
+        data_train: _MCGradProcessedData,
+        data_val: _MCGradProcessedData | None,
+    ) -> tuple[
+        list[tuple[npt.NDArray, npt.NDArray]],
+        list[_MCGradProcessedData],
+        list[_MCGradProcessedData],
+        list[pd.DataFrame],
+        list[pd.DataFrame],
+    ]:
+        """Pre-compute fold splits and build base DataFrames for metric evaluation.
+
+        Constructs reusable per-fold data splits and metric DataFrames so that
+        the early-stopping loop can update only the prediction column instead of
+        rebuilding DataFrames on every round x fold x metric evaluation.
+
+        :param train_test_splitter: Splitter that yields train/validation index
+            pairs.
+        :param data_train: The processed training data.
+        :param data_val: Optional dedicated validation data. When provided, it
+            is used for every fold instead of the split-off validation portion.
+        :returns: A tuple of ``(fold_splits, fold_data_train, fold_data_valid,
+            valid_metric_dfs, train_metric_dfs)``.
         """
-        Compatibility wrapper for MCGradProcessedData -> ScoreFunctionInterface.
+        assert data_train.labels is not None
+        fold_splits = list(
+            train_test_splitter.split(data_train.features, data_train.labels)
+        )
+        fold_data_train: list[_MCGradProcessedData] = []
+        fold_data_valid: list[_MCGradProcessedData] = []
+        valid_metric_dfs: list[pd.DataFrame] = []
+        train_metric_dfs: list[pd.DataFrame] = []
+        for train_index, valid_index in fold_splits:
+            dtcv = data_train[train_index]
+            dvcv = data_val or data_train[valid_index]
+            fold_data_train.append(dtcv)
+            fold_data_valid.append(dvcv)
+            valid_metric_dfs.append(self._build_metric_dataframe(dvcv))
+            if self.save_training_performance:
+                train_metric_dfs.append(self._build_metric_dataframe(dtcv))
+        return (
+            fold_splits,
+            fold_data_train,
+            fold_data_valid,
+            valid_metric_dfs,
+            train_metric_dfs,
+        )
+
+    @staticmethod
+    def _build_metric_dataframe(
+        data: _MCGradProcessedData,
+    ) -> pd.DataFrame:
+        """Build a DataFrame from internal data for metric evaluation.
+
+        Constructs a DataFrame containing features, labels, and weights.
+        The ``prediction`` column is left unset and should be assigned by the
+        caller before passing the DataFrame to a metric function.
         """
         feature_columns = data.categorical_feature_names + data.numerical_feature_names
         df = pd.DataFrame(
@@ -1220,14 +1293,8 @@ class _BaseMCGrad(
             columns=feature_columns,
         )
         df["label"] = data.labels
-        df["prediction"] = predictions
         df["weight"] = data.weights
-        return metric(
-            df=df,
-            label_column="label",
-            score_column="prediction",
-            weight_column="weight",
-        )
+        return df
 
     def _get_elapsed_time(self, start_time: float) -> int:
         """
