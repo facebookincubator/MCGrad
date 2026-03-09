@@ -39,7 +39,11 @@ from typing_extensions import Self
 
 from . import _utils as utils
 from .base import BaseCalibrator
-from .metrics import _ScoreFunctionInterface, wrap_sklearn_metric_func
+from .metrics import (
+    _ScoreFunctionInterface,
+    soft_label_log_loss,
+    wrap_sklearn_metric_func,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -958,35 +962,40 @@ class _BaseMCGrad(
         x = np.concatenate((cat_features, num_features), axis=1)
         return x
 
-    def _determine_train_test_splitter(
-        self,
-        estimation_method: _EstimationMethod,
-        has_custom_validation_set: bool,
-    ) -> (
-        KFold
-        | StratifiedKFold
-        | utils.TrainTestSplitWrapper
-        | utils.NoopSplitterWrapper
-    ):
-        if estimation_method == _EstimationMethod.CROSS_VALIDATION:
-            if has_custom_validation_set:
-                raise ValueError(
-                    "Custom validation set was provided while cross validation was enabled for early stopping. Please set early_stopping_use_crossvalidation to False or remove df_val."
-                )
+  def _determine_train_test_splitter(
+      self,
+      estimation_method: _EstimationMethod,
+      has_custom_validation_set: bool,
+      labels: npt.NDArray | None = None,
+  ) -> KFold | StratifiedKFold | utils.TrainTestSplitWrapper | utils.NoopSplitterWrapper:
+      labels_are_binary = labels is None or np.isin(labels, [0, 1]).all()
 
-            logger.info("Running early stopping using Cross Validation.")
-            train_test_splitter = self._cv_splitter
-        else:
-            if not has_custom_validation_set:
-                logger.info(
-                    f"Running early stopping using holdout set of size {self.VALID_SIZE}."
-                )
-                train_test_splitter = self._holdout_splitter
-            else:
-                logger.info("Running early stopping using provided validation set.")
-                train_test_splitter = self._noop_splitter
+      if estimation_method == _EstimationMethod.CROSS_VALIDATION and has_custom_validation_set:
+          raise ValueError(
+              "Custom validation set was provided while cross validation was enabled "
+              "for early stopping. Please set early_stopping_use_crossvalidation to "
+              "False or remove df_val."
+          )
 
-        return train_test_splitter
+      if has_custom_validation_set:
+          logger.info("Running early stopping using provided validation set.")
+          return self._noop_splitter
+
+      if estimation_method == _EstimationMethod.CROSS_VALIDATION:
+          logger.info("Running early stopping using Cross Validation.")
+          if labels_are_binary:
+              return self._cv_splitter
+          return KFold(
+              n_splits=self.n_folds, shuffle=True, random_state=self._next_seed(),
+          )
+
+      logger.info(f"Running early stopping using holdout set of size {self.VALID_SIZE}.")
+      if labels_are_binary:
+          return self._holdout_splitter
+      return utils.TrainTestSplitWrapper(
+          test_size=self.VALID_SIZE, shuffle=True,
+          random_state=self._next_seed(), stratify=False,
+      )
 
     def _determine_n_folds(
         self,
@@ -1012,6 +1021,7 @@ class _BaseMCGrad(
         train_test_splitter = self._determine_train_test_splitter(
             estimation_method,
             data_val is not None,
+            labels=data_train.labels,
         )
         final_n_folds = self._determine_n_folds(estimation_method)
 
@@ -1512,7 +1522,7 @@ class MCGrad(_BaseMCGrad):
     def _default_early_stopping_metric(
         self,
     ) -> tuple[_ScoreFunctionInterface, bool]:
-        return wrap_sklearn_metric_func(skmetrics.log_loss), True
+        return wrap_sklearn_metric_func(soft_label_log_loss), True
 
     def _check_predictions(
         self, df_train: pd.DataFrame, prediction_column_name: str
@@ -1542,21 +1552,29 @@ class MCGrad(_BaseMCGrad):
             )
 
     def _check_labels(self, df_train: pd.DataFrame, label_column_name: str) -> None:
-        if df_train[label_column_name].isnull().any():
+        labels = df_train[label_column_name]
+        if labels.isnull().any():
             raise ValueError(
-                f"{self.__class__.__name__} does not support missing values in the label column, but {df_train[label_column_name].isnull().sum()}"
-                f" of {len(df_train[label_column_name])} are null."
+                f"{self.__class__.__name__} does not support missing values in the label column, but {labels.isnull().sum()}"
+                f" of {len(labels)} are null."
             )
-        unique_labels = list(df_train[label_column_name].unique())
-        labels_are_valid_int = df_train[label_column_name].isin([0, 1]).all()
-        labels_are_valid_bool = df_train[label_column_name].isin([True, False]).all()
-        if not (labels_are_valid_bool or labels_are_valid_int):
+        if not pd.api.types.is_numeric_dtype(labels) and not pd.api.types.is_bool_dtype(
+            labels
+        ):
             raise ValueError(
-                f"Labels in column `{label_column_name}` must be binary, either 0/1 or True/False. Got {unique_labels=}"
+                f"Labels in column `{label_column_name}` must be numeric (binary 0/1, boolean True/False, "
+                f"or float in [0, 1]). Got dtype {labels.dtype}."
             )
-        if not len(unique_labels) == 2:
+        numeric_labels = labels.astype(float)
+        if (numeric_labels < 0).any() or (numeric_labels > 1).any():
             raise ValueError(
-                f"Labels in column `{label_column_name}` must have at least 2 values but the data contains only 1: {unique_labels=}"
+                f"Labels in column `{label_column_name}` must be in the range [0, 1]. "
+                f"Found min={numeric_labels.min()}, max={numeric_labels.max()}."
+            )
+        if labels.nunique() < 2:
+            raise ValueError(
+                f"Labels in column `{label_column_name}` must have at least 2 unique values "
+                f"but the data contains only {labels.nunique()}: {list(labels.unique())}"
             )
 
     @property

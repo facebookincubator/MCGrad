@@ -17,6 +17,7 @@ from sklearn.model_selection import KFold, StratifiedKFold
 from .. import _utils as utils, methods
 from ..metrics import (
     _ScoreFunctionInterface,
+    soft_label_log_loss,
     wrap_multicalibration_error_metric,
     wrap_sklearn_metric_func,
 )
@@ -2542,12 +2543,17 @@ def test_cross_val_timeout_in_mcgrad(calibrator_class, rng):
         ## Valid cases
         (methods.MCGrad, [0, 1], True),
         (methods.MCGrad, [True, False], True),
+        ## Valid soft label cases
+        (methods.MCGrad, [0.0, 0.5, 1.0], True),
+        (methods.MCGrad, [0.1, 0.9], True),
+        (methods.MCGrad, [0.3, 0.7, 0.5], True),
         ## Invalid cases
         ### Only one unique label
         (methods.MCGrad, [0, 0], False),
         (methods.MCGrad, [1, 1], False),
         (methods.MCGrad, [True, True], False),
         (methods.MCGrad, [False, False], False),
+        (methods.MCGrad, [0.5, 0.5], False),
         ### Value > 1
         (methods.MCGrad, [0, 1.1], False),
         ### Value < 0
@@ -4242,3 +4248,222 @@ def test_compute_unshrink_factor_warns_when_not_close_to_1(caplog):
     # Result is ~2.8354, which is far from 1
     assert result > 1.05
     assert "Unshrink is not close to 1" in caplog.text
+
+
+def generate_soft_label_test_data(n, rng):
+    """Generate test data with soft labels (float confidence scores in [0, 1])."""
+    return pd.DataFrame(
+        {
+            "City": rng.choice(["Paris", "Tokyo", "Amsterdam"], size=n),
+            "Gender": rng.choice(["Male", "Female"], size=n),
+            "Prediction": rng.uniform(0.01, 0.99, size=n),
+            "Label": rng.uniform(0, 1, size=n),
+        }
+    )
+
+
+def test_soft_label_log_loss_matches_sklearn_for_binary_labels():
+    """soft_label_log_loss should match sklearn log_loss for hard binary labels."""
+    y_true = np.array([0, 1, 1, 0, 1])
+    y_pred = np.array([0.1, 0.9, 0.8, 0.2, 0.7])
+    expected = skmetrics.log_loss(y_true, y_pred)
+    result = soft_label_log_loss(y_true, y_pred)
+    np.testing.assert_almost_equal(result, expected, decimal=10)
+
+
+def test_soft_label_log_loss_with_sample_weight():
+    """soft_label_log_loss should handle sample weights correctly."""
+    y_true = np.array([0, 1, 1, 0, 1])
+    y_pred = np.array([0.1, 0.9, 0.8, 0.2, 0.7])
+    weights = np.array([1.0, 2.0, 1.0, 1.0, 2.0])
+    expected = skmetrics.log_loss(y_true, y_pred, sample_weight=weights)
+    result = soft_label_log_loss(y_true, y_pred, sample_weight=weights)
+    np.testing.assert_almost_equal(result, expected, decimal=10)
+
+
+def test_soft_label_log_loss_with_soft_labels():
+    """soft_label_log_loss should compute correct cross-entropy for soft labels."""
+    y_true = np.array([0.3, 0.7, 0.5])
+    y_pred = np.array([0.3, 0.7, 0.5])
+    # Perfect calibration: cross-entropy = -[y*log(y) + (1-y)*log(1-y)]
+    expected = -np.mean(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
+    result = soft_label_log_loss(y_true, y_pred)
+    np.testing.assert_almost_equal(result, expected, decimal=10)
+
+
+@pytest.mark.parametrize(
+    "calibrator_kwargs",
+    [
+        {
+            "num_rounds": 2,
+            "early_stopping": False,
+            "lightgbm_params": {"num_leaves": 2, "max_depth": 2, "n_estimators": 2},
+        },
+        {
+            "num_rounds": 2,
+            "early_stopping": True,
+            "early_stopping_use_crossvalidation": True,
+            "n_folds": 2,
+            "lightgbm_params": {"num_leaves": 2, "max_depth": 2, "n_estimators": 2},
+        },
+        {
+            "num_rounds": 2,
+            "early_stopping": True,
+            "early_stopping_use_crossvalidation": False,
+            "lightgbm_params": {"num_leaves": 2, "max_depth": 2, "n_estimators": 2},
+        },
+    ],
+)
+def test_mcgrad_fit_predict_with_soft_labels_yields_valid_predictions(
+    calibrator_kwargs,
+    rng,
+):
+    """MCGrad should fit and predict with float labels in [0, 1]."""
+    df_train = generate_soft_label_test_data(100, rng)
+    df_test = generate_soft_label_test_data(20, rng)
+
+    model = methods.MCGrad(**calibrator_kwargs)
+    model.fit(
+        df_train=df_train,
+        prediction_column_name="Prediction",
+        label_column_name="Label",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+
+    predictions = model.predict(
+        df=df_test,
+        prediction_column_name="Prediction",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+    assert predictions.shape == (len(df_test),)
+    # Calibrated predictions should be valid probabilities
+    assert np.all(predictions >= 0) and np.all(predictions <= 1)
+    assert not np.any(np.isnan(predictions))
+
+
+def test_mcgrad_soft_labels_serialize_deserialize_consistent_predictions(rng):
+    """MCGrad with soft labels should produce consistent results after serialization."""
+    df_train = generate_soft_label_test_data(50, rng)
+    df_test = generate_soft_label_test_data(10, rng)
+
+    model = methods.MCGrad(
+        num_rounds=2,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "max_depth": 2, "n_estimators": 2},
+    )
+    model.fit(
+        df_train=df_train,
+        prediction_column_name="Prediction",
+        label_column_name="Label",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+
+    original_predictions = model.predict(
+        df=df_test,
+        prediction_column_name="Prediction",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+
+    serialized = model.serialize()
+    deserialized = methods.MCGrad.deserialize(serialized)
+
+    deserialized_predictions = deserialized.predict(
+        df=df_test,
+        prediction_column_name="Prediction",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+
+    np.testing.assert_array_equal(original_predictions, deserialized_predictions)
+
+
+def test_mcgrad_soft_labels_does_not_raise_with_boundary_values():
+    """MCGrad should handle soft labels that include exact 0 and 1 values mixed with floats."""
+    df_train = pd.DataFrame(
+        {
+            "City": ["Paris", "Tokyo", "Amsterdam", "Paris", "Amsterdam"],
+            "Prediction": [0.1, 0.2, 0.3, 0.4, 0.5],
+            "Label": [0.0, 0.3, 0.5, 0.8, 1.0],
+        }
+    )
+
+    model = methods.MCGrad(
+        num_rounds=1,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "max_depth": 2, "n_estimators": 2},
+    )
+    model.fit(
+        df_train=df_train,
+        prediction_column_name="Prediction",
+        label_column_name="Label",
+        categorical_feature_column_names=["City"],
+    )
+
+    predictions = model.predict(
+        df=df_train,
+        prediction_column_name="Prediction",
+        categorical_feature_column_names=["City"],
+    )
+    assert predictions.shape == (len(df_train),)
+    assert np.all(predictions >= 0) and np.all(predictions <= 1)
+
+
+def test_mcgrad_compute_unshrink_factor_with_soft_labels_is_finite(rng):
+    """_compute_unshrink_factor should return a finite result with soft labels."""
+    n = 100
+    y_soft = rng.uniform(0, 1, size=n)
+    predictions = rng.normal(0, 1, size=n)
+
+    factor = methods.MCGrad._compute_unshrink_factor(y_soft, predictions, None)
+    # Factor should be a finite number
+    assert np.isfinite(factor)
+
+
+def test_mcgrad_compute_unshrink_factor_same_for_binary_labels(rng):
+    """Near-binary soft labels should produce approximately the same unshrink
+    coefficient as exact binary labels."""
+    n = 100
+    y_binary = rng.choice([0, 1], size=n).astype(float)
+    predictions = rng.normal(0, 1, size=n)
+
+    # Binary labels take the standard path (no expansion)
+    factor_standard = methods.MCGrad._compute_unshrink_factor(
+        y_binary, predictions, None
+    )
+
+    # Near-binary labels that trigger the soft-label expansion path.
+    # A tiny perturbation should yield essentially the same coefficient,
+    # confirming the expansion is equivalent for binary inputs.
+    y_near_binary = y_binary.copy()
+    y_near_binary[y_binary == 0] = 1e-10
+    y_near_binary[y_binary == 1] = 1 - 1e-10
+
+    factor_expanded = methods.MCGrad._compute_unshrink_factor(
+        y_near_binary, predictions, None
+    )
+
+    np.testing.assert_almost_equal(factor_standard, factor_expanded, decimal=3)
+
+
+def test_mcgrad_binary_labels_unchanged():
+    """Existing binary label behavior should be unaffected by soft label changes."""
+    df_train = generate_test_data(5)
+    model = methods.MCGrad(
+        num_rounds=2,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "max_depth": 2, "n_estimators": 2},
+    )
+    model.fit(
+        df_train=df_train,
+        prediction_column_name="Prediction",
+        label_column_name="Label",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+    assert len(model.mr) == 2
+
+    predictions = model.predict(
+        df=df_train,
+        prediction_column_name="Prediction",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+    assert predictions.shape == (5,)
+    assert np.all(predictions >= 0) and np.all(predictions <= 1)
