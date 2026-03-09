@@ -30,7 +30,7 @@ import lightgbm as lgb
 import numpy as np
 import pandas as pd
 from numpy import typing as npt
-from scipy.optimize._linesearch import LineSearchWarning
+from scipy.optimize import minimize_scalar
 from sklearn import isotonic, metrics as skmetrics
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.model_selection import KFold, StratifiedKFold
@@ -1462,93 +1462,51 @@ class MCGrad(_BaseMCGrad):
         y: npt.NDArray, predictions: npt.NDArray, w: npt.NDArray | None
     ) -> float:
         """
-        Compute an unshrinkage coefficient using logistic regression.
+        Compute an unshrinkage coefficient equivalent to logistic regression without intercept.
 
-        Fits a logistic regression model without intercept to find a scaling coefficient
-        that adjusts for shrinkage in the logits. Uses Newton-CG solver primarily, with
-        LBFGS as fallback if Newton-CG fails to converge.
+        Finds a scalar α that scales the input logits to best fit the observed
+        labels, adjusting for shrinkage introduced by earlier modelling stages.
+        This is mathematically equivalent to fitting a single-feature logistic
+        regression with no intercept on the logits.
 
-        :param y: Array of binary labels (0 or 1).
+        The implementation minimizes weighted cross-entropy directly via
+        :func:`scipy.optimize.minimize_scalar`, which also naturally supports
+        soft (continuous) labels in [0, 1] without special-casing.
+
+        :param y: Array of labels in [0, 1]. Can be binary (0/1) or soft (float).
         :param predictions: Array of logit values (log-odds) to unshrink.
         :param w: Optional array of sample weights. If None, uniform weights are used.
-        :return: The unshrinkage coefficient. Returns 1 if both solvers fail.
+        :return: The unshrinkage coefficient.
         """
         if w is None:
             w = np.ones_like(y)
-        logits = predictions.reshape(-1, 1)
 
         # Clip logits to avoid extreme coefficient driven by outliers
-        logits = np.clip(
-            logits, -MCGrad.UNSHRINK_LOGIT_EPSILON, MCGrad.UNSHRINK_LOGIT_EPSILON
+        logits: npt.NDArray = np.clip(
+            predictions, -MCGrad.UNSHRINK_LOGIT_EPSILON, MCGrad.UNSHRINK_LOGIT_EPSILON
         )
 
-        primary_solver = LogisticRegression(
-            C=np.inf, fit_intercept=False, solver="newton-cg"
-        )
-        with warnings.catch_warnings(record=True) as recorded_warnings:
-            warnings.simplefilter("always")
-            # Suppress sklearn 1.8+ UserWarning which is a known bug. Will be fixed in sklearn 1.8.1
-            # See: https://github.com/scikit-learn/scikit-learn/issues/32927
-            warnings.filterwarnings(
-                "ignore",
-                message="Setting penalty=None will ignore the C and l1_ratio parameters",
-                category=UserWarning,
+        def _loss(alpha: float) -> float:
+            ax = alpha * logits
+            # Numerically stable cross-entropy via log-sum-exp:
+            #   -log σ(z)   = log(1 + exp(-z)) = logaddexp(0, -z)
+            #   -log(1-σ(z)) = log(1 + exp(z))  = logaddexp(0,  z)
+            neg_log_sigma = np.logaddexp(0, -ax)
+            neg_log_1_minus_sigma = np.logaddexp(0, ax)
+            sample_loss = y * neg_log_sigma + (1 - y) * neg_log_1_minus_sigma
+            return float(np.average(sample_loss, weights=w))
+
+        result = minimize_scalar(_loss, bounds=(1e-8, 50), method="bounded")
+        alpha = float(result.x)
+
+        if alpha < 0.95 or alpha > 1.05:
+            logger.warning(
+                "Unshrink is not close to 1: %s. This may create a problem "
+                "with the multicalibration of the model.",
+                alpha,
             )
-            primary_solver.fit(logits, y, sample_weight=w)
-        for rec_warn in recorded_warnings:
-            if isinstance(rec_warn.message, LineSearchWarning):
-                logger.info(
-                    "Line search warning (unshrink): %s. Solution is approximately "
-                    "optimal - no ideal step size for the gradient descent update "
-                    "can be found. These warnings are generally harmless.",
-                    rec_warn.message,
-                )
-            else:
-                logger.debug(rec_warn)
-                warnings.warn_explicit(
-                    message=str(rec_warn.message),
-                    category=rec_warn.category,
-                    filename=rec_warn.filename,
-                    lineno=rec_warn.lineno,
-                    source=rec_warn.source,
-                )
 
-        # Return result if logistic regression with Newton-CG converged to a solution,
-        # if not try LBFGS.
-        # pyre-ignore, coef_ is available after `fit()` has been called
-        if not np.isnan(primary_solver.coef_).any():
-            if primary_solver.coef_[0][0] < 0.95 or primary_solver.coef_[0][0] > 1.05:
-                logger.warning(
-                    "Unshrink is not close to 1: %s. This may create a problem "
-                    "with the multicalibration of the model.",
-                    primary_solver.coef_[0][0],
-                )
-
-            return primary_solver.coef_[0][0]
-
-        fallback_solver = LogisticRegression(
-            C=np.inf, fit_intercept=False, solver="lbfgs"
-        )
-        # Suppress sklearn 1.8+ UserWarning which is a known bug. Will be fixed in sklearn 1.8.1
-        # See: https://github.com/scikit-learn/scikit-learn/issues/32927
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                message="Setting penalty=None will ignore the C and l1_ratio parameters",
-                category=UserWarning,
-            )
-            fallback_solver.fit(logits, y, sample_weight=w)
-        if not np.isnan(fallback_solver.coef_).any():
-            if fallback_solver.coef_[0][0] < 0.95 or fallback_solver.coef_[0][0] > 1.05:
-                logger.warning(
-                    "Unshrink is not close to 1: %s. This may create a problem "
-                    "with the multicalibration of the model.",
-                    fallback_solver.coef_[0][0],
-                )
-            return fallback_solver.coef_[0][0]
-
-        # If both solvers fail, return default value. Not disastrous, but requires GBDT to do more heavy-lifting.
-        return 1
+        return alpha
 
     @property
     def _objective(self) -> str:
