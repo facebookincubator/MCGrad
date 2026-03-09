@@ -789,9 +789,7 @@ def test_califree_ne_is_invariant_to_logit_shifts(logit_shift):
     # Hardcoded labels and predictions with equal sums
     labels = np.array([0, 1, 0, 1, 1, 0, 1, 0, 1, 0])
     predictions = np.array([0.1, 0.9, 0.1, 0.9, 0.9, 0.1, 0.9, 0.1, 0.9, 0.1])
-    shifted_predictions = utils.logistic_vectorized(
-        utils.logit(predictions) + logit_shift
-    )
+    shifted_predictions = utils.logistic(utils.logit(predictions) + logit_shift)
     # Calculate normalized entropy and calibration-free normalized entropy
     califree_ne_original = metrics.calibration_free_normalized_entropy(
         labels, predictions

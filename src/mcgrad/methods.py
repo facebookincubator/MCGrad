@@ -1454,7 +1454,8 @@ class MCGrad(_BaseMCGrad):
 
     @staticmethod
     def _inverse_transform_predictions(transformed: npt.NDArray) -> npt.NDArray:
-        return utils.logistic_vectorized(transformed)
+        # logistic() returns ndarray when given ndarray input
+        return utils.logistic(transformed)  # pyre-ignore[7]
 
     @staticmethod
     def _compute_unshrink_factor(
