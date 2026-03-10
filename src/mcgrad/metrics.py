@@ -1854,6 +1854,34 @@ class MulticalibrationError(
 # @oss-disable[end= ]: apply_mce_transition_overrides(MulticalibrationError)
 
 
+def soft_label_log_loss(
+    y_true: npt.NDArray,
+    y_pred: npt.NDArray,
+    sample_weight: npt.NDArray | None = None,
+) -> float:
+    """Binary cross-entropy loss that supports soft labels in [0, 1].
+
+    Equivalent to sklearn's ``log_loss`` for hard binary labels, but also
+    supports continuous labels (e.g. confidence scores) in the [0, 1] interval.
+
+    :param y_true: Ground truth labels, either binary {0, 1} or soft floats in [0, 1].
+    :param y_pred: Predicted probabilities in (0, 1).
+    :param sample_weight: Optional sample weights.
+    :return: Weighted mean cross-entropy loss.
+    """
+    eps = 1e-15
+    y_pred = np.clip(y_pred, eps, 1 - eps)
+    loss = -(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
+    if sample_weight is not None:
+        return float(np.average(loss, weights=sample_weight))
+    return float(np.mean(loss))
+
+
+# pyre-ignore[16]: Setting __name__ so wrap_sklearn_metric_func
+# identifies this metric as "log_loss" for early-stopping heuristics.
+soft_label_log_loss.__name__ = "log_loss"
+
+
 class _ScoreFunctionInterface(Protocol):
     name: str
 
