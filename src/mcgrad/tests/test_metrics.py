@@ -468,6 +468,53 @@ def test_fpr():
 
 
 @pytest.mark.parametrize(
+    "labels, scores, expected_j",
+    [
+        # Perfect separation: positives=1.0, negatives=0.0 -> 1.0
+        ([0, 1, 0, 1, 0, 1, 0, 1], [0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0], 1.0),
+        # Constant scores: all 0.5 -> 0.0
+        ([0, 1, 0, 1, 0, 1, 0, 1], [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], 0.0),
+        # Inverted: positives=0.0, negatives=1.0 -> -1.0
+        ([0, 1, 0, 1, 0, 1, 0, 1], [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0], -1.0),
+        # Partial: E[s|y=1]=(0.9+0.7)/2=0.8, E[s|y=0]=(0.2+0.3)/2=0.25 -> 0.55
+        ([0, 1, 0, 1], [0.2, 0.9, 0.3, 0.7], 0.55),
+        # Higher mean for positives: E[s|y=1]=0.7, E[s|y=0]=0.35 -> 0.35
+        ([0, 1, 0, 1, 0, 1, 0, 1], [0.1, 0.6, 0.3, 0.8, 0.5, 0.7, 0.5, 0.7], 0.35),
+        # Binary predictions still work: same as classical TPR-FPR
+        ([0, 1, 0, 1], [0, 1, 1, 1], 0.5),
+    ],
+)
+def test_youdens_j(labels, scores, expected_j):
+    result = metrics.youdens_j(np.array(labels), np.array(scores, dtype=float))
+    assert result == pytest.approx(expected_j)
+
+
+def test_youdens_j_with_sample_weight():
+    labels = np.array([0, 1, 0, 1])
+    scores = np.array([0.2, 0.9, 0.4, 0.7])
+    weights = np.array([1.0, 2.0, 3.0, 4.0])
+
+    # E[s|y=1] = (0.9*2 + 0.7*4) / (2+4) = (1.8 + 2.8) / 6 = 4.6/6
+    # E[s|y=0] = (0.2*1 + 0.4*3) / (1+3) = (0.2 + 1.2) / 4 = 1.4/4
+    # NDR = 4.6/6 - 1.4/4
+    expected = 4.6 / 6.0 - 1.4 / 4.0
+    result = metrics.youdens_j(labels, scores, sample_weight=weights)
+    assert result == pytest.approx(expected)
+
+
+def test_youdens_j_does_not_modify_inputs():
+    labels = np.array([0, 1, 0, 1, 0, 1])
+    scores = np.array([0.1, 0.9, 0.3, 0.8, 0.2, 0.7])
+    labels_copy = labels.copy()
+    scores_copy = scores.copy()
+
+    metrics.youdens_j(labels, scores)
+
+    np.testing.assert_array_equal(labels, labels_copy)
+    np.testing.assert_array_equal(scores, scores_copy)
+
+
+@pytest.mark.parametrize(
     "scores, labels, sample_weight, expected_result",
     [
         ([0.6, 0.8, 0.2, 0.4], [0, 1, 0, 1], None, 0.15),
