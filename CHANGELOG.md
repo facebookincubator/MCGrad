@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unified `logistic()` and `logistic_vectorized()` into a single `logistic()` function that handles both scalar and array inputs. The `logistic_vectorized` alias has been removed. Performance improvement of ~16x on large arrays by using native NumPy operations instead of `np.vectorize`.
 
 ### Added
+- `youdens_j` metric (Youden's J statistic / informedness) in the `metrics` module. Computes the continuous net detection rate as `E[scores | positive] - E[scores | negative]`, ranging from -1 to 1, with support for sample weights (#233)
 - Support for float calibration targets (soft labels) in `MCGrad`. Labels can now be continuous values in [0, 1] instead of only binary 0/1 or True/False. This enables calibrating to confidence-weighted labels that account for label uncertainty and quality.
 - `soft_label_log_loss` function in the `metrics` module for soft-label cross-entropy, used as the default early stopping metric in `MCGrad`.
 - Feature consistency check in `predict()` that validates feature names and order match those used during `fit()`. Previously, mismatched features produced confusing encoder errors or silently wrong predictions when feature order was swapped.

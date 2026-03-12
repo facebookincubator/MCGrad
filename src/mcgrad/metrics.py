@@ -338,6 +338,50 @@ def precision(
     )
 
 
+def youdens_j(
+    labels: npt.NDArray,
+    predicted_scores: npt.NDArray,
+    sample_weight: npt.NDArray | None = None,
+    **kwargs: Any,
+) -> float:
+    """
+    Calculate the continuous net detection rate (Youden's J).
+
+    Computes ``E[scores | positive label] - E[scores | negative label]``.
+    When the scores are binary predictions this reduces to the classical
+    ``TPR - FPR``.  The value ranges from -1 to 1, where 1 indicates perfect
+    separation, 0 indicates no discriminative ability, and negative values
+    indicate an inverted model.
+
+    :param labels: Array of true binary labels.
+    :param predicted_scores: Array of predicted scores (continuous or binary).
+    :param sample_weight: Optional array of sample weights.
+    :return: The continuous net detection rate.
+    """
+    labels = labels.astype(int)
+    if sample_weight is None:
+        sample_weight = np.ones_like(predicted_scores)
+
+    pos_mask = labels == 1
+    neg_mask = labels == 0
+
+    pos_weight = sample_weight[pos_mask].sum()
+    neg_weight = sample_weight[neg_mask].sum()
+
+    mean_score_pos = (
+        (predicted_scores[pos_mask] * sample_weight[pos_mask]).sum() / pos_weight
+        if pos_weight > 0
+        else 0.0
+    )
+    mean_score_neg = (
+        (predicted_scores[neg_mask] * sample_weight[neg_mask]).sum() / neg_weight
+        if neg_weight > 0
+        else 0.0
+    )
+
+    return float(mean_score_pos - mean_score_neg)
+
+
 def fpr(
     labels: npt.NDArray,
     predicted_labels: npt.NDArray,
