@@ -31,16 +31,18 @@ mce = MulticalibrationError(
     numerical_segment_columns=['income']
 )
 
-print(f"MCE: {mce.mce:.2f}%")
+print(f"MCE: {mce.mce:.4f}")
+print(f"MDE: {mce.mde:.4f}")
 print(f"P-value: {mce.mce_pvalue:.4f}")
-print(f"Worst segment: {mce.mce_sigma:.2f} standard deviations")
+print(f"MCE (sigma): {mce.mce_sigma:.2f}")
 ```
 
 The output is interpreted as follows:
 
-- **`mce`**: The multicalibration error.
-- **`mce_pvalue`**: Statistical significance of the worst miscalibration.
-- **`mce_sigma`**: MCE in units of standard deviations (for statistical significance).
+- **`mce`**: The multicalibration error on the absolute scale, in the same units as the predictions (typically in $[0, 1]$).
+- **`mde`**: The approximate Minimum Detectable Error on the absolute scale. Compare `mce` to `mde`: if `mce < mde`, the observed miscalibration is below the detection threshold for the given sample size.
+- **`mce_pvalue`**: The p-value for the observed MCE under the null hypothesis of perfect multicalibration. Note that this p-value is not adjusted for multiple testing (see [details below](#p-value-mce_pvalue)).
+- **`mce_sigma`**: MCE normalized by the standard deviation of the ECCE under perfect calibration. As a practical rule of thumb, values above ~5 are considered significant (see [details below](#sigma-scale-mce_sigma)).
 
 ## How Does the MCE Work?
 
@@ -93,21 +95,50 @@ Global miscalibrations are also detected, as the first segment represents the en
 
 ### Step 3: Combine Segment Errors Into an Interpretable Single Score
 
-After computing the calibration error (ECCE) for each segment, results are aggregated to produce a single summary metric: the **Multicalibration Error (MCE) on the sigma-scale**.
+After computing the calibration error (ECCE) for each segment, results are aggregated to produce a single summary metric: the **Multicalibration Error (MCE)**. The MCE is defined as the maximum ECCE across all segments because: practically, the average would be sensitive to the addition of noisier, smaller segments; theoretically, the maximum aligns with the definition of multicalibration as a worst-case guarantee.
 
-- For each segment, the ECCE is normalized by its estimated standard deviation (the "sigma-scale"). This accounts for the statistical reliability of each segment and ensures that segments with few samples do not dominate the metric due to noise.
-- The **maximum** normalized error across all segments is taken. This approach highlights the segment with the worst signal-to-noise-weighted miscalibration, making the metric easy to interpret and actionable.
+#### Absolute Scale (`mce`)
+
+The primary MCE metric is on the absolute scale. It is obtained by rescaling the sigma-scale MCE back to the original ECCE units:
+
+$$
+\text{MCE} = \text{MCE}_\sigma \cdot \hat\sigma_0
+$$
+
+where $\hat\sigma_0$ is the estimated standard deviation of the global ECCE under perfect calibration. This value is in the same units as the predictions (typically in $[0, 1]$) and represents the absolute magnitude of the worst-case calibration error.
+
+#### Minimum Detectable Error (`mde`)
+
+The Minimum Detectable Error (MDE) is on the absolute scale and provides a rough estimate of the smallest calibration error that could be reliably detected given the sample size and properties of the data. Compare `mce` to `mde` to assess whether the observed miscalibration is meaningful. It is approximated as:
+
+$$
+\text{MDE} \approx 5 \cdot \hat\sigma_0
+$$
+
+where $\hat\sigma_0$ is the global ECCE standard deviation. This approximation assumes the null hypothesis variance, so it is approximate under miscalibration. In practice, MCGrad is typically able to reduce the MCE below the MDE.
+
+#### Sigma Scale (`mce_sigma`)
+
+For each segment, the ECCE is normalized by its estimated standard deviation under the null hypothesis of perfect calibration (the "sigma scale"). This accounts for the statistical reliability of each segment and ensures that segments with few samples do not dominate the metric due to noise. The MCE on the sigma scale is the **maximum** of these normalized errors across all segments:
+
+$$
+\text{MCE}_\sigma = \max_k \frac{\text{ECCE}_k}{\hat\sigma_k}
+$$
+
+Higher values indicate stronger statistical evidence for miscalibration. As a practical rule of thumb, we use a threshold of ~5 sigma to flag miscalibration. This is more conservative than typical single-test thresholds because the MCE takes the maximum over many correlated segment-level tests, which inflates the statistic. The 5-sigma threshold is not derived from a formal multiple-testing correction but has proven to work well in practice. This scale depends on dataset properties such as sample size, score distribution, and minority class proportion.
+
+#### P-value (`mce_pvalue`)
+
+The p-value represents the probability of the observed MCE under the null hypothesis of perfect multicalibration. It is computed from the distribution of the range of a standard Brownian motion.
+
+Note that this p-value is not adjusted for multiple testing, so the probability of a type I error is somewhat higher in practice. The required adjustment is expected to be small because the hypotheses are highly correlated (many segments overlap).
+
+:::note Relative Scale
+For binary classification, a relative scale is also available via `mce_relative` and `mde_relative`. These express the MCE and MDE as a percentage of the minority class prevalence ($\text{MCE}_\% = \text{MCE} / \text{prevalence} \times 100$), which can be useful for comparing across datasets with different base rates.
+:::
 
 **Example:**
 In the ad click prediction scenario, suppose the segment "US market AND mobile" has the highest normalized ECCE. The MCE reflects this value, indicating that this segment is the most miscalibrated and should be the priority for further model improvement.
-
-#### Alternative Scale: Rescaling MCE to the Percent-Scale
-
-The raw MCE value represents how many standard deviations the worst segment deviates from perfect calibration. Higher values indicate stronger statistical evidence for miscalibration. This scale depends on dataset properties, such as minority class proportion, score distribution, and sample size.
-
-For applications requiring magnitude of miscalibration, the **Multicalibration Error (MCE) on the percent-scale** is available: by multiplying the MCE (sigma-scale) by the expected standard deviation for the global segment and dividing by the minority class prevalence, the result is a relative effect size in [0, 1]. This represents the magnitude of miscalibration and is useful for comparing models or tracking improvements over time, as it is independent of sample size.
-
-The maximum is used because it aligns with theoretical definitions of multicalibration.
 
 
 ## How Does the MCE Relate to the Theoretical Definition of Multicalibration?
