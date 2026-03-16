@@ -807,8 +807,13 @@ def _calculate_cumulative_differences(
         dtype=precision_dtype,
     )
     differences[:, 0] = 0
-    weighted_diff = np.multiply((segments * sample_weight), (labels - predicted_scores))
-    normalization = (segments * sample_weight).sum(axis=1)[:, np.newaxis]
+
+    # Compute segment weights once — was computed twice in the original code
+    segment_weights = segments * sample_weight
+    weighted_diff = np.multiply(segment_weights, (labels - predicted_scores))
+    normalization = segment_weights.sum(axis=1)[:, np.newaxis]
+    del segment_weights
+
     # Division by zero only happens for empty segments, which are handled below
     with np.errstate(divide="ignore", invalid="ignore"):
         normalized_diff = np.divide(weighted_diff, normalization)
@@ -872,12 +877,14 @@ def _ecce_standard_deviation_per_segment(
         shape=(np.shape(segments)[0],),
         dtype=precision_dtype,
     )
-    weighted_segments = segments * np.square(sample_weight)
+    # Compute segments * sample_weight once; reused for both numerator and denominator.
     variance_preds = predicted_scores * (1 - predicted_scores)
-    variance_weighted_segments = np.multiply(weighted_segments, variance_preds).sum(
-        axis=1
-    )
-    normalization_variance = np.square((segments * sample_weight).sum(axis=1))
+    segment_weights = segments * sample_weight
+    variance_weighted_segments = np.multiply(
+        segment_weights, sample_weight * variance_preds
+    ).sum(axis=1)
+    normalization_variance = np.square(segment_weights.sum(axis=1))
+    del segment_weights
     with np.errstate(divide="ignore", invalid="ignore"):
         np.sqrt(
             np.divide(
@@ -1032,6 +1039,70 @@ def ecce_pvalue_from_sigma(ecce_sigma: float) -> float:
     if ecce_sigma > ECCE_SIGMA_MAX:
         return sys.float_info.epsilon
     return 1 - _ecce_cdf(ecce_sigma)
+
+
+def _ecce_pvalue_from_sigma_vectorized(
+    ecce_sigma: npt.NDArray[Any],
+) -> npt.NDArray[Any]:
+    """
+    Vectorized computation of p-values from sigma-scaled ECCE statistics.
+
+    Equivalent to applying :func:`ecce_pvalue_from_sigma` element-wise, but
+    uses numpy broadcasting to avoid Python loops. This is used internally
+    by :class:`MulticalibrationError` to compute p-values for all segments
+    at once.
+
+    :param ecce_sigma: Array of ECCE statistics normalized by standard deviation.
+    :return: Array of p-values.
+    """
+    eps = sys.float_info.epsilon
+    x = np.asarray(ecce_sigma, dtype=np.float64)
+
+    # Initialize result: p-value = 1.0 by default (below-minimum case)
+    p_values = np.ones_like(x, dtype=np.float64)
+
+    # Handle above-max case: p-value = machine epsilon
+    above_max_mask = x >= ECCE_SIGMA_MAX
+    p_values[above_max_mask] = eps
+
+    # Identify elements that need actual CDF computation
+    compute_mask = (x >= ECCE_SIGMA_MIN) & (~above_max_mask)
+
+    if not np.any(compute_mask):
+        return p_values
+
+    xc = x[compute_mask]
+
+    # Compute kmax for each element (same formula as _ecce_cdf)
+    fact = 4.0 / math.sqrt(2.0 * math.pi) * (1.0 / xc + xc / math.pi**2)
+    kmax_per_element = np.ceil(
+        0.5 + xc / math.pi / math.sqrt(2.0) * np.sqrt(np.log(fact / eps))
+    ).astype(int)
+
+    # Use the global maximum to define the 2D array dimensions
+    kmax_global = int(np.max(kmax_per_element))
+
+    # k values: shape (kmax_global,)
+    k = np.arange(kmax_global)
+    kplus = k + 0.5
+
+    # Broadcasting: xc (n,) x kplus (kmax_global,) -> (n, kmax_global)
+    xc_2d = xc[:, np.newaxis]
+    kplus_2d = kplus[np.newaxis, :]
+
+    coeff = 8.0 / xc_2d**2 + 2.0 / kplus_2d**2 / math.pi**2
+    exponent = -2.0 * kplus_2d**2 * math.pi**2 / xc_2d**2
+    terms = coeff * np.exp(exponent)
+
+    # Mask out terms where k >= kmax for each element
+    valid_mask = k[np.newaxis, :] < kmax_per_element[:, np.newaxis]
+    terms = np.where(valid_mask, terms, 0.0)
+
+    # Sum along the k axis to get CDF values, then p-value = 1 - CDF
+    cdf_values = np.sum(terms, axis=1)
+    p_values[compute_mask] = 1.0 - cdf_values
+
+    return p_values
 
 
 def ecce(
@@ -1723,9 +1794,7 @@ class MulticalibrationError(
 
         :return: Array of shape (n_segments,) with p-values between 0 and 1.
         """
-        ecce_pvalue_vec = np.vectorize(ecce_pvalue_from_sigma)
-        p_values = ecce_pvalue_vec(self.segments_ecce_sigma)
-        return p_values
+        return _ecce_pvalue_from_sigma_vectorized(self.segments_ecce_sigma)
 
     @functools.cached_property
     def _segments_ecce_std(self) -> npt.NDArray[np.float16 | np.float32 | np.float64]:

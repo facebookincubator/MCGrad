@@ -2302,6 +2302,32 @@ def test_ecce_pvalue_consistency_with_ecce_pvalue_from_sigma(rng):
     assert ecce_pvalue_result == pytest.approx(ecce_pvalue_from_sigma_result, rel=1e-10)
 
 
+def test_ecce_pvalue_vectorized_matches_scalar():
+    """Verify _ecce_pvalue_from_sigma_vectorized matches the scalar version."""
+    from ..metrics import _ecce_pvalue_from_sigma_vectorized
+
+    test_sigmas = np.array([0, 1e-25, 0.5, 1.0, 2.0, 3.0, 5.0, 8.0, 8.5, 100.0, np.inf])
+    expected = np.array([metrics.ecce_pvalue_from_sigma(s) for s in test_sigmas])
+    result = _ecce_pvalue_from_sigma_vectorized(test_sigmas)
+    np.testing.assert_allclose(result, expected, rtol=1e-10)
+
+
+def test_ecce_pvalue_vectorized_empty_array():
+    """Verify _ecce_pvalue_from_sigma_vectorized handles empty input."""
+    from ..metrics import _ecce_pvalue_from_sigma_vectorized
+
+    result = _ecce_pvalue_from_sigma_vectorized(np.array([]))
+    assert len(result) == 0
+
+
+def test_ecce_pvalue_vectorized_all_below_min():
+    """Verify vectorized returns 1.0 for all sub-threshold inputs."""
+    from ..metrics import _ecce_pvalue_from_sigma_vectorized
+
+    result = _ecce_pvalue_from_sigma_vectorized(np.array([0.0, 1e-30, 1e-25]))
+    np.testing.assert_array_equal(result, np.ones(3))
+
+
 def test_regression_mce_returns_zero_for_perfectly_calibrated_data():
     test_df = pd.DataFrame(
         {
