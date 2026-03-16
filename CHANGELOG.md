@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Improved early stopping performance by caching per-fold metric DataFrames and fold splits, avoiding redundant DataFrame reconstruction on every round × fold × metric evaluation (#229)
+- Speed up fitting with early stopping and save training performance enabled: Remove redundant `_predict` call on the training set in `_determine_best_num_rounds`, reusing predictions already returned by `_fit_single_round` instead (#236)
 - Unified `logistic()` and `logistic_vectorized()` into a single `logistic()` function that handles both scalar and array inputs. The `logistic_vectorized` alias has been removed. Performance improvement of ~16x on large arrays by using native NumPy operations instead of `np.vectorize`.
 
 ### Added
