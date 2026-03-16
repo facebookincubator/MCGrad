@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fixed documentation inaccuracies in the MCE metrics page: corrected `mce` formatting from percent to absolute scale, added documentation for MDE and all four available scales, and clarified statistical interpretation of sigma threshold and p-value.
+
 ### Changed
 - Improved early stopping performance by caching per-fold metric DataFrames and fold splits, avoiding redundant DataFrame reconstruction on every round × fold × metric evaluation (#229)
 - Unified `logistic()` and `logistic_vectorized()` into a single `logistic()` function that handles both scalar and array inputs. The `logistic_vectorized` alias has been removed. Performance improvement of ~16x on large arrays by using native NumPy operations instead of `np.vectorize`.
