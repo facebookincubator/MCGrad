@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Improved early stopping performance by caching per-fold metric DataFrames and fold splits, avoiding redundant DataFrame reconstruction on every round × fold × metric evaluation (#229)
 - Unified `logistic()` and `logistic_vectorized()` into a single `logistic()` function that handles both scalar and array inputs. The `logistic_vectorized` alias has been removed. Performance improvement of ~16x on large arrays by using native NumPy operations instead of `np.vectorize`.
+- Vectorized `segments_ecce_pvalue` computation in `MulticalibrationError` using NumPy broadcasting instead of `np.vectorize`. Code quality improvement; does not meaningfully affect end-to-end MCE computation time since p-value calculation is <0.1% of the pipeline (dominated by segment generation and ECCE computation).
+- Eliminated redundant `segments * sample_weight` broadcast in `_calculate_cumulative_differences` (~6% faster on the ECCE computation hot path).
+- Eliminated redundant `segments * sample_weight` broadcast in `_ecce_standard_deviation_per_segment` (~30% faster on the std dev computation hot path).
+- Replaced per-segment `pd.DataFrame` creation with batch list accumulation in `get_segment_masks`, yielding 2.2-3.1x speedup on the segment generation hot path (~53% of total pipeline time).
 
 ### Added
 - Conda / Mamba installation instructions to the documentation (#234)
