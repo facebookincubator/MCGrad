@@ -1,0 +1,12 @@
+coverage:
+  status:
+    project:
+      default:
+        # Don't fail CI when overall coverage percentage changes.
+        # A refactor that reduces line count can lower the percentage
+        # even when every changed line is covered.
+        informational: true
+    patch:
+      default:
+        # Fail CI when lines added or modified in the diff are not covered.
+        target: 100%
