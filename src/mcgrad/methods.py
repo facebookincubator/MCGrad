@@ -1123,10 +1123,8 @@ class _BaseMCGrad(
                     )
                     predictions_per_fold[fold_num] = new_predictions
                     if self.save_training_performance:
-                        train_fold_preds = mcgrad_per_fold[fold_num]._predict(
-                            x=data_train_cv.features,
-                            transformed_predictions=data_train_cv.predictions,
-                            return_all_rounds=False,
+                        train_fold_preds = self._inverse_transform_predictions(
+                            new_predictions
                         )
 
                     valid_fold_preds = mcgrad_per_fold[fold_num]._predict(
