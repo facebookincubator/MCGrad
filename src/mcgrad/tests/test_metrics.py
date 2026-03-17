@@ -1935,6 +1935,17 @@ def test_ecce_cdf_returns_near_one_for_large_x():
     assert result_large == pytest.approx(1.0)
 
 
+@pytest.mark.parametrize("value", [-1.0, 0.0])
+def test_ecce_cdf_raises_for_non_positive_scalar(value):
+    with pytest.raises(ValueError, match="Can only evaluate ECCE CDF at positive x"):
+        metrics._ecce_cdf(value)
+
+
+def test_ecce_cdf_raises_for_non_positive_in_array():
+    with pytest.raises(ValueError, match="Can only evaluate ECCE CDF at positive x"):
+        metrics._ecce_cdf(np.array([1.0, -0.5, 2.0]))
+
+
 def test_ecce_pvalue_returns_one_for_very_small_statistic():
     # Create perfectly calibrated predictions
     labels = np.array([0.0, 0.0, 1.0, 1.0])
@@ -2302,29 +2313,31 @@ def test_ecce_pvalue_consistency_with_ecce_pvalue_from_sigma(rng):
     assert ecce_pvalue_result == pytest.approx(ecce_pvalue_from_sigma_result, rel=1e-10)
 
 
-def test_ecce_pvalue_vectorized_matches_scalar():
-    """Verify _ecce_pvalue_from_sigma_vectorized matches the scalar version."""
-    from ..metrics import _ecce_pvalue_from_sigma_vectorized
+def test_ecce_cdf_accepts_array_input():
+    scalar_results = [metrics._ecce_cdf(v) for v in [0.5, 1.0, 2.0, 5.0, 8.3]]
+    array_result = metrics._ecce_cdf(np.array([0.5, 1.0, 2.0, 5.0, 8.3]))
+    np.testing.assert_allclose(array_result, scalar_results, rtol=1e-10)
 
+
+def test_ecce_pvalue_from_sigma_accepts_array_input():
     test_sigmas = np.array([0, 1e-25, 0.5, 1.0, 2.0, 3.0, 5.0, 8.0, 8.5, 100.0, np.inf])
-    expected = np.array([metrics.ecce_pvalue_from_sigma(s) for s in test_sigmas])
-    result = _ecce_pvalue_from_sigma_vectorized(test_sigmas)
-    np.testing.assert_allclose(result, expected, rtol=1e-10)
+    scalar_results = [metrics.ecce_pvalue_from_sigma(s) for s in test_sigmas]
+    array_result = metrics.ecce_pvalue_from_sigma(test_sigmas)
+    np.testing.assert_allclose(array_result, scalar_results, rtol=1e-10)
 
 
-def test_ecce_pvalue_vectorized_empty_array():
-    """Verify _ecce_pvalue_from_sigma_vectorized handles empty input."""
-    from ..metrics import _ecce_pvalue_from_sigma_vectorized
+def test_ecce_pvalue_from_sigma_returns_scalar_for_scalar_input():
+    result = metrics.ecce_pvalue_from_sigma(2.0)
+    assert isinstance(result, float)
 
-    result = _ecce_pvalue_from_sigma_vectorized(np.array([]))
+
+def test_ecce_pvalue_from_sigma_empty_array():
+    result = metrics.ecce_pvalue_from_sigma(np.array([]))
     assert len(result) == 0
 
 
-def test_ecce_pvalue_vectorized_all_below_min():
-    """Verify vectorized returns 1.0 for all sub-threshold inputs."""
-    from ..metrics import _ecce_pvalue_from_sigma_vectorized
-
-    result = _ecce_pvalue_from_sigma_vectorized(np.array([0.0, 1e-30, 1e-25]))
+def test_ecce_pvalue_from_sigma_all_below_min():
+    result = metrics.ecce_pvalue_from_sigma(np.array([0.0, 1e-30, 1e-25]))
     np.testing.assert_array_equal(result, np.ones(3))
 
 
