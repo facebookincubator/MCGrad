@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Improved early stopping performance by caching per-fold metric DataFrames and fold splits, avoiding redundant DataFrame reconstruction on every round × fold × metric evaluation (#229)
 - Speed up fitting with early stopping and save training performance enabled: Remove redundant `_predict` call on the training set in `_determine_best_num_rounds`, reusing predictions already returned by `_fit_single_round` instead (#236)
+- Skip redundant `_inverse_transform_predictions` calls in `_predict` when `return_all_rounds=False`. Previously called the logistic function on every boosting round but only used the last result; now calls it once. Reduces total inverse-transform calls during early stopping from O(R²) to O(R) (#241)
 - Unified `logistic()` and `logistic_vectorized()` into a single `logistic()` function that handles both scalar and array inputs. The `logistic_vectorized` alias has been removed. Performance improvement of ~16x on large arrays by using native NumPy operations instead of `np.vectorize`.
 - Vectorized `segments_ecce_pvalue` computation in `MulticalibrationError` using NumPy broadcasting instead of `np.vectorize`. Code quality improvement; does not meaningfully affect end-to-end MCE computation time since p-value calculation is <0.1% of the pipeline (dominated by segment generation and ECCE computation).
 - Eliminated redundant `segments * sample_weight` broadcast in `_calculate_cumulative_differences` (~6% faster on the ECCE computation hot path).
