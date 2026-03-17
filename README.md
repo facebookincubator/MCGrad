@@ -63,6 +63,13 @@ Stable release:
 pip install mcgrad
 ```
 
+Or via conda / mamba:
+```bash
+conda install mcgrad
+# or
+mamba install mcgrad
+```
+
 Latest development version:
 ```bash
 pip install git+https://github.com/facebookincubator/MCGrad.git
