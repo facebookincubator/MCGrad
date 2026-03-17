@@ -903,15 +903,24 @@ class _BaseMCGrad(
 
         predictions = transformed_predictions.copy()
         x = np.c_[x, predictions]
-        predictions_per_round = np.zeros((len(self.mr), len(predictions)))
+        predictions_per_round: npt.NDArray | None = (
+            np.zeros((len(self.mr), len(predictions))) if return_all_rounds else None
+        )
         for i in range(len(self.mr)):
             new_pred = self.mr[i].predict(x, raw_score=True)
             predictions += new_pred
             predictions *= self.unshrink_factors[i]
             x[:, -1] = predictions
-            predictions_per_round[i] = self._inverse_transform_predictions(predictions)
+            if return_all_rounds:
+                assert predictions_per_round is not None
+                predictions_per_round[i] = self._inverse_transform_predictions(
+                    predictions
+                )
 
-        return predictions_per_round if return_all_rounds else predictions_per_round[-1]
+        if return_all_rounds:
+            assert predictions_per_round is not None
+            return predictions_per_round
+        return self._inverse_transform_predictions(predictions)
 
     def _get_lgbm_params(self, x: npt.NDArray) -> dict[str, Any]:
         lgb_params = self.lightgbm_params.copy()
