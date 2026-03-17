@@ -32,7 +32,7 @@ import math
 import sys
 import warnings
 from collections.abc import Callable
-from typing import Any, Protocol
+from typing import Any, overload, Protocol
 
 import numpy as np
 import pandas as pd
@@ -991,102 +991,55 @@ def _ecce_per_segment(
     return np.ptp(differences, axis=1)
 
 
-def _ecce_cdf(x: float) -> float:
+@overload
+def _ecce_cdf(x: float) -> float: ...
+
+
+@overload
+def _ecce_cdf(x: npt.NDArray[Any]) -> npt.NDArray[np.float64]: ...
+
+
+def _ecce_cdf(
+    x: float | npt.NDArray[Any],
+) -> float | npt.NDArray[np.float64]:
     """
     Evaluate the cumulative distribution function for the ECCE statistic.
 
     This computes the CDF for the range (maximum minus minimum) of the
     standard Brownian motion on [0, 1], which is used to compute p-values
-    for the ECCE statistic.
+    for the ECCE statistic. Accepts both scalar and array inputs.
 
-    :param float x: argument at which to evaluate the cumulative distribution function
-                    (must be positive)
-    :return: cumulative distribution function evaluated at x
-    :rtype: float
+    :param x: Scalar or array of values at which to evaluate the CDF.
+              All values must be positive.
+    :return: CDF value(s) evaluated at *x*. Returns a scalar when *x* is
+             scalar, an array otherwise.
     """
-    if x <= 0:
-        raise ValueError(f"Can only evaluate ECCE CDF at positive x, not at {x}")
-    if x >= ECCE_SIGMA_MAX:
-        return 1.0 - sys.float_info.epsilon
+    scalar_input = np.ndim(x) == 0
+    x = np.atleast_1d(np.asarray(x, dtype=np.float64))
 
-    # Compute the machine precision assuming binary numerical representations.
-    eps = sys.float_info.epsilon
-    # Determine how many terms to use to attain accuracy eps.
-    fact = 4.0 / math.sqrt(2.0 * math.pi) * (1.0 / x + x / math.pi**2)
-    kmax = math.ceil(
-        1.0 / 2.0 + x / math.pi / math.sqrt(2) * math.sqrt(math.log(fact / eps))
-    )
-
-    # Sum the series.
-    c = 0.0
-    for k in range(kmax):
-        kplus = k + 1.0 / 2.0
-        c += (8.0 / x**2.0 + 2.0 / kplus**2.0 / math.pi**2.0) * math.exp(
-            -2.0 * kplus**2.0 * math.pi**2.0 / x**2.0
+    if np.any(x <= 0):
+        raise ValueError(
+            f"Can only evaluate ECCE CDF at positive x, not at {x[x <= 0]}"
         )
-    return c
 
-
-def ecce_pvalue_from_sigma(ecce_sigma: float) -> float:
-    """
-    Compute p-value from a sigma-scaled ECCE statistic.
-
-    :param ecce_sigma: The ECCE statistic normalized by standard deviation.
-    :return: The p-value from the ECCE test.
-    """
-    if ecce_sigma < ECCE_SIGMA_MIN:
-        return 1.0
-    if ecce_sigma > ECCE_SIGMA_MAX:
-        return sys.float_info.epsilon
-    return 1 - _ecce_cdf(ecce_sigma)
-
-
-def _ecce_pvalue_from_sigma_vectorized(
-    ecce_sigma: npt.NDArray[Any],
-) -> npt.NDArray[Any]:
-    """
-    Vectorized computation of p-values from sigma-scaled ECCE statistics.
-
-    Equivalent to applying :func:`ecce_pvalue_from_sigma` element-wise, but
-    uses numpy broadcasting to avoid Python loops. This is used internally
-    by :class:`MulticalibrationError` to compute p-values for all segments
-    at once.
-
-    :param ecce_sigma: Array of ECCE statistics normalized by standard deviation.
-    :return: Array of p-values.
-    """
     eps = sys.float_info.epsilon
-    x = np.asarray(ecce_sigma, dtype=np.float64)
+    result = np.full_like(x, 1.0 - eps, dtype=np.float64)
 
-    # Initialize result: p-value = 1.0 by default (below-minimum case)
-    p_values = np.ones_like(x, dtype=np.float64)
+    needs_computation = x < ECCE_SIGMA_MAX
+    if not np.any(needs_computation):
+        return float(result[0]) if scalar_input else result
 
-    # Handle above-max case: p-value = machine epsilon
-    above_max_mask = x >= ECCE_SIGMA_MAX
-    p_values[above_max_mask] = eps
+    xc = x[needs_computation]
 
-    # Identify elements that need actual CDF computation
-    compute_mask = (x >= ECCE_SIGMA_MIN) & (~above_max_mask)
-
-    if not np.any(compute_mask):
-        return p_values
-
-    xc = x[compute_mask]
-
-    # Compute kmax for each element (same formula as _ecce_cdf)
     fact = 4.0 / math.sqrt(2.0 * math.pi) * (1.0 / xc + xc / math.pi**2)
     kmax_per_element = np.ceil(
         0.5 + xc / math.pi / math.sqrt(2.0) * np.sqrt(np.log(fact / eps))
     ).astype(int)
 
-    # Use the global maximum to define the 2D array dimensions
     kmax_global = int(np.max(kmax_per_element))
-
-    # k values: shape (kmax_global,)
     k = np.arange(kmax_global)
     kplus = k + 0.5
 
-    # Broadcasting: xc (n,) x kplus (kmax_global,) -> (n, kmax_global)
     xc_2d = xc[:, np.newaxis]
     kplus_2d = kplus[np.newaxis, :]
 
@@ -1094,14 +1047,58 @@ def _ecce_pvalue_from_sigma_vectorized(
     exponent = -2.0 * kplus_2d**2 * math.pi**2 / xc_2d**2
     terms = coeff * np.exp(exponent)
 
-    # Mask out terms where k >= kmax for each element
     valid_mask = k[np.newaxis, :] < kmax_per_element[:, np.newaxis]
     terms = np.where(valid_mask, terms, 0.0)
 
-    # Sum along the k axis to get CDF values, then p-value = 1 - CDF
-    cdf_values = np.sum(terms, axis=1)
-    p_values[compute_mask] = 1.0 - cdf_values
+    result[needs_computation] = np.sum(terms, axis=1)
 
+    if scalar_input:
+        return float(result[0])
+    return result
+
+
+@overload
+def ecce_pvalue_from_sigma(ecce_sigma: float) -> float: ...
+
+
+@overload
+def ecce_pvalue_from_sigma(
+    ecce_sigma: npt.NDArray[Any],
+) -> npt.NDArray[np.float64]: ...
+
+
+def ecce_pvalue_from_sigma(
+    ecce_sigma: float | npt.NDArray[Any],
+) -> float | npt.NDArray[np.float64]:
+    """
+    Compute p-value from a sigma-scaled ECCE statistic.
+
+    Accepts both scalar and array inputs.
+
+    :param ecce_sigma: The ECCE statistic normalized by standard deviation.
+                       Can be a scalar or array.
+    :return: The p-value(s) from the ECCE test. Returns a scalar when the
+             input is scalar, an array otherwise.
+    """
+    scalar_input = np.ndim(ecce_sigma) == 0
+    x = np.atleast_1d(np.asarray(ecce_sigma, dtype=np.float64))
+
+    eps = sys.float_info.epsilon
+    p_values = np.empty_like(x, dtype=np.float64)
+
+    below_min = x < ECCE_SIGMA_MIN
+    p_values[below_min] = 1.0
+
+    above_max = x >= ECCE_SIGMA_MAX
+    p_values[above_max] = eps
+
+    needs_cdf = (x >= ECCE_SIGMA_MIN) & (~above_max)
+    if np.any(needs_cdf):
+        cdf_values = _ecce_cdf(x[needs_cdf])
+        p_values[needs_cdf] = 1.0 - np.asarray(cdf_values, dtype=np.float64)
+
+    if scalar_input:
+        return float(p_values[0])
     return p_values
 
 
@@ -1794,7 +1791,7 @@ class MulticalibrationError(
 
         :return: Array of shape (n_segments,) with p-values between 0 and 1.
         """
-        return _ecce_pvalue_from_sigma_vectorized(self.segments_ecce_sigma)
+        return ecce_pvalue_from_sigma(self.segments_ecce_sigma)
 
     @functools.cached_property
     def _segments_ecce_std(self) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
