@@ -1403,7 +1403,7 @@ def calibration_free_normalized_entropy(
         current_calibration = calibration_ratio(labels, predicted_scores, sample_weight)
         it += 1
 
-    calib_free_ne = normalized_entropy(labels, predicted_scores)
+    calib_free_ne = normalized_entropy(labels, predicted_scores, sample_weight)
     return calib_free_ne
 
 
