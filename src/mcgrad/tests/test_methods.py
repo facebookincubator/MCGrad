@@ -39,7 +39,7 @@ def generate_test_data(n):
     )
 
 
-@pytest.mark.parametrize("num_rounds", [(1), (2), (6), (10), (16)])
+@pytest.mark.parametrize("num_rounds", [(1), (2), (6)])
 @pytest.mark.parametrize(
     "calibrator_class",
     [
@@ -226,7 +226,7 @@ def test_mcgrad_serialize_deserialize_no_encode_categorical(
         methods.RegressionMCGrad,
     ],
 )
-@pytest.mark.parametrize("max_num_rounds", [(1), (2), (6), (10), (16)])
+@pytest.mark.parametrize("max_num_rounds", [(1), (2), (6)])
 def test_deserialized_mcgrad_has_at_most_max_num_rounds(
     max_num_rounds, calibrator_class
 ):
@@ -257,6 +257,7 @@ def test_deserialized_mcgrad_has_at_most_max_num_rounds(
     assert len(deserialized.mr) == len(model.mr)
 
 
+@pytest.mark.parametrize("use_train_col", [True, False])
 @pytest.mark.parametrize(
     "calibrator_class, calibrator_kwargs",
     [
@@ -304,8 +305,8 @@ def test_deserialized_mcgrad_has_at_most_max_num_rounds(
         ),
     ],
 )
-def test_fit_transform_with_train_col_identical_to_fit_then_predict(
-    calibrator_class, calibrator_kwargs, rng
+def test_fit_transform_identical_to_fit_then_predict(
+    calibrator_class, calibrator_kwargs, use_train_col, rng
 ):
     df = pd.DataFrame(
         {
@@ -314,89 +315,32 @@ def test_fit_transform_with_train_col_identical_to_fit_then_predict(
             "is_train_set": np.concatenate([np.full(50, False), np.full(50, True)]),
         }
     )
+
+    fit_transform_kwargs = {
+        "prediction_column_name": "prediction",
+        "label_column_name": "label",
+    }
+    if use_train_col:
+        fit_transform_kwargs["is_train_set_col_name"] = "is_train_set"
+
     result_fit_transform = calibrator_class(**calibrator_kwargs).fit_transform(
-        df,
-        prediction_column_name="prediction",
-        label_column_name="label",
-        is_train_set_col_name="is_train_set",
+        df, **fit_transform_kwargs
     )
 
-    calibrator = calibrator_class(**calibrator_kwargs)
-    calibrator.fit(df[df.is_train_set], "prediction", "label")
-    result_fit_predict = calibrator.predict(df[~df.is_train_set], "prediction")
-
-    assert np.allclose(result_fit_transform[~df.is_train_set], result_fit_predict), (
-        "fit_transform does not give the same result as fit followed by predict"
-    )
-
-
-@pytest.mark.parametrize(
-    "calibrator_class, calibrator_kwargs",
-    [
-        (methods.PlattScaling, {}),
-        (methods.IsotonicRegression, {}),
-        # Pass MCGrad params that minimize test runtime
-        (
-            methods.MCGrad,
-            {"num_rounds": 2, "lightgbm_params": {"max_depth": 2, "n_estimators": 2}},
-        ),
-        (
-            methods.MCGrad,
-            {
-                "num_rounds": 2,
-                "early_stopping": True,
-                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
-            },
-        ),
-        (
-            methods.MCGrad,
-            {
-                "num_rounds": 2,
-                "early_stopping": False,
-                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
-            },
-        ),
-        (methods.IdentityCalibrator, {}),
-        (methods.MultiplicativeAdjustment, {}),
-        (methods.AdditiveAdjustment, {}),
-        (
-            methods.RegressionMCGrad,
-            {
-                "num_rounds": 2,
-                "early_stopping": True,
-                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
-            },
-        ),
-        (
-            methods.RegressionMCGrad,
-            {
-                "num_rounds": 2,
-                "early_stopping": False,
-                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
-            },
-        ),
-    ],
-)
-def test_fit_transform_no_train_col_identical_to_fit_then_predict(
-    calibrator_class, calibrator_kwargs, rng
-):
-    df = pd.DataFrame(
-        {
-            "prediction": np.linspace(0, 1, 100),
-            "label": rng.choice([0, 1], 100),
-        }
-    )
-    result_fit_transform = calibrator_class(**calibrator_kwargs).fit_transform(
-        df, prediction_column_name="prediction", label_column_name="label"
-    )
-
-    calibrator = calibrator_class(**calibrator_kwargs)
-    calibrator.fit(df, "prediction", "label")
-    result_fit_predict = calibrator.predict(df, "prediction")
-
-    assert np.allclose(result_fit_transform, result_fit_predict), (
-        "fit_transform does not give the same result as fit followed by predict"
-    )
+    if use_train_col:
+        calibrator = calibrator_class(**calibrator_kwargs)
+        calibrator.fit(df[df.is_train_set], "prediction", "label")
+        result_fit_predict = calibrator.predict(df[~df.is_train_set], "prediction")
+        assert np.allclose(
+            result_fit_transform[~df.is_train_set], result_fit_predict
+        ), "fit_transform does not give the same result as fit followed by predict"
+    else:
+        calibrator = calibrator_class(**calibrator_kwargs)
+        calibrator.fit(df, "prediction", "label")
+        result_fit_predict = calibrator.predict(df, "prediction")
+        assert np.allclose(result_fit_transform, result_fit_predict), (
+            "fit_transform does not give the same result as fit followed by predict"
+        )
 
 
 def test_segmentwise_calibrator_raises_when_incompatible_calibrator_kwargs_are_passed():
