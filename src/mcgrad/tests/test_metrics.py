@@ -847,6 +847,58 @@ def test_califree_ne_is_invariant_to_logit_shifts(logit_shift):
     assert pytest.approx(califree_ne_shifted, 0.01) == califree_ne_original
 
 
+@pytest.mark.parametrize(
+    "metric_func",
+    [
+        metrics.normalized_entropy,
+        metrics.calibration_free_normalized_entropy,
+        metrics.calibration_ratio,
+        metrics.expected_calibration_error,
+        metrics.proportional_expected_calibration_error,
+        metrics.youdens_j,
+        metrics.recall_at_precision,
+        metrics.fpr_at_precision,
+        metrics.precision_at_recall,
+        metrics.precision_at_predictive_prevalence,
+    ],
+)
+def test_weighted_score_metric_matches_expanded_unweighted(metric_func):
+    """Weighted score metrics should give the same result as duplicating rows by weight."""
+    labels = np.array([0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0])
+    scores = np.array([0.1, 0.85, 0.6, 0.7, 0.9, 0.2, 0.4, 0.35, 0.75, 0.15, 0.55, 0.8])
+    weights = np.array([3, 2, 1, 2, 1, 3, 2, 1, 1, 2, 1, 1])
+
+    expanded_labels = np.repeat(labels, weights)
+    expanded_scores = np.repeat(scores, weights)
+
+    weighted_result = metric_func(labels, scores, sample_weight=weights)
+    unweighted_result = metric_func(expanded_labels, expanded_scores)
+
+    assert weighted_result == pytest.approx(unweighted_result, rel=1e-5)
+
+
+@pytest.mark.parametrize(
+    "metric_func",
+    [
+        metrics.recall,
+        metrics.fpr,
+    ],
+)
+def test_weighted_binary_metric_matches_expanded_unweighted(metric_func):
+    """Weighted binary metrics should give the same result as duplicating rows by weight."""
+    labels = np.array([0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0])
+    predicted_labels = np.array([0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 1, 1])
+    weights = np.array([3, 2, 1, 2, 1, 3, 2, 1, 1, 2, 1, 1])
+
+    expanded_labels = np.repeat(labels, weights)
+    expanded_predicted_labels = np.repeat(predicted_labels, weights)
+
+    weighted_result = metric_func(labels, predicted_labels, sample_weight=weights)
+    unweighted_result = metric_func(expanded_labels, expanded_predicted_labels)
+
+    assert weighted_result == pytest.approx(unweighted_result, rel=1e-5)
+
+
 @pytest.mark.parametrize("target_precision, expected_fpr", [(0.9, 0.0), (0.8, 0.2)])
 def test_fpr_at_precision(target_precision, expected_fpr):
     y_true = np.array([0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
