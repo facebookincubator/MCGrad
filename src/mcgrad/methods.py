@@ -256,6 +256,8 @@ class _BaseMCGrad(
             It includes which metrics to monitor during training, in addition to the metric used for early stopping (score_func).
         :param allow_missing_segment_feature_values: whether to allow missing values in the segment feature data. If set to True, missing values are used for training and prediction. If set to False, training with missing values will raise an Exception and prediction
             with missing values will return None.
+        :param random_state: Controls randomness for reproducibility. Can be an integer seed,
+            a numpy Generator, or None for non-deterministic behavior.
         """
         self.random_state = random_state
         if isinstance(random_state, np.random.Generator):
@@ -892,6 +894,9 @@ class _BaseMCGrad(
 
         :param x: the segment features.
         :param transformed_predictions: the transformed (e.g., logit) predictions that we are looking to calibrate.
+        :param return_all_rounds: If True, returns predictions for all MCGrad rounds as a 2D array of shape
+            (num_rounds, num_samples). If False, returns only the final round predictions as a 1D array.
+        :return: Array of calibrated predictions. Shape depends on return_all_rounds parameter.
         """
         assert len(self.mr) == len(self.unshrink_factors)
         if len(self.mr) < 1:
