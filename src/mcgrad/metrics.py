@@ -1212,7 +1212,7 @@ def _rank_calibration_error(
 
     prediction_cdfs = np.array(
         [
-            (np.sum([prediction_means[i] >= prediction_means])) / (num_bins)
+            np.sum(prediction_means[i] >= prediction_means) / num_bins
             for i in range(num_bins)
         ]
     )
