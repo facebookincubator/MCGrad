@@ -674,7 +674,11 @@ def fpr_at_precision(
     :param sample_weight: Optional array of sample weights.
     :return: False positive rate at the precision target, or NaN if unachievable.
     """
-    negatives = y_scores[y_true == 0].shape[0]
+    if sample_weight is None:
+        sample_weight = np.ones_like(y_scores)
+
+    neg_mask = y_true == 0
+    negatives = sample_weight[neg_mask].sum()
     # if there are no negatives in the data, fpr is undefined
     if negatives == 0:
         return np.nan
@@ -694,7 +698,9 @@ def fpr_at_precision(
 
     threshold_at_precision_target = np.min(thresholds_at_target_precision)
 
-    false_positives = np.sum(y_scores[y_true == 0] >= threshold_at_precision_target)
+    false_positives = sample_weight[
+        neg_mask & (y_scores >= threshold_at_precision_target)
+    ].sum()
     false_positive_rate = false_positives / negatives
 
     return false_positive_rate

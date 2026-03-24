@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed documentation inaccuracies in the MCE metrics page: corrected `mce` formatting from percent to absolute scale, added documentation for MDE and all four available scales, and clarified statistical interpretation of sigma threshold and p-value.
 - Fixed `calibration_free_normalized_entropy` not passing `sample_weight` to the final `normalized_entropy` call, causing weighted calibration-free NE to silently ignore sample weights.
 - Fixed `predictions_to_labels` ignoring the `threshold_column` parameter — the threshold comparison hardcoded `.threshold` via pandas attribute access instead of using `[threshold_column]`, causing an `AttributeError` when a non-default column name was passed.
+- Fixed `fpr_at_precision` not using `sample_weight` when computing the false positive rate, causing weighted FPR to silently use unweighted counts.
 
 ### Changed
 - Improved early stopping performance by caching per-fold metric DataFrames and fold splits, avoiding redundant DataFrame reconstruction on every round × fold × metric evaluation (#229)
