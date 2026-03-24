@@ -140,15 +140,6 @@ def get_segment_masks(
             yield chunk.copy(), n_segments_in_chunk, df_feature_values
 
 
-def _format_segment_feature_values(
-    product: tuple[tuple[int | float | str, str], ...],
-    idx_segment: int,
-) -> pd.DataFrame:
-    df_feature_values = pd.DataFrame(product, columns=["value", "segment_column"])
-    df_feature_values["idx_segment"] = idx_segment
-    return df_feature_values[["segment_column", "value", "idx_segment"]]
-
-
 def _label_values_with_colname(
     unique_values: npt.NDArray,
     colname: str,

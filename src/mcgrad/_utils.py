@@ -659,6 +659,6 @@ def predictions_to_labels(
         thresholds, on=segmentation_columns, how="left"
     )
     data_w_thresholds["predicted_label"] = (
-        data_w_thresholds[prediction_column] >= data_w_thresholds.threshold
+        data_w_thresholds[prediction_column] >= data_w_thresholds[threshold_column]
     ).astype(int)
     return data_w_thresholds

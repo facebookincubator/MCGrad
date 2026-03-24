@@ -739,6 +739,38 @@ def test_predictions_to_labels_gives_expected_result():
     pd.testing.assert_frame_equal(data_with_predicted_labels_and_thresholds, expected)
 
 
+def test_predictions_to_labels_with_custom_threshold_column_name():
+    data = pd.DataFrame(
+        {
+            "prediction": [0.1, 0.2, 0.4, 0.8, 0.9],
+            "segment_a": ["a", "a", "b", "b", "a"],
+        }
+    )
+    thresholds = pd.DataFrame(
+        {
+            "segment_a": ["a", "b"],
+            "cutoff": [0.5, 0.6],
+        }
+    )
+    expected = pd.DataFrame(
+        {
+            "prediction": [0.1, 0.2, 0.4, 0.8, 0.9],
+            "segment_a": ["a", "a", "b", "b", "a"],
+            "cutoff": [0.5, 0.5, 0.6, 0.6, 0.5],
+            "predicted_label": [0, 0, 0, 1, 1],
+        }
+    )
+
+    result = utils.predictions_to_labels(
+        data=data,
+        prediction_column="prediction",
+        thresholds=thresholds,
+        threshold_column="cutoff",
+    )
+
+    pd.testing.assert_frame_equal(result, expected)
+
+
 def test_predictions_to_labels_does_not_modify_input_dataframes():
     """Verify predictions_to_labels does not modify input DataFrames."""
     data = pd.DataFrame(
