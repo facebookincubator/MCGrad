@@ -899,6 +899,35 @@ def test_weighted_binary_metric_matches_expanded_unweighted(metric_func):
     assert weighted_result == pytest.approx(unweighted_result, rel=1e-5)
 
 
+def test_weighted_fpr_at_precision_with_false_positives():
+    """Weighted fpr_at_precision must use sample_weight for both the FP count and negatives.
+
+    The generic test_weighted_score_metric_matches_expanded_unweighted test
+    happens to produce FPR=0 for fpr_at_precision (no negatives exceed the
+    precision threshold), so this test uses data specifically designed to have
+    nonzero FPR with non-uniform weights on the negatives.
+    """
+    # 20 positives (scores 0.99..0.80, weight 3 each) + 5 negatives.
+    # The first negative (score 0.815, weight 3) exceeds the lowest qualifying
+    # threshold (0.81), creating a weighted false positive that exercises the
+    # FPR logic.  The remaining negatives have weights [1, 2, 1, 1].
+    labels = np.concatenate([np.ones(20), np.zeros(5)])
+    pos_scores = np.linspace(0.99, 0.80, 20)
+    neg_scores = np.array([0.815, 0.3, 0.2, 0.1, 0.05])
+    scores = np.concatenate([pos_scores, neg_scores])
+    weights = np.array([3] * 21 + [1, 2, 1, 1])
+
+    expanded_labels = np.repeat(labels, weights)
+    expanded_scores = np.repeat(scores, weights)
+
+    weighted_result = metrics.fpr_at_precision(labels, scores, sample_weight=weights)
+    unweighted_result = metrics.fpr_at_precision(expanded_labels, expanded_scores)
+
+    # Verify FPR is nonzero (i.e. the test data actually exercises the FPR path)
+    assert weighted_result > 0, "Test data should produce nonzero FPR"
+    assert weighted_result == pytest.approx(unweighted_result, rel=1e-5)
+
+
 @pytest.mark.parametrize("target_precision, expected_fpr", [(0.9, 0.0), (0.8, 0.2)])
 def test_fpr_at_precision(target_precision, expected_fpr):
     y_true = np.array([0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
