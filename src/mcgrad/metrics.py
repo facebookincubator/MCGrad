@@ -1191,6 +1191,7 @@ def _rank_calibration_error(
     :param labels: Array of true labels.
     :param predicted_labels: Array of predicted labels.
     :param num_bins: Number of bins to use for the rank calibration error calculation.
+    :param rng: Optional random state for tie-breaking. If None, a fixed seed (42) is used for reproducibility.
     :return: tuple (RCE, label_cdfs, prediction_cdfs)
     """
     # break ties
@@ -1943,6 +1944,8 @@ class MulticalibrationError(
         The MDE represents the smallest calibration error that would be
         statistically detectable at approximately 5 sigma significance,
         given the sample size. Expressed as an absolute probability difference.
+
+        :return: Minimum detectable error as an absolute probability difference.
         """
         return 5 * self._global_ecce_std
 
