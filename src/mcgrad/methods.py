@@ -1702,7 +1702,7 @@ class RegressionMCGrad(_BaseMCGrad):
         if np.isinf(predictions).any():
             raise ValueError(
                 f"{self.__class__.__name__} does not support infinite values in the prediction column, but {np.sum(np.isinf(predictions))}"
-                f" of {len(predictions)} are null."
+                f" of {len(predictions)} are infinite."
             )
 
     def _check_labels(self, df_train: pd.DataFrame, label_column_name: str) -> None:

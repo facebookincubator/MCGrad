@@ -2573,6 +2573,23 @@ def test_mcgrad__check_predictions_fails_when_expected(
             calibrator._check_predictions(df, "score")
 
 
+@pytest.mark.parametrize(
+    "calibrator_class,scores,expected_match",
+    [
+        (methods.RegressionMCGrad, [1.0, np.nan], "null"),
+        (methods.RegressionMCGrad, [1.0, float("inf")], "infinite"),
+    ],
+)
+def test_mcgrad__check_predictions_error_message_matches_cause(
+    calibrator_class, scores, expected_match
+):
+    """Verify that the error message correctly identifies the type of invalid value."""
+    df = pd.DataFrame({"score": scores})
+    calibrator = calibrator_class()
+    with pytest.raises(ValueError, match=expected_match):
+        calibrator._check_predictions(df, "score")
+
+
 def test_basemcgrad_implementations_transform_inverse_transform_invariance():
     # Find all subclasses of _BaseMCGrad. This only works for classes that are imported in this file
     # so we're operating on the assumption that there's at least on other relevant test for any MCGrad implementation.
