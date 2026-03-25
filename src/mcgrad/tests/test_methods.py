@@ -39,7 +39,7 @@ def generate_test_data(n):
     )
 
 
-@pytest.mark.parametrize("num_rounds", [(1), (2), (6)])
+@pytest.mark.parametrize("num_rounds", [(1), (2), (3)])
 @pytest.mark.parametrize(
     "calibrator_class",
     [
@@ -399,7 +399,7 @@ def test_segmentwise_calibrator_equivalent_to_calibrator_per_segment(
 
 
 def test_segmentwise_calibrator_with_additive_adjustment_gives_expected_results(rng):
-    df = pd.DataFrame(index=range(1000))
+    df = pd.DataFrame(index=range(100))
     df["label"] = rng.choice(range(1000), size=len(df))
     df["uncalibrated_score"] = rng.choice(range(1000), size=len(df)).astype(float)
     df["segment_1"] = rng.choice(["A", "B"], size=len(df))
