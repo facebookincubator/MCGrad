@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-03-26
+
 ### Fixed
 - Fixed documentation inaccuracies in the MCE metrics page: corrected `mce` formatting from percent to absolute scale, added documentation for MDE and all four available scales, and clarified statistical interpretation of sigma threshold and p-value.
 - Fixed `calibration_free_normalized_entropy` not passing `sample_weight` to the final `normalized_entropy` call, causing weighted calibration-free NE to silently ignore sample weights.
@@ -69,5 +71,5 @@ Note: Early pre-release versions (i.e., 0.0.0 and 0.1.0) were yanked due to pack
 - Sphinx API documentation at mcgrad.readthedocs.io
 
 
-<!-- Link will be updated after first release tag is created -->
-[Unreleased]: https://github.com/facebookincubator/MCGrad/commits/main
+[Unreleased]: https://github.com/facebookincubator/MCGrad/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/facebookincubator/MCGrad/compare/v0.1.3...v0.1.4
