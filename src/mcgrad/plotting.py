@@ -103,7 +103,7 @@ def plot_global_calibration_curve(
         bins) or "equisized" (equal-count bins).
     :param plot_incomplete_cis: Whether to plot bins with incomplete confidence
         intervals (i.e., bins with NaN values).
-    :param x_lim: Tuple specifying the x-axis and y-axis limits.
+    :param x_lim: Tuple specifying both the x-axis and y-axis limits (same range applied to both axes).
     :return: A Plotly Figure object with the calibration curve, confidence intervals,
         and a histogram of scores.
     """
