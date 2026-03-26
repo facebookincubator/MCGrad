@@ -18,6 +18,7 @@ All calibrators follow a scikit-learn-style fit/predict interface defined by
 import json
 import logging
 import time
+# @oss-disable[end= ]: import uuid
 import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
@@ -49,7 +50,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 from ._compat import create_kbins_discretizer, groupby_apply
 # @oss-disable[end= ]: from .internal._compat import DeprecatedAttributesMixin
-# @oss-disable[end= ]: from .internal.cas_logger import log_usage
+# @oss-disable[end= ]: from .internal.cas_logger import log_fit
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,6 +120,17 @@ class _EstimationMethod(Enum):
     CROSS_VALIDATION = 1
     HOLDOUT = 2
     AUTO = 3
+
+
+@dataclass(frozen=True)
+class _EarlyStoppingResult:
+    """Result of the early stopping procedure."""
+
+    best_num_rounds: int
+    num_rounds_evaluated: int
+    timed_out: bool
+    resolved_estimation_method: str
+    best_metric_value: float
 
 
 class _BaseMCGrad(
@@ -651,6 +663,8 @@ class _BaseMCGrad(
             to be set to False for this to work.
         :return: The fitted calibrator instance
         """
+        fit_start_time = time.time()
+
         self._check_input_data(
             df_train,
             prediction_column_name,
@@ -676,6 +690,7 @@ class _BaseMCGrad(
 
         preprocessed_val_data = None
 
+        es_result = None
         num_rounds = self.num_rounds
         if self.early_stopping:
             timeout_msg = (
@@ -707,10 +722,11 @@ class _BaseMCGrad(
                     is_fit_phase=False,  # Don't want to fit the encoder on validation data, emulate predict setup
                 )
 
-            num_rounds = self._determine_best_num_rounds(
+            es_result = self._determine_best_num_rounds(
                 preprocessed_data, preprocessed_val_data
             )
 
+            num_rounds = es_result.best_num_rounds
             if num_rounds > 0:
                 logger.info(
                     f"Fitting final {self.__class__.__name__} model with {num_rounds} rounds"
@@ -732,9 +748,24 @@ class _BaseMCGrad(
                 numerical_feature_column_names=preprocessed_data.numerical_feature_names,
             )
 
+        fit_duration = time.time() - fit_start_time
+        logger.info(f"MCGrad fit completed in {fit_duration:.1f}s")
+
         # @oss-disable[end= ]: if not kwargs.pop("_disable_telemetry", False):
-            # @oss-disable[end= ]: overrides = kwargs.pop("_telemetry_overrides", None)
-            # @oss-disable[end= ]: log_usage(self, overrides)
+            # @oss-disable[end= ]: _tel_overrides = kwargs.pop("_telemetry_overrides", None)
+            # @oss-disable[end= ]: log_fit(
+                # @oss-disable[end= ]: instance=self,
+                # @oss-disable[end= ]: run_id=str(uuid.uuid4()),
+                # @oss-disable[end= ]: es_result=es_result,
+                # @oss-disable[end= ]: n_train_rows=len(df_train),
+                # @oss-disable[end= ]: n_train_columns=len(df_train.columns),
+                # @oss-disable[end= ]: prediction_column_name=prediction_column_name,
+                # @oss-disable[end= ]: label_column_name=label_column_name,
+                # @oss-disable[end= ]: weight_column_name=weight_column_name,
+                # @oss-disable[end= ]: n_val_rows=len(df_val) if df_val is not None else None,
+                # @oss-disable[end= ]: fit_duration_seconds=fit_duration,
+                # @oss-disable[end= ]: cas_telemetry_overrides=_tel_overrides,
+            # @oss-disable[end= ]: )
 
         self._is_fitted = True
         return self
@@ -1041,12 +1072,13 @@ class _BaseMCGrad(
         self,
         data_train: _MCGradProcessedData,
         data_val: _MCGradProcessedData | None = None,
-    ) -> int:
+    ) -> _EarlyStoppingResult:
         logger.info("Determining optimal number of rounds")
         if data_train.labels is None:
             raise ValueError("_determine_best_num_rounds() requires labels.")
 
         estimation_method = self._determine_estimation_method(data_train.weights)
+        resolved_method_name = estimation_method.name
         train_test_splitter = self._determine_train_test_splitter(
             estimation_method,
             data_val is not None,
@@ -1063,6 +1095,8 @@ class _BaseMCGrad(
         predictions_per_fold: Dict[int, npt.NDArray] = {}
 
         best_score = -np.inf
+        best_metric_value = float("nan")
+        timed_out = False
 
         (
             fold_splits,
@@ -1091,6 +1125,7 @@ class _BaseMCGrad(
                     f"Stopping early stopping upon exceeding the {self.early_stopping_timeout:,}-second timeout; "
                     + f"{self.__class__.__name__} results will likely improve by increasing `early_stopping_timeout` or setting it to None"
                 )
+                timed_out = True
                 break
 
             valid_monitored_metrics_per_round = np.zeros(
@@ -1207,18 +1242,14 @@ class _BaseMCGrad(
 
             if current_score > best_score:
                 best_score = current_score
+                best_metric_value = early_stopping_metric_value
                 best_num_rounds = num_rounds
                 patience_counter = 0
             else:
                 patience_counter += 1
 
-            best_early_stopping_metric_value = (
-                (-best_score if best_score != -np.inf else np.inf)
-                if self.early_stopping_minimize_score
-                else best_score
-            )
             logger.info(
-                f"Round {num_rounds}: validation loss = {early_stopping_metric_value:.4f} (best: {best_early_stopping_metric_value:.4f}, patience: {patience_counter}/{self.patience})"
+                f"Round {num_rounds}: validation loss = {early_stopping_metric_value:.4f} (best: {best_metric_value:.4f}, patience: {patience_counter}/{self.patience})"
             )
 
             num_rounds += 1
@@ -1257,7 +1288,13 @@ class _BaseMCGrad(
                         f"The final Multicalibration Error on the validation set after using {self.__class__.__name__} is {mce_at_best_num_rounds}, which is not lower than the initial Multicalibration Error of {mce_at_initial_round}. This indicates that {self.__class__.__name__} did not improve the multi-calibration of the model."
                     )
 
-        return best_num_rounds
+        return _EarlyStoppingResult(
+            best_num_rounds=best_num_rounds,
+            num_rounds_evaluated=num_rounds,
+            timed_out=timed_out,
+            resolved_estimation_method=resolved_method_name,
+            best_metric_value=best_metric_value,
+        )
 
     def _precompute_fold_data(
         self,
