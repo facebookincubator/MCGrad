@@ -4,6 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 # pyre-unsafe
 
+import json
 import logging
 from unittest.mock import Mock
 
@@ -1490,6 +1491,48 @@ def test_feature_consistency_skipped_for_legacy_serialized_models(
         categorical_feature_column_names=["cat_a"],
     )
     assert result.shape == (30,)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCGrad,
+        methods.RegressionMCGrad,
+    ],
+)
+def test_deserialize_restores_allow_missing_segment_feature_values(
+    calibrator_class, rng
+):
+    """Test that allow_missing_segment_feature_values survives serialize/deserialize roundtrip."""
+    df = pd.DataFrame(
+        {
+            "prediction": rng.rand(30),
+            "label": rng.randint(0, 2, 30),
+            "cat_a": rng.choice(["x", "y"], 30),
+        }
+    )
+    # Fit with allow_missing_segment_feature_values=False (non-default)
+    model = calibrator_class(
+        num_rounds=1,
+        early_stopping=False,
+        allow_missing_segment_feature_values=False,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+    model.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["cat_a"],
+    )
+
+    serialized = model.serialize()
+    # Verify the param is stored in the serialized JSON
+    json_obj = json.loads(serialized)
+    assert json_obj["params"]["allow_missing_segment_feature_values"] is False
+
+    deserialized = calibrator_class.deserialize(serialized)
+    # The non-default value should be restored after deserialization
+    assert deserialized.allow_missing_segment_feature_values is False
 
 
 @pytest.mark.parametrize(

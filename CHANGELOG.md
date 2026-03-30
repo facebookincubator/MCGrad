@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fixed `_BaseMCGrad.deserialize()` not restoring `allow_missing_segment_feature_values`, causing models serialized with `allow_missing_segment_feature_values=False` to silently revert to the default (`True`) after deserialization.
+
 ## [0.1.4] - 2026-03-26
 
 ### Fixed

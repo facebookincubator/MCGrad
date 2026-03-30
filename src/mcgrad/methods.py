@@ -1440,6 +1440,14 @@ class _BaseMCGrad(
         model._is_fitted = True
         model.categorical_feature_names = json_obj.get("categorical_feature_names")
         model.numerical_feature_names = json_obj.get("numerical_feature_names")
+
+        # Restore params that were saved during serialization
+        params = json_obj.get("params", {})
+        if "allow_missing_segment_feature_values" in params:
+            model.allow_missing_segment_feature_values = params[
+                "allow_missing_segment_feature_values"
+            ]
+
         return model
 
     def _compute_effective_sample_size(self, weights: npt.NDArray) -> int:
