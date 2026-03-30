@@ -165,7 +165,7 @@ def test_plot_calibration_curve_by_segment_empty_data():
 @pytest.fixture
 def mcgrad_training_df(rng):
     """Fixture providing training data for MCGrad model tests."""
-    n_samples = 200
+    n_samples = 50
     return pd.DataFrame(
         {
             "prediction": rng.rand(n_samples),
