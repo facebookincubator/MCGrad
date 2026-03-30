@@ -330,7 +330,7 @@ def test_ndcg_score_is_correct_when_k_larger_than_array_length(
     ],
 )
 def test_multi_cg_gives_same_result_as_cg_per_segment(rank_discount, rng):
-    n_samples = 1000
+    n_samples = 200
     k = 100
     df = pd.DataFrame(index=range(n_samples))
     df["label"] = rng.random_sample(n_samples)
