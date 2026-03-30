@@ -254,11 +254,11 @@ class _BaseMCGrad(
             number of rounds. If set to None, default values are used.
         :param lightgbm_params: the training parameters of lightgbm model. See: https://lightgbm.readthedocs.io/en/stable/Parameters.html
             if None, we will use a set of default parameters.
-        :param early_stopping: whether to use early stopping based on cross-validation. When early stopping is used, then num_rounds specifies
-            the maximum number of rounds that are fit, and the effective number of rounds is determined based on cross-validation.
+        :param early_stopping: whether to use early stopping. When early stopping is used, then num_rounds specifies
+            the maximum number of rounds that are fit, and the effective number of rounds is determined based on validation performance.
         :param patience: the maximum number of consecutive rounds without improvement in `early_stopping_score_func`.
         :param early_stopping_use_crossvalidation: whether to use cross-validation (k-fold) for early stopping (otherwise use holdout). If set to None, then the evaluation method is determined automatically.
-        :param early_stopping_score_func: the metric (default = log_loss if set to None) used to select the optimal number of rounds, when early stopping is used. It can be the Multicalibration Error (MulticalibrationError) or any SkLearn metric (SkLearnWrapper).
+        :param early_stopping_score_func: the metric used to select the optimal number of rounds, when early stopping is used. If None, a subclass-specific default is used (log_loss for MCGrad, MSE for RegressionMCGrad). Use :func:`wrap_sklearn_metric_func` to wrap an sklearn metric, or :func:`wrap_multicalibration_error_metric` for multicalibration error.
         :param early_stopping_minimize_score: whether the score function used for early stopping should be minimized. If set to False score is maximized.
         :param early_stopping_timeout: number of seconds after which early stopping is forced to stop and the number of rounds is determined. If set to None, then early stopping will not time out. Ignored when early stopping is disabled.
         :param n_folds: number of folds for k-fold cross-validation (used only when `early_stopping_use_crossvalidation` is `True`; or when that argument is `None` and k-fold is chosen automatically).
