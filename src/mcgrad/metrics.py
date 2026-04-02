@@ -1398,7 +1398,7 @@ def calibration_free_normalized_entropy(
     :param max_iter: Maximum number of iterations for the calibration adjustment. Defaults to 10000.
     :return: the calibration-free NE.
     """
-    if len(labels.shape) != 1:
+    if len(predicted_scores.shape) != 1:
         raise ValueError("y_pred must be the predicted probability for class 1 only.")
 
     current_calibration = calibration_ratio(labels, predicted_scores, sample_weight)
