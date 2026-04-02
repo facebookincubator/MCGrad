@@ -723,18 +723,18 @@ def multi_cg_score(
     metric: _MulticalibrationRankErrorMetricsInterface = ndcg_score,
     rank_discount: Callable[[int], npt.NDArray] = utils.rank_no_discount,
     k: int | None = None,
-) -> npt.NDArray:
+) -> pd.Series:
     """
     Calculates the metric score for each segment.
 
     :param labels: Array of true labels.
-    :param predictions: Array of predicted labels.
+    :param predictions: Array of predicted scores.
     :param segments_df: Dataframe with the segments to calculate the error
     :param metric: The cumulative gain metric to use. Defaults to ndcg_score.
     :param rank_discount: rank discount function of the metric. Defaults to no discount.
     :param k: If not None, the metric is calculated only based on the top k samples.
         k cannot be smaller than 1 and cannot be larger than the number of samples.
-    :return: an array of size n_segments with the metric score for each segment.
+    :return: a Series of size n_segments with the metric score for each segment.
     """
     if metric not in (ndcg_score, dcg_score):
         raise ValueError("Only ndcg_score and dcg_score are supported")
@@ -1313,7 +1313,7 @@ def _rank_multicalibration_error(
     :param predicted_labels: Array of predicted labels.
     :param segments_df: Dataframe with the segments to calculate the error
     :param num_bins: Number of bins to use for the rank calibration error calculation.
-    :return: an array of size n_segments with the tuple of (RCE, label_cdfs, prediction_cdfs) for each segment.
+    :return: a Series of size n_segments with the tuple of (RCE, label_cdfs, prediction_cdfs) for each segment.
     """
     segments_df = segments_df.copy()
     segmentation_cols = list(segments_df.columns)
