@@ -455,7 +455,8 @@ def _dcg_sample_scores(
         with the discount factor for each sample
     :param k: If not None, the DCG score is calculated only for the top k samples. If None, the DCG score is calculated for all samples.
         k cannot be smaller than 1 and cannot be larger than the number of samples.
-    :return: the array of size n_samples with the DCG score for each sample. If k is not None, then elements after the k-th one are 0.
+    :return: the array of size n_samples with the DCG score for each sample. If k is not None, then elements after the k-th one
+        plateau at the k-th cumulative value (because the discount is zeroed out, so no further gains are accumulated).
     """
     discount = rank_discount(labels.shape[0])
 
@@ -519,7 +520,8 @@ def _ndcg_sample_scores(
         with the discount factor for each sample
     :param k: If not None, the NDCG score is calculated only for the top k samples. If None, the NDCG score is calculated for all samples.
         k cannot be smaller than 1 and cannot be larger than the number of samples.
-    :return: the array of size n_samples with the NDCG score for each sample. If k is not None, then elements after the k-th one are 0.
+    :return: the array of size n_samples with the NDCG score for each sample. If k is not None, then elements after the k-th one
+        plateau at the k-th cumulative value (because the discount is zeroed out, so no further gains are accumulated).
     """
     gain = _dcg_sample_scores(
         labels, predicted_labels, rank_discount=rank_discount, k=k
