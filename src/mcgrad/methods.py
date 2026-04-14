@@ -1450,7 +1450,7 @@ class _BaseMCGrad(
 
         return model
 
-    def _compute_effective_sample_size(self, weights: npt.NDArray) -> int:
+    def _compute_effective_sample_size(self, weights: npt.NDArray) -> float:
         """
         Computes the effective sample size for the given weights.
         The effective sample size is defined as square of the sum of weights over the sum of the squared weights,
