@@ -99,7 +99,7 @@ def combine_segment_calibration_plots(
     Combines multiple segment calibration error plots into a single plot with different colors for each method.
 
     :param segment_plots: Dictionary where keys are method names and values are plotly figures from plot_segment_calibration_errors
-    :param quantity: The MCE quantity being plotted, corresponding to availabel attributes in `metrics.MulticalibrationError`
+    :param quantity: The MCE quantity being plotted, corresponding to available attributes in `metrics.MulticalibrationError`
     :returns: A Plotly Figure object
     """
     if not segment_plots:
