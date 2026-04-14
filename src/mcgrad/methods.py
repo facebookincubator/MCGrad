@@ -1467,6 +1467,8 @@ class _BaseMCGrad(
         Returns the estimation method to use for early stopping given the arguments and the weights (when relevant).
         This is especially useful for the AUTO option, where we infer the proper estimation method to use based on the effective sample size.
 
+        :param weights: weights for each sample, used to compute the effective sample size when
+            the estimation method is AUTO.
         :return: the estimation method to use.
         """
         if self.early_stopping_estimation_method != _EstimationMethod.AUTO:
