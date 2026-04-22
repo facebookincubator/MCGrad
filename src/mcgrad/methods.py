@@ -654,9 +654,9 @@ class _BaseMCGrad(
         :param prediction_column_name: Name of the column in dataframe df that contains the uncalibrated predictions
         :param label_column_name: Name of the column in dataframe df that contains the ground truth labels
         :param weight_column_name: Name of the column in dataframe df that contains the instance weights
-        :param categorical_feature_column_names: List of column names in the df that contain the categorical
+        :param categorical_feature_column_names: List of column names in df_train that contain the categorical
             segmentation features
-        :param numerical_feature_column_names: List of column names in the df that contain the numerical
+        :param numerical_feature_column_names: List of column names in df_train that contain the numerical
             segmentation features
         :param df_val: Optional validation dataframe for early stopping. When provided with early stopping enabled,
             this validation set will be used instead of a holdout from the training data. early_stopping_use_crossvalidation has
@@ -2346,9 +2346,9 @@ class PlattScalingWithFeatures(BaseCalibrator):
         :param prediction_column_name: Name of the column in dataframe df that contains the predictions
         :param label_column_name: Name of the column in dataframe df that contains the ground truth labels
         :param weight_column_name: Name of the column in dataframe df that contains the instance weights
-        :param categorical_feature_column_names: List of column names in the df that contain the categorical
+        :param categorical_feature_column_names: List of column names in df_train that contain the categorical
             segmentation features (these will be one-hot encoded)
-        :param numerical_feature_column_names: List of column names in the df that contain the numerical
+        :param numerical_feature_column_names: List of column names in df_train that contain the numerical
             segmentation features (these will be discretized into bins)
         :param kwargs: Additional keyword arguments
         :return: The fitted calibrator instance
@@ -2489,9 +2489,9 @@ class SegmentwiseCalibrator(Generic[TCalibrator], BaseCalibrator):
         :param prediction_column_name: Name of the column in dataframe df that contains the predictions
         :param label_column_name: Name of the column in dataframe df that contains the ground truth labels
         :param weight_column_name: Name of the column in dataframe df that contains the instance weights
-        :param categorical_feature_column_names: List of column names in the df that contain the categorical
+        :param categorical_feature_column_names: List of column names in df_train that contain the categorical
             segmentation features (passed to individual calibrators)
-        :param numerical_feature_column_names: List of column names in the df that contain the numerical
+        :param numerical_feature_column_names: List of column names in df_train that contain the numerical
             segmentation features (passed to individual calibrators)
         :param kwargs: Additional keyword arguments
         :return: The fitted calibrator instance
