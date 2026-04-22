@@ -7,6 +7,7 @@ Interactive Jupyter notebooks demonstrating how to use MCGrad for multicalibrati
 | Tutorial | Description | Colab |
 |----------|-------------|-------|
 | [01. MCGrad Core Algorithm](01_mcgrad_core.ipynb) | Complete introduction to multicalibration with MCGrad | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/facebookincubator/MCGrad/blob/main/tutorials/01_mcgrad_core.ipynb) |
+| [02. Calibrating an LLM Classifier with MCGrad](02_calibrating_llm_outputs.ipynb) | Apply MCGrad to a Claude Opus classifier on the Comparative Agendas Project, with per-segment prevalence estimation and marginal precision use cases | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/facebookincubator/MCGrad/blob/main/tutorials/02_calibrating_llm_outputs.ipynb) |
 
 ## Running Tutorials
 
