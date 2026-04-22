@@ -1401,7 +1401,9 @@ def calibration_free_normalized_entropy(
     :return: the calibration-free NE.
     """
     if len(predicted_scores.shape) != 1:
-        raise ValueError("y_pred must be the predicted probability for class 1 only.")
+        raise ValueError(
+            "predicted_scores must be the predicted probability for class 1 only."
+        )
 
     current_calibration = calibration_ratio(labels, predicted_scores, sample_weight)
 
