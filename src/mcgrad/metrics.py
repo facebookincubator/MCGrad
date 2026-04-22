@@ -1364,7 +1364,7 @@ def normalized_entropy(
     :param labels: Ground truth (correct) labels for n_samples samples.
     :param predicted_scores: Predicted probabilities, as returned by a classifier's predict_proba method.
     :param sample_weight: Optional array of sample weights for each instance.
-    :returns: the normalized entropy
+    :return: the normalized entropy
     """
     if sample_weight is None:
         sample_weight = np.ones_like(predicted_scores)
