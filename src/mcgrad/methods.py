@@ -478,6 +478,14 @@ class _BaseMCGrad(
         ).sort_values("importance", ascending=False)
 
     def _reset_training_state(self) -> None:
+        """Clear every attribute that :meth:`fit` writes to.
+
+        Calibrators reuse a single instance across multiple ``fit()`` calls
+        (e.g., during hyperparameter tuning). Every attribute written by a
+        ``fit()`` code path -- including attributes added in subclasses or
+        helper methods -- must be cleared here, otherwise stale state leaks
+        into the next fit and produces silently incorrect models.
+        """
         self.mr = []
         self.unshrink_factors = []
         self.mce_below_initial = None

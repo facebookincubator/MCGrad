@@ -4466,3 +4466,72 @@ def test_mcgrad_binary_labels_unchanged():
     )
     assert predictions.shape == (5,)
     assert np.all(predictions >= 0) and np.all(predictions <= 1)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [methods.MCGrad, methods.RegressionMCGrad],
+)
+def test_reset_training_state_restores_fresh_state(calibrator_class):
+    """Every fit-mutated attribute must be cleared by ``_reset_training_state``.
+
+    Calibrators reuse a single instance across repeated fits (e.g. during
+    hyperparameter tuning), so any attribute written by ``fit`` that is not
+    also cleared by ``_reset_training_state`` leaks stale state into the next
+    fit -- a silent correctness bug.
+
+    This snapshot test captures ``vars(instance)`` immediately after
+    construction, fits the model, calls ``_reset_training_state``, and asserts
+    the vars dict matches the snapshot. A newly added attribute that is set
+    during fit but not listed in ``_reset_training_state`` will appear as a
+    diff here.
+
+    Attributes that intentionally persist across fits (e.g. generator objects
+    whose internal state advances but whose reference does not change) are
+    listed in ``identity_only_attrs`` and compared by identity rather than
+    ``==``.
+    """
+    identity_only_attrs: frozenset[str] = frozenset({"_rng"})
+
+    model = calibrator_class(
+        num_rounds=1,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+    fresh_state = dict(vars(model))
+
+    df_train = generate_test_data(5)
+    model.fit(
+        df_train=df_train,
+        prediction_column_name="Prediction",
+        label_column_name="Label",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+    model._reset_training_state()
+    reset_state = dict(vars(model))
+
+    added = set(reset_state) - set(fresh_state)
+    removed = set(fresh_state) - set(reset_state)
+    assert not added and not removed, (
+        f"_reset_training_state changed the attribute set. "
+        f"Added after fit + reset: {sorted(added)!r}. "
+        f"Removed after fit + reset: {sorted(removed)!r}. "
+        f"Any attribute set during fit() must also be cleared by "
+        f"_reset_training_state."
+    )
+
+    for attr_name in sorted(fresh_state):
+        fresh_val = fresh_state[attr_name]
+        reset_val = reset_state[attr_name]
+        if attr_name in identity_only_attrs:
+            assert reset_val is fresh_val, (
+                f"Attribute {attr_name!r} identity changed after fit + reset. "
+                f"This attribute is whitelisted for identity comparison, so a "
+                f"new instance being assigned is a regression."
+            )
+        else:
+            assert reset_val == fresh_val, (
+                f"Attribute {attr_name!r} was not restored to its fresh value "
+                f"by _reset_training_state. "
+                f"Fresh: {fresh_val!r}. After fit + reset: {reset_val!r}."
+            )
