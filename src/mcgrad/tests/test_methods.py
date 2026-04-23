@@ -4535,3 +4535,116 @@ def test_reset_training_state_restores_fresh_state(calibrator_class):
                 f"by _reset_training_state. "
                 f"Fresh: {fresh_val!r}. After fit + reset: {reset_val!r}."
             )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [methods.MCGrad, methods.RegressionMCGrad],
+)
+def test_serialize_deserialize_roundtrip_restores_full_config(calibrator_class):
+    """Schema-v1 serialize/deserialize restores the user-controllable config.
+
+    Prior to schema v1, ``deserialize`` called ``cls()`` with no arguments, so
+    nearly every ``__init__`` kwarg fell back to defaults after a round-trip.
+    This test fits a calibrator with non-default values across the v1 kwarg
+    set, serializes, deserializes, and asserts each field survives.
+    ``num_rounds`` is explicitly checked to be the **configured** value rather
+    than the trained booster count -- ``num_rounds_trained`` exposes the
+    count.
+    """
+    df_train = generate_test_data(5)
+    model = calibrator_class(
+        num_rounds=7,  # upper bound; early stopping may pick fewer
+        monotone_t=True,
+        early_stopping=True,
+        patience=1,
+        early_stopping_use_crossvalidation=True,
+        n_folds=2,
+        early_stopping_timeout=3600,
+        save_training_performance=True,
+        encode_categorical_variables=True,
+        allow_missing_segment_feature_values=True,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+    model.fit(
+        df_train=df_train,
+        prediction_column_name="Prediction",
+        label_column_name="Label",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+
+    restored = calibrator_class.deserialize(model.serialize())
+
+    assert restored.num_rounds == 7, (
+        f"Configured num_rounds=7 should survive the round-trip, "
+        f"got {restored.num_rounds}"
+    )
+    assert restored.num_rounds_trained == len(model.mr)
+    assert restored.monotone_t is True
+    assert restored.early_stopping is True
+    assert restored.patience == 1
+    assert restored.n_folds == 2
+    assert restored.early_stopping_timeout == 3600
+    assert restored.save_training_performance is True
+    assert restored.encode_categorical_variables is True
+    assert restored.allow_missing_segment_feature_values is True
+    assert (
+        restored.early_stopping_estimation_method
+        == methods._EstimationMethod.CROSS_VALIDATION
+    )
+    # The lightgbm_params dict is populated with a seed and objective at
+    # __init__ time; compare the keys the user supplied.
+    for key in ("num_leaves", "n_estimators", "max_depth"):
+        assert restored.lightgbm_params[key] == model.lightgbm_params[key]
+
+    # Legacy format (no schema_version) continues to load with a warning.
+    legacy_payload = json.loads(model.serialize())
+    legacy_payload.pop("schema_version")
+    legacy_restored = calibrator_class.deserialize(json.dumps(legacy_payload))
+    assert legacy_restored.num_rounds == len(legacy_restored.mr), (
+        "Legacy format should fall back to num_rounds=len(mr) (pre-schema behavior)."
+    )
+
+
+def test_deserialize_rejects_unknown_schema_version():
+    """An unknown schema_version must raise, not silently degrade."""
+    payload = {
+        "schema_version": 999,
+        "mcgrad": [],
+        "has_encoder": False,
+    }
+    with pytest.raises(ValueError, match="unsupported schema_version"):
+        methods.MCGrad.deserialize(json.dumps(payload))
+
+
+def test_serialize_deserialize_roundtrip_holdout_early_stopping():
+    """Guard against regressions in the HOLDOUT early-stopping roundtrip.
+
+    ``__init__`` sets ``self.n_folds = 1`` internally in HOLDOUT mode but
+    rejects an explicit ``n_folds`` kwarg in that mode. Any roundtrip that
+    persists ``n_folds`` alongside a HOLDOUT estimation method would therefore
+    fail at deserialize time. This test exercises that combination directly so
+    future changes can't reintroduce the bug.
+    """
+    df_train = generate_test_data(5)
+    model = methods.MCGrad(
+        num_rounds=2,
+        early_stopping=True,
+        early_stopping_use_crossvalidation=False,  # HOLDOUT mode
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+    model.fit(
+        df_train=df_train,
+        prediction_column_name="Prediction",
+        label_column_name="Label",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+
+    restored = methods.MCGrad.deserialize(model.serialize())
+
+    assert restored.early_stopping is True
+    assert (
+        restored.early_stopping_estimation_method == methods._EstimationMethod.HOLDOUT
+    )
+    # HOLDOUT mode sets n_folds to 1 internally; the restored value should match.
+    assert restored.n_folds == 1
