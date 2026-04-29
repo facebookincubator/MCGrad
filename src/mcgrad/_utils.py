@@ -40,25 +40,27 @@ BIN_EPSILON: float = 1e-8
 MIN_LOGIT_EPSILON: float = 1e-304
 
 
-def logistic(logits: float) -> float:
+def logistic(
+    logits: float | npt.NDArray[Any],
+) -> float | npt.NDArray[Any]:
     """
     Compute the logistic (sigmoid) function in a numerically stable way.
 
-    Uses a computational trick to avoid overflow/underflow by choosing
-    different formulations based on the sign of the input.
+    Accepts both scalar and array inputs. Uses ``np.where`` to select the
+    appropriate formulation based on the sign of each element, avoiding
+    overflow/underflow.
 
-    :param logits: Input value in log-odds space.
-    :return: Probability value in (0, 1).
+    :param logits: Input value(s) in log-odds space (scalar or array).
+    :return: Probability value(s) in (0, 1).
     """
-    if logits >= 0:
-        return 1.0 / (1.0 + math.exp(-logits))
-    else:
-        return math.exp(logits) / (1.0 + math.exp(logits))
-
-
-logistic_vectorized: Callable[[npt.NDArray[Any]], npt.NDArray[Any]] = np.vectorize(
-    logistic
-)
+    logits = np.asarray(logits)
+    with np.errstate(over="ignore", invalid="ignore"):
+        result = np.where(
+            logits >= 0,
+            1.0 / (1.0 + np.exp(-logits)),
+            np.exp(logits) / (1.0 + np.exp(logits)),
+        )
+    return result.item() if result.ndim == 0 else result
 
 
 def logit(
@@ -657,6 +659,6 @@ def predictions_to_labels(
         thresholds, on=segmentation_columns, how="left"
     )
     data_w_thresholds["predicted_label"] = (
-        data_w_thresholds[prediction_column] >= data_w_thresholds.threshold
+        data_w_thresholds[prediction_column] >= data_w_thresholds[threshold_column]
     ).astype(int)
     return data_w_thresholds

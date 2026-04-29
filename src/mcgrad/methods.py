@@ -18,6 +18,7 @@ All calibrators follow a scikit-learn-style fit/predict interface defined by
 import json
 import logging
 import time
+# @oss-disable[end= ]: import uuid
 import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
@@ -30,7 +31,7 @@ import lightgbm as lgb
 import numpy as np
 import pandas as pd
 from numpy import typing as npt
-from scipy.optimize._linesearch import LineSearchWarning
+from scipy.optimize import minimize_scalar
 from sklearn import isotonic, metrics as skmetrics
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.model_selection import KFold, StratifiedKFold
@@ -39,13 +40,17 @@ from typing_extensions import Self
 
 from . import _utils as utils
 from .base import BaseCalibrator
-from .metrics import _ScoreFunctionInterface, wrap_sklearn_metric_func
+from .metrics import (
+    _ScoreFunctionInterface,
+    soft_label_log_loss,
+    wrap_sklearn_metric_func,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 from ._compat import create_kbins_discretizer, groupby_apply
 # @oss-disable[end= ]: from .internal._compat import DeprecatedAttributesMixin
-# @oss-disable[end= ]: from .internal.cas_logger import log_usage
+# @oss-disable[end= ]: from .internal.cas_logger import log_fit
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,6 +120,17 @@ class _EstimationMethod(Enum):
     CROSS_VALIDATION = 1
     HOLDOUT = 2
     AUTO = 3
+
+
+@dataclass(frozen=True)
+class _EarlyStoppingResult:
+    """Result of the early stopping procedure."""
+
+    best_num_rounds: int
+    num_rounds_evaluated: int
+    timed_out: bool
+    resolved_estimation_method: str
+    best_metric_value: float
 
 
 class _BaseMCGrad(
@@ -238,12 +254,12 @@ class _BaseMCGrad(
             number of rounds. If set to None, default values are used.
         :param lightgbm_params: the training parameters of lightgbm model. See: https://lightgbm.readthedocs.io/en/stable/Parameters.html
             if None, we will use a set of default parameters.
-        :param early_stopping: whether to use early stopping based on cross-validation. When early stopping is used, then num_rounds specifies
-            the maximum number of rounds that are fit, and the effective number of rounds is determined based on cross-validation.
+        :param early_stopping: whether to use early stopping. When early stopping is used, then num_rounds specifies
+            the maximum number of rounds that are fit, and the effective number of rounds is determined based on validation performance.
         :param patience: the maximum number of consecutive rounds without improvement in `early_stopping_score_func`.
         :param early_stopping_use_crossvalidation: whether to use cross-validation (k-fold) for early stopping (otherwise use holdout). If set to None, then the evaluation method is determined automatically.
-        :param early_stopping_score_func: the metric (default = log_loss if set to None) used to select the optimal number of rounds, when early stopping is used. It can be the Multicalibration Error (MulticalibrationError) or any SkLearn metric (SkLearnWrapper).
-        :param early_stopping_minimize_score: whether the score function used for early stopping should be minimized. If set to False score is maximized.
+        :param early_stopping_score_func: the metric used to select the optimal number of rounds, when early stopping is used. If None, a subclass-specific default is used (log_loss for MCGrad, MSE for RegressionMCGrad). Use :func:`wrap_sklearn_metric_func` to wrap an sklearn metric, or :func:`wrap_multicalibration_error_metric` for multicalibration error.
+        :param early_stopping_minimize_score: whether the score function used for early stopping should be minimized (True) or maximized (False). Defaults to None, which automatically determines the direction based on the default metric. Must be explicitly set when providing a custom ``early_stopping_score_func``.
         :param early_stopping_timeout: number of seconds after which early stopping is forced to stop and the number of rounds is determined. If set to None, then early stopping will not time out. Ignored when early stopping is disabled.
         :param n_folds: number of folds for k-fold cross-validation (used only when `early_stopping_use_crossvalidation` is `True`; or when that argument is `None` and k-fold is chosen automatically).
         :param save_training_performance: whether to save the training performance values for each round, in addition to the performance on the held-out validation set.
@@ -252,6 +268,8 @@ class _BaseMCGrad(
             It includes which metrics to monitor during training, in addition to the metric used for early stopping (score_func).
         :param allow_missing_segment_feature_values: whether to allow missing values in the segment feature data. If set to True, missing values are used for training and prediction. If set to False, training with missing values will raise an Exception and prediction
             with missing values will return None.
+        :param random_state: Controls randomness for reproducibility. Can be an integer seed,
+            a numpy Generator, or None for non-deterministic behavior.
         """
         self.random_state = random_state
         if isinstance(random_state, np.random.Generator):
@@ -460,6 +478,14 @@ class _BaseMCGrad(
         ).sort_values("importance", ascending=False)
 
     def _reset_training_state(self) -> None:
+        """Clear every attribute that :meth:`fit` writes to.
+
+        Calibrators reuse a single instance across multiple ``fit()`` calls
+        (e.g., during hyperparameter tuning). Every attribute written by a
+        ``fit()`` code path -- including attributes added in subclasses or
+        helper methods -- must be cleared here, otherwise stale state leaks
+        into the next fit and produces silently incorrect models.
+        """
         self.mr = []
         self.unshrink_factors = []
         self.mce_below_initial = None
@@ -636,15 +662,17 @@ class _BaseMCGrad(
         :param prediction_column_name: Name of the column in dataframe df that contains the uncalibrated predictions
         :param label_column_name: Name of the column in dataframe df that contains the ground truth labels
         :param weight_column_name: Name of the column in dataframe df that contains the instance weights
-        :param categorical_feature_column_names: List of column names in the df that contain the categorical
+        :param categorical_feature_column_names: List of column names in df_train that contain the categorical
             segmentation features
-        :param numerical_feature_column_names: List of column names in the df that contain the numerical
+        :param numerical_feature_column_names: List of column names in df_train that contain the numerical
             segmentation features
         :param df_val: Optional validation dataframe for early stopping. When provided with early stopping enabled,
             this validation set will be used instead of a holdout from the training data. early_stopping_use_crossvalidation has
             to be set to False for this to work.
         :return: The fitted calibrator instance
         """
+        fit_start_time = time.time()
+
         self._check_input_data(
             df_train,
             prediction_column_name,
@@ -670,6 +698,7 @@ class _BaseMCGrad(
 
         preprocessed_val_data = None
 
+        es_result = None
         num_rounds = self.num_rounds
         if self.early_stopping:
             timeout_msg = (
@@ -701,10 +730,11 @@ class _BaseMCGrad(
                     is_fit_phase=False,  # Don't want to fit the encoder on validation data, emulate predict setup
                 )
 
-            num_rounds = self._determine_best_num_rounds(
+            es_result = self._determine_best_num_rounds(
                 preprocessed_data, preprocessed_val_data
             )
 
+            num_rounds = es_result.best_num_rounds
             if num_rounds > 0:
                 logger.info(
                     f"Fitting final {self.__class__.__name__} model with {num_rounds} rounds"
@@ -726,9 +756,24 @@ class _BaseMCGrad(
                 numerical_feature_column_names=preprocessed_data.numerical_feature_names,
             )
 
+        fit_duration = time.time() - fit_start_time
+        logger.info(f"MCGrad fit completed in {fit_duration:.1f}s")
+
         # @oss-disable[end= ]: if not kwargs.pop("_disable_telemetry", False):
-            # @oss-disable[end= ]: overrides = kwargs.pop("_telemetry_overrides", None)
-            # @oss-disable[end= ]: log_usage(self, overrides)
+            # @oss-disable[end= ]: _tel_overrides = kwargs.pop("_telemetry_overrides", None)
+            # @oss-disable[end= ]: log_fit(
+                # @oss-disable[end= ]: instance=self,
+                # @oss-disable[end= ]: run_id=str(uuid.uuid4()),
+                # @oss-disable[end= ]: es_result=es_result,
+                # @oss-disable[end= ]: n_train_rows=len(df_train),
+                # @oss-disable[end= ]: n_train_columns=len(df_train.columns),
+                # @oss-disable[end= ]: prediction_column_name=prediction_column_name,
+                # @oss-disable[end= ]: label_column_name=label_column_name,
+                # @oss-disable[end= ]: weight_column_name=weight_column_name,
+                # @oss-disable[end= ]: n_val_rows=len(df_val) if df_val is not None else None,
+                # @oss-disable[end= ]: fit_duration_seconds=fit_duration,
+                # @oss-disable[end= ]: cas_telemetry_overrides=_tel_overrides,
+            # @oss-disable[end= ]: )
 
         self._is_fitted = True
         return self
@@ -888,6 +933,9 @@ class _BaseMCGrad(
 
         :param x: the segment features.
         :param transformed_predictions: the transformed (e.g., logit) predictions that we are looking to calibrate.
+        :param return_all_rounds: If True, returns predictions for all MCGrad rounds as a 2D array of shape
+            (num_rounds, num_samples). If False, returns only the final round predictions as a 1D array.
+        :return: Array of calibrated predictions. Shape depends on return_all_rounds parameter.
         """
         assert len(self.mr) == len(self.unshrink_factors)
         if len(self.mr) < 1:
@@ -899,15 +947,24 @@ class _BaseMCGrad(
 
         predictions = transformed_predictions.copy()
         x = np.c_[x, predictions]
-        predictions_per_round = np.zeros((len(self.mr), len(predictions)))
+        predictions_per_round: npt.NDArray | None = (
+            np.zeros((len(self.mr), len(predictions))) if return_all_rounds else None
+        )
         for i in range(len(self.mr)):
             new_pred = self.mr[i].predict(x, raw_score=True)
             predictions += new_pred
             predictions *= self.unshrink_factors[i]
             x[:, -1] = predictions
-            predictions_per_round[i] = self._inverse_transform_predictions(predictions)
+            if return_all_rounds:
+                assert predictions_per_round is not None
+                predictions_per_round[i] = self._inverse_transform_predictions(
+                    predictions
+                )
 
-        return predictions_per_round if return_all_rounds else predictions_per_round[-1]
+        if return_all_rounds:
+            assert predictions_per_round is not None
+            return predictions_per_round
+        return self._inverse_transform_predictions(predictions)
 
     def _get_lgbm_params(self, x: npt.NDArray) -> dict[str, Any]:
         lgb_params = self.lightgbm_params.copy()
@@ -962,12 +1019,17 @@ class _BaseMCGrad(
         self,
         estimation_method: _EstimationMethod,
         has_custom_validation_set: bool,
+        labels: npt.NDArray | None = None,
     ) -> (
         KFold
         | StratifiedKFold
         | utils.TrainTestSplitWrapper
         | utils.NoopSplitterWrapper
     ):
+        # Stratified splitting requires discrete labels; fall back to
+        # non-stratified variants when labels are continuous (soft).
+        labels_are_binary = labels is None or np.isin(labels, [0, 1]).all()
+
         if estimation_method == _EstimationMethod.CROSS_VALIDATION:
             if has_custom_validation_set:
                 raise ValueError(
@@ -975,13 +1037,28 @@ class _BaseMCGrad(
                 )
 
             logger.info("Running early stopping using Cross Validation.")
-            train_test_splitter = self._cv_splitter
+            if labels_are_binary:
+                train_test_splitter = self._cv_splitter
+            else:
+                train_test_splitter = KFold(
+                    n_splits=self.n_folds,
+                    shuffle=True,
+                    random_state=self._next_seed(),
+                )
         else:
             if not has_custom_validation_set:
                 logger.info(
                     f"Running early stopping using holdout set of size {self.VALID_SIZE}."
                 )
-                train_test_splitter = self._holdout_splitter
+                if labels_are_binary:
+                    train_test_splitter = self._holdout_splitter
+                else:
+                    train_test_splitter = utils.TrainTestSplitWrapper(
+                        test_size=self.VALID_SIZE,
+                        shuffle=True,
+                        random_state=self._next_seed(),
+                        stratify=False,
+                    )
             else:
                 logger.info("Running early stopping using provided validation set.")
                 train_test_splitter = self._noop_splitter
@@ -1003,15 +1080,17 @@ class _BaseMCGrad(
         self,
         data_train: _MCGradProcessedData,
         data_val: _MCGradProcessedData | None = None,
-    ) -> int:
+    ) -> _EarlyStoppingResult:
         logger.info("Determining optimal number of rounds")
         if data_train.labels is None:
             raise ValueError("_determine_best_num_rounds() requires labels.")
 
         estimation_method = self._determine_estimation_method(data_train.weights)
+        resolved_method_name = estimation_method.name
         train_test_splitter = self._determine_train_test_splitter(
             estimation_method,
             data_val is not None,
+            labels=data_train.labels,
         )
         final_n_folds = self._determine_n_folds(estimation_method)
 
@@ -1024,6 +1103,20 @@ class _BaseMCGrad(
         predictions_per_fold: Dict[int, npt.NDArray] = {}
 
         best_score = -np.inf
+        best_metric_value = float("nan")
+        timed_out = False
+
+        (
+            fold_splits,
+            fold_data_train,
+            fold_data_valid,
+            valid_metric_dfs,
+            train_metric_dfs,
+        ) = self._precompute_fold_data(
+            train_test_splitter,
+            data_train,
+            data_val,
+        )
 
         start_time = time.time()
 
@@ -1040,6 +1133,7 @@ class _BaseMCGrad(
                     f"Stopping early stopping upon exceeding the {self.early_stopping_timeout:,}-second timeout; "
                     + f"{self.__class__.__name__} results will likely improve by increasing `early_stopping_timeout` or setting it to None"
                 )
+                timed_out = True
                 break
 
             valid_monitored_metrics_per_round = np.zeros(
@@ -1051,12 +1145,9 @@ class _BaseMCGrad(
                 dtype=float,
             )
 
-            fold_num = 0
-            for train_index, valid_index in train_test_splitter.split(
-                data_train.features, data_train.labels
-            ):
-                data_train_cv = data_train[train_index]
-                data_valid_cv = data_val or data_train[valid_index]
+            for fold_num in range(len(fold_splits)):
+                data_train_cv = fold_data_train[fold_num]
+                data_valid_cv = fold_data_valid[fold_num]
 
                 if num_rounds == 0:
                     train_fold_preds = self._inverse_transform_predictions(
@@ -1089,10 +1180,8 @@ class _BaseMCGrad(
                     )
                     predictions_per_fold[fold_num] = new_predictions
                     if self.save_training_performance:
-                        train_fold_preds = mcgrad_per_fold[fold_num]._predict(
-                            x=data_train_cv.features,
-                            transformed_predictions=data_train_cv.predictions,
-                            return_all_rounds=False,
+                        train_fold_preds = self._inverse_transform_predictions(
+                            new_predictions
                         )
 
                     valid_fold_preds = mcgrad_per_fold[fold_num]._predict(
@@ -1101,27 +1190,35 @@ class _BaseMCGrad(
                         return_all_rounds=False,
                     )
 
+                # Reuse pre-built DataFrames — only update the prediction column
+                valid_metric_dfs[fold_num]["prediction"] = valid_fold_preds
+                if self.save_training_performance:
+                    train_metric_dfs[fold_num]["prediction"] = (
+                        train_fold_preds  # pyre-ignore[61]: train_fold_preds is not None whenever self.save_training_performance is True
+                    )
+
                 for metric_idx, monitored_metric in enumerate(
                     self.monitored_metrics_during_training
                 ):
                     valid_monitored_metrics_per_round[metric_idx, fold_num] = (
-                        self._compute_metric_on_internal_data(
-                            monitored_metric,
-                            data_valid_cv,
-                            valid_fold_preds,
+                        monitored_metric(
+                            df=valid_metric_dfs[fold_num],
+                            label_column="label",
+                            score_column="prediction",
+                            weight_column="weight",
                         )
                     )
                     if self.save_training_performance:
                         train_monitored_metrics_per_round[metric_idx, fold_num] = (
-                            self._compute_metric_on_internal_data(
-                                monitored_metric,
-                                data_train_cv,
-                                train_fold_preds,  # pyre-ignore[61]: train_fold_preds is not None whenever self.save_training_performance is True
+                            monitored_metric(
+                                df=train_metric_dfs[fold_num],
+                                label_column="label",
+                                score_column="prediction",
+                                weight_column="weight",
                             )
                         )
 
                 logger.debug(f"Evaluated on fold {fold_num}")
-                fold_num += 1
 
             valid_mean_scores = np.mean(valid_monitored_metrics_per_round, axis=1)
             train_mean_scores = np.mean(train_monitored_metrics_per_round, axis=1)
@@ -1153,18 +1250,14 @@ class _BaseMCGrad(
 
             if current_score > best_score:
                 best_score = current_score
+                best_metric_value = early_stopping_metric_value
                 best_num_rounds = num_rounds
                 patience_counter = 0
             else:
                 patience_counter += 1
 
-            best_early_stopping_metric_value = (
-                (-best_score if best_score != -np.inf else np.inf)
-                if self.early_stopping_minimize_score
-                else best_score
-            )
             logger.info(
-                f"Round {num_rounds}: validation loss = {early_stopping_metric_value:.4f} (best: {best_early_stopping_metric_value:.4f}, patience: {patience_counter}/{self.patience})"
+                f"Round {num_rounds}: validation loss = {early_stopping_metric_value:.4f} (best: {best_metric_value:.4f}, patience: {patience_counter}/{self.patience})"
             )
 
             num_rounds += 1
@@ -1203,16 +1296,78 @@ class _BaseMCGrad(
                         f"The final Multicalibration Error on the validation set after using {self.__class__.__name__} is {mce_at_best_num_rounds}, which is not lower than the initial Multicalibration Error of {mce_at_initial_round}. This indicates that {self.__class__.__name__} did not improve the multi-calibration of the model."
                     )
 
-        return best_num_rounds
+        return _EarlyStoppingResult(
+            best_num_rounds=best_num_rounds,
+            num_rounds_evaluated=num_rounds,
+            timed_out=timed_out,
+            resolved_estimation_method=resolved_method_name,
+            best_metric_value=best_metric_value,
+        )
 
-    def _compute_metric_on_internal_data(
+    def _precompute_fold_data(
         self,
-        metric: _ScoreFunctionInterface,
-        data: _MCGradProcessedData,
-        predictions: npt.NDArray,
-    ) -> float:
+        train_test_splitter: (
+            KFold
+            | StratifiedKFold
+            | utils.TrainTestSplitWrapper
+            | utils.NoopSplitterWrapper
+        ),
+        data_train: _MCGradProcessedData,
+        data_val: _MCGradProcessedData | None,
+    ) -> tuple[
+        list[tuple[npt.NDArray, npt.NDArray]],
+        list[_MCGradProcessedData],
+        list[_MCGradProcessedData],
+        list[pd.DataFrame],
+        list[pd.DataFrame],
+    ]:
+        """Pre-compute fold splits and build base DataFrames for metric evaluation.
+
+        Constructs reusable per-fold data splits and metric DataFrames so that
+        the early-stopping loop can update only the prediction column instead of
+        rebuilding DataFrames on every round x fold x metric evaluation.
+
+        :param train_test_splitter: Splitter that yields train/validation index
+            pairs.
+        :param data_train: The processed training data.
+        :param data_val: Optional dedicated validation data. When provided, it
+            is used for every fold instead of the split-off validation portion.
+        :returns: A tuple of ``(fold_splits, fold_data_train, fold_data_valid,
+            valid_metric_dfs, train_metric_dfs)``.
         """
-        Compatibility wrapper for MCGradProcessedData -> ScoreFunctionInterface.
+        assert data_train.labels is not None
+        fold_splits = list(
+            train_test_splitter.split(data_train.features, data_train.labels)
+        )
+        fold_data_train: list[_MCGradProcessedData] = []
+        fold_data_valid: list[_MCGradProcessedData] = []
+        valid_metric_dfs: list[pd.DataFrame] = []
+        train_metric_dfs: list[pd.DataFrame] = []
+        for train_index, valid_index in fold_splits:
+            dtcv = data_train[train_index]
+            dvcv = data_val or data_train[valid_index]
+            fold_data_train.append(dtcv)
+            fold_data_valid.append(dvcv)
+            valid_metric_dfs.append(self._build_metric_dataframe(dvcv))
+            if self.save_training_performance:
+                train_metric_dfs.append(self._build_metric_dataframe(dtcv))
+        return (
+            fold_splits,
+            fold_data_train,
+            fold_data_valid,
+            valid_metric_dfs,
+            train_metric_dfs,
+        )
+
+    @staticmethod
+    def _build_metric_dataframe(
+        data: _MCGradProcessedData,
+    ) -> pd.DataFrame:
+        """Build a DataFrame from internal data for metric evaluation.
+
+        Constructs a DataFrame containing features, labels, and weights.
+        The ``prediction`` column is left unset and should be assigned by the
+        caller before passing the DataFrame to a metric function.
         """
         feature_columns = data.categorical_feature_names + data.numerical_feature_names
         df = pd.DataFrame(
@@ -1220,14 +1375,8 @@ class _BaseMCGrad(
             columns=feature_columns,
         )
         df["label"] = data.labels
-        df["prediction"] = predictions
         df["weight"] = data.weights
-        return metric(
-            df=df,
-            label_column="label",
-            score_column="prediction",
-            weight_column="weight",
-        )
+        return df
 
     def _get_elapsed_time(self, start_time: float) -> int:
         """
@@ -1235,16 +1384,124 @@ class _BaseMCGrad(
         """
         return int(time.time() - start_time)
 
+    @property
+    def num_rounds_trained(self) -> int:
+        """Number of boosting rounds actually trained on this instance.
+
+        This is distinct from :attr:`num_rounds`, which is the **configured**
+        upper bound supplied at construction time. With early stopping, the
+        trained count can be strictly less than the configured upper bound.
+        Returns ``0`` on an unfitted instance (equivalent to ``len(self.mr)``).
+        """
+        return len(self.mr)
+
+    # JSON-serializable ``__init__`` kwargs persisted under ``"params"`` at
+    # serialize time and passed through to ``cls(**kwargs)`` on deserialize.
+    # Fields involving Python callables or RNG objects (``early_stopping_score_func``,
+    # ``early_stopping_minimize_score``, ``monitored_metrics_during_training``,
+    # ``random_state``) are intentionally not round-tripped in schema v1 --
+    # deserialized models reset them to subclass defaults. This is acceptable
+    # for the dominant predict-only reuse case; re-fitting a deserialized model
+    # with a custom score function is not supported without re-configuring.
+    _SCHEMA_V1_INIT_KWARGS: tuple[str, ...] = (
+        "num_rounds",
+        "monotone_t",
+        "lightgbm_params",
+        "early_stopping",
+        "patience",
+        "n_folds",
+        "early_stopping_timeout",
+        "save_training_performance",
+        "encode_categorical_variables",
+        "allow_missing_segment_feature_values",
+    )
+
+    def _collect_schema_v1_params(self) -> dict[str, Any]:
+        """Snapshot the user-configurable state that defines this model.
+
+        Includes only fields that are JSON-serializable and safe to pass back
+        into ``__init__``. Interdependent fields are omitted when their
+        enclosing mode would cause ``__init__`` to reject them: ``patience``
+        and ``n_folds`` are skipped when early stopping is disabled, and
+        ``n_folds`` is skipped when the estimation method is ``HOLDOUT``
+        (``__init__`` sets ``n_folds`` to ``1`` internally in HOLDOUT mode
+        but rejects it as an explicit kwarg).
+        """
+        params: dict[str, Any] = {
+            "num_rounds": self.num_rounds,
+            "monotone_t": self.monotone_t,
+            "lightgbm_params": self.lightgbm_params,
+            "early_stopping": self.early_stopping,
+            "early_stopping_timeout": self.early_stopping_timeout,
+            "save_training_performance": self.save_training_performance,
+            "encode_categorical_variables": self.encode_categorical_variables,
+            "allow_missing_segment_feature_values": self.allow_missing_segment_feature_values,
+            "early_stopping_estimation_method": self.early_stopping_estimation_method.name,
+        }
+        if self.early_stopping:
+            params["patience"] = self.patience
+            if self.early_stopping_estimation_method != _EstimationMethod.HOLDOUT:
+                params["n_folds"] = self.n_folds
+        return params
+
+    @classmethod
+    def _init_kwargs_from_schema_v1_params(
+        cls, params: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Translate a serialized ``params`` dict back into ``__init__`` kwargs.
+
+        ``early_stopping_estimation_method`` is remapped to the tri-state
+        ``early_stopping_use_crossvalidation`` argument. Early-stopping-only
+        kwargs (``patience``, ``n_folds``, ``early_stopping_use_crossvalidation``)
+        are dropped when early stopping is disabled, because ``__init__``
+        rejects them in that case.
+        """
+        kwargs: dict[str, Any] = {
+            k: params[k] for k in cls._SCHEMA_V1_INIT_KWARGS if k in params
+        }
+        estimation_method_name = params.get("early_stopping_estimation_method")
+        if estimation_method_name == _EstimationMethod.CROSS_VALIDATION.name:
+            kwargs["early_stopping_use_crossvalidation"] = True
+        elif estimation_method_name == _EstimationMethod.HOLDOUT.name:
+            kwargs["early_stopping_use_crossvalidation"] = False
+        # _EstimationMethod.AUTO -> leave the kwarg unset (it defaults to None).
+
+        if kwargs.get("early_stopping") is False:
+            for forbidden in (
+                "patience",
+                "n_folds",
+                "early_stopping_use_crossvalidation",
+            ):
+                kwargs.pop(forbidden, None)
+        elif kwargs.get("early_stopping_use_crossvalidation") is False:
+            # HOLDOUT mode: ``__init__`` rejects an explicit ``n_folds``.
+            kwargs.pop("n_folds", None)
+        return kwargs
+
     def serialize(self) -> str:
         """Serializes the fitted MCGrad model to a JSON string.
 
-        The serialized model includes all boosters, unshrink factors, encoder state, and configuration parameters,
-        allowing the model to be saved and restored later.
+        The serialized model includes all boosters, unshrink factors, encoder
+        state, and the full JSON-serializable configuration, allowing the
+        model to be saved and restored later.
+
+        The output carries a ``schema_version`` field.
+
+        - ``2``: identical structure to version 1; the bump signals that
+          downstream consumers should enforce version checks.
+        - ``1``: persists the simple scalar and dict-valued ``__init__`` kwargs
+          (see :attr:`_SCHEMA_V1_INIT_KWARGS`).
+
+        Fields backed by callables or RNG objects (custom
+        ``early_stopping_score_func``, ``early_stopping_minimize_score``,
+        ``monitored_metrics_during_training``, ``random_state``) are **not**
+        persisted; a deserialized model uses subclass defaults for those.
 
         :return: JSON string containing the serialized model
         """
         serialized_boosters = [booster.model_to_string() for booster in self.mr]
         json_obj: dict[str, Any] = {
+            "schema_version": 2,
             self._SERIALIZATION_KEY: [
                 {
                     "booster": serialized_booster,
@@ -1254,9 +1511,7 @@ class _BaseMCGrad(
                     serialized_boosters, self.unshrink_factors
                 )
             ],
-            "params": {
-                "allow_missing_segment_feature_values": self.allow_missing_segment_feature_values,
-            },
+            "params": self._collect_schema_v1_params(),
         }
         json_obj["has_encoder"] = self.encode_categorical_variables
         if hasattr(self, "enc") and self.enc is not None:
@@ -1270,38 +1525,103 @@ class _BaseMCGrad(
         return cls(**kwargs)
 
     @classmethod
-    def deserialize(cls, model_str: str) -> Self:
-        """Deserializes an MCGrad model from a JSON string.
+    def _deserialize_legacy(cls, json_obj: dict[str, Any]) -> Self:
+        """Restore a model serialized before ``schema_version`` was added.
 
-        Reconstructs a fitted MCGrad model from a previously serialized representation.
-
-        :param model_str: JSON string containing the serialized model
-        :return: A fitted MCGrad instance with all state restored
+        Only the fields persisted by the pre-schema format are restored;
+        everything else falls back to ``__init__`` defaults, and
+        ``self.num_rounds`` is set to the trained booster count (legacy
+        behavior). Emits a warning so callers know to re-serialize.
         """
-        json_obj = json.loads(model_str)
+        logger.warning(
+            "%s.deserialize: input has no 'schema_version' field (legacy "
+            "format). Restoring boosters and encoder only; all other "
+            "configuration falls back to defaults. Re-serialize this model "
+            "to upgrade it to schema_version=1 and preserve the full "
+            "configuration.",
+            cls.__name__,
+        )
         model = cls()
         model.mr = []
         model.unshrink_factors = []
-
         for model_info in json_obj[cls._SERIALIZATION_KEY]:
             booster = lgb.Booster(model_str=model_info["booster"])
             model.mr.append(booster)
             model.unshrink_factors.append(model_info["unshrink_factor"])
-
         model.num_rounds = len(model.mr)
-
         model.encode_categorical_variables = json_obj["has_encoder"]
         if json_obj["has_encoder"] and "encoder" in json_obj:
             model.enc = utils.OrdinalEncoderWithUnknownSupport.deserialize(
                 json_obj["encoder"]
             )
+        model._is_fitted = True
+        model.categorical_feature_names = json_obj.get("categorical_feature_names")
+        model.numerical_feature_names = json_obj.get("numerical_feature_names")
+        params = json_obj.get("params", {})
+        if "allow_missing_segment_feature_values" in params:
+            model.allow_missing_segment_feature_values = params[
+                "allow_missing_segment_feature_values"
+            ]
+        return model
 
+    @classmethod
+    def deserialize(cls, model_str: str) -> Self:
+        """Deserializes an MCGrad model from a JSON string.
+
+        Reconstructs a fitted MCGrad model from a previously serialized
+        representation. The behavior depends on the ``schema_version`` field:
+
+        - ``schema_version == 2`` or ``schema_version == 1``: full
+          configuration round-trip for the fields listed in
+          :attr:`_SCHEMA_V1_INIT_KWARGS`. ``self.num_rounds`` is restored to
+          the configured upper bound; use :attr:`num_rounds_trained` to get
+          the actual booster count.
+        - no ``schema_version`` field (legacy): boosters and encoder are
+          restored; all other configuration falls back to defaults and a
+          warning is logged.
+        - unknown ``schema_version``: raises :class:`ValueError`.
+
+        :param model_str: JSON string containing the serialized model
+        :return: A fitted MCGrad instance with all state restored
+        """
+        _SUPPORTED_SCHEMA_VERSIONS = {1, 2}
+        json_obj = json.loads(model_str)
+        schema_version = json_obj.get("schema_version")
+        if schema_version is None:
+            return cls._deserialize_legacy(json_obj)
+        if schema_version not in _SUPPORTED_SCHEMA_VERSIONS:
+            raise ValueError(
+                f"{cls.__name__}.deserialize: unsupported schema_version="
+                f"{schema_version!r}. Supported versions: "
+                f"{_SUPPORTED_SCHEMA_VERSIONS} (and the legacy pre-schema format)."
+            )
+
+        params = json_obj.get("params", {})
+        init_kwargs = cls._init_kwargs_from_schema_v1_params(params)
+        model = cls(**init_kwargs)
+
+        model.mr = []
+        model.unshrink_factors = []
+        for model_info in json_obj[cls._SERIALIZATION_KEY]:
+            booster = lgb.Booster(model_str=model_info["booster"])
+            model.mr.append(booster)
+            model.unshrink_factors.append(model_info["unshrink_factor"])
+
+        # ``encode_categorical_variables`` was already restored from
+        # ``params`` via ``cls(**init_kwargs)`` above. ``"has_encoder"`` in
+        # the JSON is a redundant mirror of the same value kept only for
+        # backward compatibility with the legacy (no ``schema_version``)
+        # format, which is handled separately by ``_deserialize_legacy``.
+        if model.encode_categorical_variables and "encoder" in json_obj:
+            model.enc = utils.OrdinalEncoderWithUnknownSupport.deserialize(
+                json_obj["encoder"]
+            )
         model._is_fitted = True
         model.categorical_feature_names = json_obj.get("categorical_feature_names")
         model.numerical_feature_names = json_obj.get("numerical_feature_names")
         return model
 
-    def _compute_effective_sample_size(self, weights: npt.NDArray) -> int:
+    def _compute_effective_sample_size(self, weights: npt.NDArray) -> float:
         """
         Computes the effective sample size for the given weights.
         The effective sample size is defined as square of the sum of weights over the sum of the squared weights,
@@ -1318,6 +1638,8 @@ class _BaseMCGrad(
         Returns the estimation method to use for early stopping given the arguments and the weights (when relevant).
         This is especially useful for the AUTO option, where we infer the proper estimation method to use based on the effective sample size.
 
+        :param weights: weights for each sample, used to compute the effective sample size when
+            the estimation method is AUTO.
         :return: the estimation method to use.
         """
         if self.early_stopping_estimation_method != _EstimationMethod.AUTO:
@@ -1387,100 +1709,59 @@ class MCGrad(_BaseMCGrad):
 
     @staticmethod
     def _inverse_transform_predictions(transformed: npt.NDArray) -> npt.NDArray:
-        return utils.logistic_vectorized(transformed)
+        # logistic() returns ndarray when given ndarray input
+        return utils.logistic(transformed)  # pyre-ignore[7]
 
     @staticmethod
     def _compute_unshrink_factor(
         y: npt.NDArray, predictions: npt.NDArray, w: npt.NDArray | None
     ) -> float:
         """
-        Compute an unshrinkage coefficient using logistic regression.
+        Compute an unshrinkage coefficient equivalent to logistic regression without intercept.
 
-        Fits a logistic regression model without intercept to find a scaling coefficient
-        that adjusts for shrinkage in the logits. Uses Newton-CG solver primarily, with
-        LBFGS as fallback if Newton-CG fails to converge.
+        Finds a scalar α that scales the input logits to best fit the observed
+        labels, adjusting for shrinkage introduced by earlier modelling stages.
+        This is mathematically equivalent to fitting a single-feature logistic
+        regression with no intercept on the logits.
 
-        :param y: Array of binary labels (0 or 1).
+        The implementation minimizes weighted cross-entropy directly via
+        :func:`scipy.optimize.minimize_scalar`, which also naturally supports
+        soft (continuous) labels in [0, 1] without special-casing.
+
+        :param y: Array of labels in [0, 1]. Can be binary (0/1) or soft (float).
         :param predictions: Array of logit values (log-odds) to unshrink.
         :param w: Optional array of sample weights. If None, uniform weights are used.
-        :return: The unshrinkage coefficient. Returns 1 if both solvers fail.
+        :return: The unshrinkage coefficient.
         """
         if w is None:
             w = np.ones_like(y)
-        logits = predictions.reshape(-1, 1)
 
         # Clip logits to avoid extreme coefficient driven by outliers
-        logits = np.clip(
-            logits, -MCGrad.UNSHRINK_LOGIT_EPSILON, MCGrad.UNSHRINK_LOGIT_EPSILON
+        logits: npt.NDArray = np.clip(
+            predictions, -MCGrad.UNSHRINK_LOGIT_EPSILON, MCGrad.UNSHRINK_LOGIT_EPSILON
         )
 
-        primary_solver = LogisticRegression(
-            C=np.inf, fit_intercept=False, solver="newton-cg"
-        )
-        with warnings.catch_warnings(record=True) as recorded_warnings:
-            warnings.simplefilter("always")
-            # Suppress sklearn 1.8+ UserWarning which is a known bug. Will be fixed in sklearn 1.8.1
-            # See: https://github.com/scikit-learn/scikit-learn/issues/32927
-            warnings.filterwarnings(
-                "ignore",
-                message="Setting penalty=None will ignore the C and l1_ratio parameters",
-                category=UserWarning,
+        def _loss(alpha: float) -> float:
+            ax = alpha * logits
+            # Numerically stable cross-entropy via log-sum-exp:
+            #   -log σ(z)   = log(1 + exp(-z)) = logaddexp(0, -z)
+            #   -log(1-σ(z)) = log(1 + exp(z))  = logaddexp(0,  z)
+            neg_log_sigma = np.logaddexp(0, -ax)
+            neg_log_1_minus_sigma = np.logaddexp(0, ax)
+            sample_loss = y * neg_log_sigma + (1 - y) * neg_log_1_minus_sigma
+            return float(np.average(sample_loss, weights=w))
+
+        result = minimize_scalar(_loss, bounds=(1e-8, 50), method="bounded")
+        alpha = float(result.x)
+
+        if alpha < 0.95 or alpha > 1.05:
+            logger.warning(
+                "Unshrink is not close to 1: %s. This may create a problem "
+                "with the multicalibration of the model.",
+                alpha,
             )
-            primary_solver.fit(logits, y, sample_weight=w)
-        for rec_warn in recorded_warnings:
-            if isinstance(rec_warn.message, LineSearchWarning):
-                logger.info(
-                    "Line search warning (unshrink): %s. Solution is approximately "
-                    "optimal - no ideal step size for the gradient descent update "
-                    "can be found. These warnings are generally harmless.",
-                    rec_warn.message,
-                )
-            else:
-                logger.debug(rec_warn)
-                warnings.warn_explicit(
-                    message=str(rec_warn.message),
-                    category=rec_warn.category,
-                    filename=rec_warn.filename,
-                    lineno=rec_warn.lineno,
-                    source=rec_warn.source,
-                )
 
-        # Return result if logistic regression with Newton-CG converged to a solution,
-        # if not try LBFGS.
-        # pyre-ignore, coef_ is available after `fit()` has been called
-        if not np.isnan(primary_solver.coef_).any():
-            if primary_solver.coef_[0][0] < 0.95 or primary_solver.coef_[0][0] > 1.05:
-                logger.warning(
-                    "Unshrink is not close to 1: %s. This may create a problem "
-                    "with the multicalibration of the model.",
-                    primary_solver.coef_[0][0],
-                )
-
-            return primary_solver.coef_[0][0]
-
-        fallback_solver = LogisticRegression(
-            C=np.inf, fit_intercept=False, solver="lbfgs"
-        )
-        # Suppress sklearn 1.8+ UserWarning which is a known bug. Will be fixed in sklearn 1.8.1
-        # See: https://github.com/scikit-learn/scikit-learn/issues/32927
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                message="Setting penalty=None will ignore the C and l1_ratio parameters",
-                category=UserWarning,
-            )
-            fallback_solver.fit(logits, y, sample_weight=w)
-        if not np.isnan(fallback_solver.coef_).any():
-            if fallback_solver.coef_[0][0] < 0.95 or fallback_solver.coef_[0][0] > 1.05:
-                logger.warning(
-                    "Unshrink is not close to 1: %s. This may create a problem "
-                    "with the multicalibration of the model.",
-                    fallback_solver.coef_[0][0],
-                )
-            return fallback_solver.coef_[0][0]
-
-        # If both solvers fail, return default value. Not disastrous, but requires GBDT to do more heavy-lifting.
-        return 1
+        return alpha
 
     @property
     def _objective(self) -> str:
@@ -1490,7 +1771,7 @@ class MCGrad(_BaseMCGrad):
     def _default_early_stopping_metric(
         self,
     ) -> tuple[_ScoreFunctionInterface, bool]:
-        return wrap_sklearn_metric_func(skmetrics.log_loss), True
+        return wrap_sklearn_metric_func(soft_label_log_loss), True
 
     def _check_predictions(
         self, df_train: pd.DataFrame, prediction_column_name: str
@@ -1520,21 +1801,29 @@ class MCGrad(_BaseMCGrad):
             )
 
     def _check_labels(self, df_train: pd.DataFrame, label_column_name: str) -> None:
-        if df_train[label_column_name].isnull().any():
+        labels = df_train[label_column_name]
+        if labels.isnull().any():
             raise ValueError(
-                f"{self.__class__.__name__} does not support missing values in the label column, but {df_train[label_column_name].isnull().sum()}"
-                f" of {len(df_train[label_column_name])} are null."
+                f"{self.__class__.__name__} does not support missing values in the label column, but {labels.isnull().sum()}"
+                f" of {len(labels)} are null."
             )
-        unique_labels = list(df_train[label_column_name].unique())
-        labels_are_valid_int = df_train[label_column_name].isin([0, 1]).all()
-        labels_are_valid_bool = df_train[label_column_name].isin([True, False]).all()
-        if not (labels_are_valid_bool or labels_are_valid_int):
+        if not pd.api.types.is_numeric_dtype(labels) and not pd.api.types.is_bool_dtype(
+            labels
+        ):
             raise ValueError(
-                f"Labels in column `{label_column_name}` must be binary, either 0/1 or True/False. Got {unique_labels=}"
+                f"Labels in column `{label_column_name}` must be numeric (binary 0/1, boolean True/False, "
+                f"or float in [0, 1]). Got dtype {labels.dtype}."
             )
-        if not len(unique_labels) == 2:
+        numeric_labels = labels.astype(float)
+        if (numeric_labels < 0).any() or (numeric_labels > 1).any():
             raise ValueError(
-                f"Labels in column `{label_column_name}` must have at least 2 values but the data contains only 1: {unique_labels=}"
+                f"Labels in column `{label_column_name}` must be in the range [0, 1]. "
+                f"Found min={numeric_labels.min()}, max={numeric_labels.max()}."
+            )
+        if labels.nunique() < 2:
+            raise ValueError(
+                f"Labels in column `{label_column_name}` must have at least 2 unique values "
+                f"but the data contains only {labels.nunique()}: {list(labels.unique())}"
             )
 
     @property
@@ -1631,7 +1920,7 @@ class RegressionMCGrad(_BaseMCGrad):
         if np.isinf(predictions).any():
             raise ValueError(
                 f"{self.__class__.__name__} does not support infinite values in the prediction column, but {np.sum(np.isinf(predictions))}"
-                f" of {len(predictions)} are null."
+                f" of {len(predictions)} are infinite."
             )
 
     def _check_labels(self, df_train: pd.DataFrame, label_column_name: str) -> None:
@@ -1647,8 +1936,8 @@ class RegressionMCGrad(_BaseMCGrad):
             )
         if np.isinf(labels).any():
             raise ValueError(
-                f"{self.__class__.__name__} does not support infinite values in the prediction column, but {np.sum(np.isinf(labels))}"
-                f" of {len(labels)} are null."
+                f"{self.__class__.__name__} does not support infinite values in the label column, but {np.sum(np.isinf(labels))}"
+                f" of {len(labels)} are infinite."
             )
         if labels.nunique() < 2:
             raise ValueError(
@@ -2228,9 +2517,9 @@ class PlattScalingWithFeatures(BaseCalibrator):
         :param prediction_column_name: Name of the column in dataframe df that contains the predictions
         :param label_column_name: Name of the column in dataframe df that contains the ground truth labels
         :param weight_column_name: Name of the column in dataframe df that contains the instance weights
-        :param categorical_feature_column_names: List of column names in the df that contain the categorical
+        :param categorical_feature_column_names: List of column names in df_train that contain the categorical
             segmentation features (these will be one-hot encoded)
-        :param numerical_feature_column_names: List of column names in the df that contain the numerical
+        :param numerical_feature_column_names: List of column names in df_train that contain the numerical
             segmentation features (these will be discretized into bins)
         :param kwargs: Additional keyword arguments
         :return: The fitted calibrator instance
@@ -2371,9 +2660,9 @@ class SegmentwiseCalibrator(Generic[TCalibrator], BaseCalibrator):
         :param prediction_column_name: Name of the column in dataframe df that contains the predictions
         :param label_column_name: Name of the column in dataframe df that contains the ground truth labels
         :param weight_column_name: Name of the column in dataframe df that contains the instance weights
-        :param categorical_feature_column_names: List of column names in the df that contain the categorical
+        :param categorical_feature_column_names: List of column names in df_train that contain the categorical
             segmentation features (passed to individual calibrators)
-        :param numerical_feature_column_names: List of column names in the df that contain the numerical
+        :param numerical_feature_column_names: List of column names in df_train that contain the numerical
             segmentation features (passed to individual calibrators)
         :param kwargs: Additional keyword arguments
         :return: The fitted calibrator instance

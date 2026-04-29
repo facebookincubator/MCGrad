@@ -330,7 +330,7 @@ def test_ndcg_score_is_correct_when_k_larger_than_array_length(
     ],
 )
 def test_multi_cg_gives_same_result_as_cg_per_segment(rank_discount, rng):
-    n_samples = 1000
+    n_samples = 200
     k = 100
     df = pd.DataFrame(index=range(n_samples))
     df["label"] = rng.random_sample(n_samples)
@@ -465,6 +465,53 @@ def test_fpr():
     predicted_labels = np.array([1, 0, 0, 0, 0, 0, 0, 0])
 
     assert fpr(labels, predicted_labels) == 0.25
+
+
+@pytest.mark.parametrize(
+    "labels, scores, expected_j",
+    [
+        # Perfect separation: positives=1.0, negatives=0.0 -> 1.0
+        ([0, 1, 0, 1, 0, 1, 0, 1], [0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0], 1.0),
+        # Constant scores: all 0.5 -> 0.0
+        ([0, 1, 0, 1, 0, 1, 0, 1], [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], 0.0),
+        # Inverted: positives=0.0, negatives=1.0 -> -1.0
+        ([0, 1, 0, 1, 0, 1, 0, 1], [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0], -1.0),
+        # Partial: E[s|y=1]=(0.9+0.7)/2=0.8, E[s|y=0]=(0.2+0.3)/2=0.25 -> 0.55
+        ([0, 1, 0, 1], [0.2, 0.9, 0.3, 0.7], 0.55),
+        # Higher mean for positives: E[s|y=1]=0.7, E[s|y=0]=0.35 -> 0.35
+        ([0, 1, 0, 1, 0, 1, 0, 1], [0.1, 0.6, 0.3, 0.8, 0.5, 0.7, 0.5, 0.7], 0.35),
+        # Binary predictions still work: same as classical TPR-FPR
+        ([0, 1, 0, 1], [0, 1, 1, 1], 0.5),
+    ],
+)
+def test_youdens_j(labels, scores, expected_j):
+    result = metrics.youdens_j(np.array(labels), np.array(scores, dtype=float))
+    assert result == pytest.approx(expected_j)
+
+
+def test_youdens_j_with_sample_weight():
+    labels = np.array([0, 1, 0, 1])
+    scores = np.array([0.2, 0.9, 0.4, 0.7])
+    weights = np.array([1.0, 2.0, 3.0, 4.0])
+
+    # E[s|y=1] = (0.9*2 + 0.7*4) / (2+4) = (1.8 + 2.8) / 6 = 4.6/6
+    # E[s|y=0] = (0.2*1 + 0.4*3) / (1+3) = (0.2 + 1.2) / 4 = 1.4/4
+    # NDR = 4.6/6 - 1.4/4
+    expected = 4.6 / 6.0 - 1.4 / 4.0
+    result = metrics.youdens_j(labels, scores, sample_weight=weights)
+    assert result == pytest.approx(expected)
+
+
+def test_youdens_j_does_not_modify_inputs():
+    labels = np.array([0, 1, 0, 1, 0, 1])
+    scores = np.array([0.1, 0.9, 0.3, 0.8, 0.2, 0.7])
+    labels_copy = labels.copy()
+    scores_copy = scores.copy()
+
+    metrics.youdens_j(labels, scores)
+
+    np.testing.assert_array_equal(labels, labels_copy)
+    np.testing.assert_array_equal(scores, scores_copy)
 
 
 @pytest.mark.parametrize(
@@ -789,9 +836,7 @@ def test_califree_ne_is_invariant_to_logit_shifts(logit_shift):
     # Hardcoded labels and predictions with equal sums
     labels = np.array([0, 1, 0, 1, 1, 0, 1, 0, 1, 0])
     predictions = np.array([0.1, 0.9, 0.1, 0.9, 0.9, 0.1, 0.9, 0.1, 0.9, 0.1])
-    shifted_predictions = utils.logistic_vectorized(
-        utils.logit(predictions) + logit_shift
-    )
+    shifted_predictions = utils.logistic(utils.logit(predictions) + logit_shift)
     # Calculate normalized entropy and calibration-free normalized entropy
     califree_ne_original = metrics.calibration_free_normalized_entropy(
         labels, predictions
@@ -800,6 +845,87 @@ def test_califree_ne_is_invariant_to_logit_shifts(logit_shift):
         labels, shifted_predictions
     )
     assert pytest.approx(califree_ne_shifted, 0.01) == califree_ne_original
+
+
+@pytest.mark.parametrize(
+    "metric_func",
+    [
+        metrics.normalized_entropy,
+        metrics.calibration_free_normalized_entropy,
+        metrics.calibration_ratio,
+        metrics.expected_calibration_error,
+        metrics.proportional_expected_calibration_error,
+        metrics.youdens_j,
+        metrics.recall_at_precision,
+        metrics.fpr_at_precision,
+        metrics.precision_at_recall,
+        metrics.precision_at_predictive_prevalence,
+    ],
+)
+def test_weighted_score_metric_matches_expanded_unweighted(metric_func):
+    """Weighted score metrics should give the same result as duplicating rows by weight."""
+    labels = np.array([0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0])
+    scores = np.array([0.1, 0.85, 0.6, 0.7, 0.9, 0.2, 0.4, 0.35, 0.75, 0.15, 0.55, 0.8])
+    weights = np.array([3, 2, 1, 2, 1, 3, 2, 1, 1, 2, 1, 1])
+
+    expanded_labels = np.repeat(labels, weights)
+    expanded_scores = np.repeat(scores, weights)
+
+    weighted_result = metric_func(labels, scores, sample_weight=weights)
+    unweighted_result = metric_func(expanded_labels, expanded_scores)
+
+    assert weighted_result == pytest.approx(unweighted_result, rel=1e-5)
+
+
+@pytest.mark.parametrize(
+    "metric_func",
+    [
+        metrics.recall,
+        metrics.fpr,
+    ],
+)
+def test_weighted_binary_metric_matches_expanded_unweighted(metric_func):
+    """Weighted binary metrics should give the same result as duplicating rows by weight."""
+    labels = np.array([0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0])
+    predicted_labels = np.array([0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 1, 1])
+    weights = np.array([3, 2, 1, 2, 1, 3, 2, 1, 1, 2, 1, 1])
+
+    expanded_labels = np.repeat(labels, weights)
+    expanded_predicted_labels = np.repeat(predicted_labels, weights)
+
+    weighted_result = metric_func(labels, predicted_labels, sample_weight=weights)
+    unweighted_result = metric_func(expanded_labels, expanded_predicted_labels)
+
+    assert weighted_result == pytest.approx(unweighted_result, rel=1e-5)
+
+
+def test_weighted_fpr_at_precision_with_false_positives():
+    """Weighted fpr_at_precision must use sample_weight for both the FP count and negatives.
+
+    The generic test_weighted_score_metric_matches_expanded_unweighted test
+    happens to produce FPR=0 for fpr_at_precision (no negatives exceed the
+    precision threshold), so this test uses data specifically designed to have
+    nonzero FPR with non-uniform weights on the negatives.
+    """
+    # 20 positives (scores 0.99..0.80, weight 3 each) + 5 negatives.
+    # The first negative (score 0.815, weight 3) exceeds the lowest qualifying
+    # threshold (0.81), creating a weighted false positive that exercises the
+    # FPR logic.  The remaining negatives have weights [1, 2, 1, 1].
+    labels = np.concatenate([np.ones(20), np.zeros(5)])
+    pos_scores = np.linspace(0.99, 0.80, 20)
+    neg_scores = np.array([0.815, 0.3, 0.2, 0.1, 0.05])
+    scores = np.concatenate([pos_scores, neg_scores])
+    weights = np.array([3] * 21 + [1, 2, 1, 1])
+
+    expanded_labels = np.repeat(labels, weights)
+    expanded_scores = np.repeat(scores, weights)
+
+    weighted_result = metrics.fpr_at_precision(labels, scores, sample_weight=weights)
+    unweighted_result = metrics.fpr_at_precision(expanded_labels, expanded_scores)
+
+    # Verify FPR is nonzero (i.e. the test data actually exercises the FPR path)
+    assert weighted_result > 0, "Test data should produce nonzero FPR"
+    assert weighted_result == pytest.approx(unweighted_result, rel=1e-5)
 
 
 @pytest.mark.parametrize("target_precision, expected_fpr", [(0.9, 0.0), (0.8, 0.2)])
@@ -1648,6 +1774,28 @@ def test_calibration_free_normalized_entropy_higher_for_reversed_predictions():
     assert result_bad > result_good
 
 
+def test_calibration_free_normalized_entropy_rejects_2d_predictions():
+    labels = np.array([0, 1, 0, 1])
+    predictions_2d = np.array([[0.2, 0.8], [0.7, 0.3], [0.1, 0.9], [0.6, 0.4]])
+
+    with pytest.raises(
+        ValueError, match="predicted_scores must be the predicted probability"
+    ):
+        metrics.calibration_free_normalized_entropy(
+            labels=labels, predicted_scores=predictions_2d
+        )
+
+
+def test_calibration_free_normalized_entropy_accepts_1d_labels():
+    labels = np.array([0, 1, 0, 1])
+    predictions = np.array([0.2, 0.8, 0.3, 0.7])
+
+    result = metrics.calibration_free_normalized_entropy(
+        labels=labels, predicted_scores=predictions
+    )
+    assert isinstance(result, (float, np.floating))
+
+
 def test_rank_calibration_error_zero_for_perfect_ranking():
     labels = np.array([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
     perfect_predictions = labels * 2.0
@@ -1888,6 +2036,17 @@ def test_ecce_cdf_returns_near_one_for_large_x():
 
     result_large = metrics._ecce_cdf(100.0)
     assert result_large == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("value", [-1.0, 0.0])
+def test_ecce_cdf_raises_for_non_positive_scalar(value):
+    with pytest.raises(ValueError, match="Can only evaluate ECCE CDF at positive x"):
+        metrics._ecce_cdf(value)
+
+
+def test_ecce_cdf_raises_for_non_positive_in_array():
+    with pytest.raises(ValueError, match="Can only evaluate ECCE CDF at positive x"):
+        metrics._ecce_cdf(np.array([1.0, -0.5, 2.0]))
 
 
 def test_ecce_pvalue_returns_one_for_very_small_statistic():
@@ -2255,6 +2414,34 @@ def test_ecce_pvalue_consistency_with_ecce_pvalue_from_sigma(rng):
     sigma = metrics.ecce_sigma(labels, predicted_scores)
     ecce_pvalue_from_sigma_result = metrics.ecce_pvalue_from_sigma(sigma)
     assert ecce_pvalue_result == pytest.approx(ecce_pvalue_from_sigma_result, rel=1e-10)
+
+
+def test_ecce_cdf_accepts_array_input():
+    scalar_results = [metrics._ecce_cdf(v) for v in [0.5, 1.0, 2.0, 5.0, 8.3]]
+    array_result = metrics._ecce_cdf(np.array([0.5, 1.0, 2.0, 5.0, 8.3]))
+    np.testing.assert_allclose(array_result, scalar_results, rtol=1e-10)
+
+
+def test_ecce_pvalue_from_sigma_accepts_array_input():
+    test_sigmas = np.array([0, 1e-25, 0.5, 1.0, 2.0, 3.0, 5.0, 8.0, 8.5, 100.0, np.inf])
+    scalar_results = [metrics.ecce_pvalue_from_sigma(s) for s in test_sigmas]
+    array_result = metrics.ecce_pvalue_from_sigma(test_sigmas)
+    np.testing.assert_allclose(array_result, scalar_results, rtol=1e-10)
+
+
+def test_ecce_pvalue_from_sigma_returns_scalar_for_scalar_input():
+    result = metrics.ecce_pvalue_from_sigma(2.0)
+    assert isinstance(result, float)
+
+
+def test_ecce_pvalue_from_sigma_empty_array():
+    result = metrics.ecce_pvalue_from_sigma(np.array([]))
+    assert len(result) == 0
+
+
+def test_ecce_pvalue_from_sigma_all_below_min():
+    result = metrics.ecce_pvalue_from_sigma(np.array([0.0, 1e-30, 1e-25]))
+    np.testing.assert_array_equal(result, np.ones(3))
 
 
 def test_regression_mce_returns_zero_for_perfectly_calibrated_data():

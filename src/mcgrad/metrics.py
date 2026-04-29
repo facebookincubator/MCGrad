@@ -32,7 +32,7 @@ import math
 import sys
 import warnings
 from collections.abc import Callable
-from typing import Any, Protocol
+from typing import Any, overload, Protocol
 
 import numpy as np
 import pandas as pd
@@ -338,6 +338,50 @@ def precision(
     )
 
 
+def youdens_j(
+    labels: npt.NDArray,
+    predicted_scores: npt.NDArray,
+    sample_weight: npt.NDArray | None = None,
+    **kwargs: Any,
+) -> float:
+    """
+    Calculate the continuous net detection rate (Youden's J).
+
+    Computes ``E[scores | positive label] - E[scores | negative label]``.
+    When the scores are binary predictions this reduces to the classical
+    ``TPR - FPR``.  The value ranges from -1 to 1, where 1 indicates perfect
+    separation, 0 indicates no discriminative ability, and negative values
+    indicate an inverted model.
+
+    :param labels: Array of true binary labels.
+    :param predicted_scores: Array of predicted scores (continuous or binary).
+    :param sample_weight: Optional array of sample weights.
+    :return: The continuous net detection rate.
+    """
+    labels = labels.astype(int)
+    if sample_weight is None:
+        sample_weight = np.ones_like(predicted_scores)
+
+    pos_mask = labels == 1
+    neg_mask = labels == 0
+
+    pos_weight = sample_weight[pos_mask].sum()
+    neg_weight = sample_weight[neg_mask].sum()
+
+    mean_score_pos = (
+        (predicted_scores[pos_mask] * sample_weight[pos_mask]).sum() / pos_weight
+        if pos_weight > 0
+        else 0.0
+    )
+    mean_score_neg = (
+        (predicted_scores[neg_mask] * sample_weight[neg_mask]).sum() / neg_weight
+        if neg_weight > 0
+        else 0.0
+    )
+
+    return float(mean_score_pos - mean_score_neg)
+
+
 def fpr(
     labels: npt.NDArray,
     predicted_labels: npt.NDArray,
@@ -411,7 +455,8 @@ def _dcg_sample_scores(
         with the discount factor for each sample
     :param k: If not None, the DCG score is calculated only for the top k samples. If None, the DCG score is calculated for all samples.
         k cannot be smaller than 1 and cannot be larger than the number of samples.
-    :return: the array of size n_samples with the DCG score for each sample. If k is not None, then elements after the k-th one are 0.
+    :return: the array of size n_samples with the DCG score for each sample. If k is not None, then elements after the k-th one
+        plateau at the k-th cumulative value (because the discount is zeroed out, so no further gains are accumulated).
     """
     discount = rank_discount(labels.shape[0])
 
@@ -475,7 +520,8 @@ def _ndcg_sample_scores(
         with the discount factor for each sample
     :param k: If not None, the NDCG score is calculated only for the top k samples. If None, the NDCG score is calculated for all samples.
         k cannot be smaller than 1 and cannot be larger than the number of samples.
-    :return: the array of size n_samples with the NDCG score for each sample. If k is not None, then elements after the k-th one are 0.
+    :return: the array of size n_samples with the NDCG score for each sample. If k is not None, then elements after the k-th one
+        plateau at the k-th cumulative value (because the discount is zeroed out, so no further gains are accumulated).
     """
     gain = _dcg_sample_scores(
         labels, predicted_labels, rank_discount=rank_discount, k=k
@@ -630,7 +676,11 @@ def fpr_at_precision(
     :param sample_weight: Optional array of sample weights.
     :return: False positive rate at the precision target, or NaN if unachievable.
     """
-    negatives = y_scores[y_true == 0].shape[0]
+    if sample_weight is None:
+        sample_weight = np.ones_like(y_scores)
+
+    neg_mask = y_true == 0
+    negatives = sample_weight[neg_mask].sum()
     # if there are no negatives in the data, fpr is undefined
     if negatives == 0:
         return np.nan
@@ -650,7 +700,9 @@ def fpr_at_precision(
 
     threshold_at_precision_target = np.min(thresholds_at_target_precision)
 
-    false_positives = np.sum(y_scores[y_true == 0] >= threshold_at_precision_target)
+    false_positives = sample_weight[
+        neg_mask & (y_scores >= threshold_at_precision_target)
+    ].sum()
     false_positive_rate = false_positives / negatives
 
     return false_positive_rate
@@ -673,18 +725,18 @@ def multi_cg_score(
     metric: _MulticalibrationRankErrorMetricsInterface = ndcg_score,
     rank_discount: Callable[[int], npt.NDArray] = utils.rank_no_discount,
     k: int | None = None,
-) -> npt.NDArray:
+) -> pd.Series:
     """
     Calculates the metric score for each segment.
 
     :param labels: Array of true labels.
-    :param predictions: Array of predicted labels.
+    :param predictions: Array of predicted scores.
     :param segments_df: Dataframe with the segments to calculate the error
     :param metric: The cumulative gain metric to use. Defaults to ndcg_score.
     :param rank_discount: rank discount function of the metric. Defaults to no discount.
     :param k: If not None, the metric is calculated only based on the top k samples.
         k cannot be smaller than 1 and cannot be larger than the number of samples.
-    :return: an array of size n_segments with the metric score for each segment.
+    :return: a Series of size n_segments with the metric score for each segment.
     """
     if metric not in (ndcg_score, dcg_score):
         raise ValueError("Only ndcg_score and dcg_score are supported")
@@ -763,8 +815,13 @@ def _calculate_cumulative_differences(
         dtype=precision_dtype,
     )
     differences[:, 0] = 0
-    weighted_diff = np.multiply((segments * sample_weight), (labels - predicted_scores))
-    normalization = (segments * sample_weight).sum(axis=1)[:, np.newaxis]
+
+    # Compute segment weights once — was computed twice in the original code
+    segment_weights = segments * sample_weight
+    weighted_diff = np.multiply(segment_weights, (labels - predicted_scores))
+    normalization = segment_weights.sum(axis=1)[:, np.newaxis]
+    del segment_weights
+
     # Division by zero only happens for empty segments, which are handled below
     with np.errstate(divide="ignore", invalid="ignore"):
         normalized_diff = np.divide(weighted_diff, normalization)
@@ -828,12 +885,14 @@ def _ecce_standard_deviation_per_segment(
         shape=(np.shape(segments)[0],),
         dtype=precision_dtype,
     )
-    weighted_segments = segments * np.square(sample_weight)
+    # Compute segments * sample_weight once; reused for both numerator and denominator.
     variance_preds = predicted_scores * (1 - predicted_scores)
-    variance_weighted_segments = np.multiply(weighted_segments, variance_preds).sum(
-        axis=1
-    )
-    normalization_variance = np.square((segments * sample_weight).sum(axis=1))
+    segment_weights = segments * sample_weight
+    variance_weighted_segments = np.multiply(
+        segment_weights, sample_weight * variance_preds
+    ).sum(axis=1)
+    normalization_variance = np.square(segment_weights.sum(axis=1))
+    del segment_weights
     with np.errstate(divide="ignore", invalid="ignore"):
         np.sqrt(
             np.divide(
@@ -940,54 +999,115 @@ def _ecce_per_segment(
     return np.ptp(differences, axis=1)
 
 
-def _ecce_cdf(x: float) -> float:
+@overload
+def _ecce_cdf(x: float) -> float: ...
+
+
+@overload
+def _ecce_cdf(x: npt.NDArray[Any]) -> npt.NDArray[np.float64]: ...
+
+
+def _ecce_cdf(
+    x: float | npt.NDArray[Any],
+) -> float | npt.NDArray[np.float64]:
     """
     Evaluate the cumulative distribution function for the ECCE statistic.
 
     This computes the CDF for the range (maximum minus minimum) of the
     standard Brownian motion on [0, 1], which is used to compute p-values
-    for the ECCE statistic.
+    for the ECCE statistic. Accepts both scalar and array inputs.
 
-    :param float x: argument at which to evaluate the cumulative distribution function
-                    (must be positive)
-    :return: cumulative distribution function evaluated at x
-    :rtype: float
+    :param x: Scalar or array of values at which to evaluate the CDF.
+              All values must be positive.
+    :return: CDF value(s) evaluated at *x*. Returns a scalar when *x* is
+             scalar, an array otherwise.
     """
-    if x <= 0:
-        raise ValueError(f"Can only evaluate ECCE CDF at positive x, not at {x}")
-    if x >= ECCE_SIGMA_MAX:
-        return 1.0 - sys.float_info.epsilon
+    scalar_input = np.ndim(x) == 0
+    x = np.atleast_1d(np.asarray(x, dtype=np.float64))
 
-    # Compute the machine precision assuming binary numerical representations.
-    eps = sys.float_info.epsilon
-    # Determine how many terms to use to attain accuracy eps.
-    fact = 4.0 / math.sqrt(2.0 * math.pi) * (1.0 / x + x / math.pi**2)
-    kmax = math.ceil(
-        1.0 / 2.0 + x / math.pi / math.sqrt(2) * math.sqrt(math.log(fact / eps))
-    )
-
-    # Sum the series.
-    c = 0.0
-    for k in range(kmax):
-        kplus = k + 1.0 / 2.0
-        c += (8.0 / x**2.0 + 2.0 / kplus**2.0 / math.pi**2.0) * math.exp(
-            -2.0 * kplus**2.0 * math.pi**2.0 / x**2.0
+    if np.any(x <= 0):
+        raise ValueError(
+            f"Can only evaluate ECCE CDF at positive x, not at {x[x <= 0]}"
         )
-    return c
+
+    eps = sys.float_info.epsilon
+    result = np.full_like(x, 1.0 - eps, dtype=np.float64)
+
+    needs_computation = x < ECCE_SIGMA_MAX
+    if not np.any(needs_computation):
+        return float(result[0]) if scalar_input else result
+
+    xc = x[needs_computation]
+
+    fact = 4.0 / math.sqrt(2.0 * math.pi) * (1.0 / xc + xc / math.pi**2)
+    kmax_per_element = np.ceil(
+        0.5 + xc / math.pi / math.sqrt(2.0) * np.sqrt(np.log(fact / eps))
+    ).astype(int)
+
+    kmax_global = int(np.max(kmax_per_element))
+    k = np.arange(kmax_global)
+    kplus = k + 0.5
+
+    xc_2d = xc[:, np.newaxis]
+    kplus_2d = kplus[np.newaxis, :]
+
+    coeff = 8.0 / xc_2d**2 + 2.0 / kplus_2d**2 / math.pi**2
+    exponent = -2.0 * kplus_2d**2 * math.pi**2 / xc_2d**2
+    terms = coeff * np.exp(exponent)
+
+    valid_mask = k[np.newaxis, :] < kmax_per_element[:, np.newaxis]
+    terms = np.where(valid_mask, terms, 0.0)
+
+    result[needs_computation] = np.sum(terms, axis=1)
+
+    if scalar_input:
+        return float(result[0])
+    return result
 
 
-def ecce_pvalue_from_sigma(ecce_sigma: float) -> float:
+@overload
+def ecce_pvalue_from_sigma(ecce_sigma: float) -> float: ...
+
+
+@overload
+def ecce_pvalue_from_sigma(
+    ecce_sigma: npt.NDArray[Any],
+) -> npt.NDArray[np.float64]: ...
+
+
+def ecce_pvalue_from_sigma(
+    ecce_sigma: float | npt.NDArray[Any],
+) -> float | npt.NDArray[np.float64]:
     """
     Compute p-value from a sigma-scaled ECCE statistic.
 
+    Accepts both scalar and array inputs.
+
     :param ecce_sigma: The ECCE statistic normalized by standard deviation.
-    :return: The p-value from the ECCE test.
+                       Can be a scalar or array.
+    :return: The p-value(s) from the ECCE test. Returns a scalar when the
+             input is scalar, an array otherwise.
     """
-    if ecce_sigma < ECCE_SIGMA_MIN:
-        return 1.0
-    if ecce_sigma > ECCE_SIGMA_MAX:
-        return sys.float_info.epsilon
-    return 1 - _ecce_cdf(ecce_sigma)
+    scalar_input = np.ndim(ecce_sigma) == 0
+    x = np.atleast_1d(np.asarray(ecce_sigma, dtype=np.float64))
+
+    eps = sys.float_info.epsilon
+    p_values = np.empty_like(x, dtype=np.float64)
+
+    below_min = x < ECCE_SIGMA_MIN
+    p_values[below_min] = 1.0
+
+    above_max = x >= ECCE_SIGMA_MAX
+    p_values[above_max] = eps
+
+    needs_cdf = (x >= ECCE_SIGMA_MIN) & (~above_max)
+    if np.any(needs_cdf):
+        cdf_values = _ecce_cdf(x[needs_cdf])
+        p_values[needs_cdf] = 1.0 - np.asarray(cdf_values, dtype=np.float64)
+
+    if scalar_input:
+        return float(p_values[0])
+    return p_values
 
 
 def ecce(
@@ -1073,6 +1193,7 @@ def _rank_calibration_error(
     :param labels: Array of true labels.
     :param predicted_labels: Array of predicted labels.
     :param num_bins: Number of bins to use for the rank calibration error calculation.
+    :param rng: Optional random state for tie-breaking. If None, a fixed seed (42) is used for reproducibility.
     :return: tuple (RCE, label_cdfs, prediction_cdfs)
     """
     # break ties
@@ -1100,7 +1221,7 @@ def _rank_calibration_error(
 
     prediction_cdfs = np.array(
         [
-            (np.sum([prediction_means[i] >= prediction_means])) / (num_bins)
+            np.sum(prediction_means[i] >= prediction_means) / num_bins
             for i in range(num_bins)
         ]
     )
@@ -1194,7 +1315,7 @@ def _rank_multicalibration_error(
     :param predicted_labels: Array of predicted labels.
     :param segments_df: Dataframe with the segments to calculate the error
     :param num_bins: Number of bins to use for the rank calibration error calculation.
-    :return: an array of size n_segments with the tuple of (RCE, label_cdfs, prediction_cdfs) for each segment.
+    :return: a Series of size n_segments with the tuple of (RCE, label_cdfs, prediction_cdfs) for each segment.
     """
     segments_df = segments_df.copy()
     segmentation_cols = list(segments_df.columns)
@@ -1242,7 +1363,8 @@ def normalized_entropy(
 
     :param labels: Ground truth (correct) labels for n_samples samples.
     :param predicted_scores: Predicted probabilities, as returned by a classifier's predict_proba method.
-    :returns: the normalized entropy
+    :param sample_weight: Optional array of sample weights for each instance.
+    :return: the normalized entropy
     """
     if sample_weight is None:
         sample_weight = np.ones_like(predicted_scores)
@@ -1278,8 +1400,10 @@ def calibration_free_normalized_entropy(
     :param max_iter: Maximum number of iterations for the calibration adjustment. Defaults to 10000.
     :return: the calibration-free NE.
     """
-    if len(labels.shape) != 1:
-        raise ValueError("y_pred must be the predicted probability for class 1 only.")
+    if len(predicted_scores.shape) != 1:
+        raise ValueError(
+            "predicted_scores must be the predicted probability for class 1 only."
+        )
 
     current_calibration = calibration_ratio(labels, predicted_scores, sample_weight)
 
@@ -1291,7 +1415,7 @@ def calibration_free_normalized_entropy(
         current_calibration = calibration_ratio(labels, predicted_scores, sample_weight)
         it += 1
 
-    calib_free_ne = normalized_entropy(labels, predicted_scores)
+    calib_free_ne = normalized_entropy(labels, predicted_scores, sample_weight)
     return calib_free_ne
 
 
@@ -1679,9 +1803,7 @@ class MulticalibrationError(
 
         :return: Array of shape (n_segments,) with p-values between 0 and 1.
         """
-        ecce_pvalue_vec = np.vectorize(ecce_pvalue_from_sigma)
-        p_values = ecce_pvalue_vec(self.segments_ecce_sigma)
-        return p_values
+        return ecce_pvalue_from_sigma(self.segments_ecce_sigma)
 
     @functools.cached_property
     def _segments_ecce_std(self) -> npt.NDArray[np.float16 | np.float32 | np.float64]:
@@ -1826,6 +1948,8 @@ class MulticalibrationError(
         The MDE represents the smallest calibration error that would be
         statistically detectable at approximately 5 sigma significance,
         given the sample size. Expressed as an absolute probability difference.
+
+        :return: Minimum detectable error as an absolute probability difference.
         """
         return 5 * self._global_ecce_std
 
@@ -1852,6 +1976,34 @@ class MulticalibrationError(
 
 # Apply transition period overrides for mce/global_ecce/mde (internal only)
 # @oss-disable[end= ]: apply_mce_transition_overrides(MulticalibrationError)
+
+
+def soft_label_log_loss(
+    y_true: npt.NDArray,
+    y_pred: npt.NDArray,
+    sample_weight: npt.NDArray | None = None,
+) -> float:
+    """Binary cross-entropy loss that supports soft labels in [0, 1].
+
+    Equivalent to sklearn's ``log_loss`` for hard binary labels, but also
+    supports continuous labels (e.g. confidence scores) in the [0, 1] interval.
+
+    :param y_true: Ground truth labels, either binary {0, 1} or soft floats in [0, 1].
+    :param y_pred: Predicted probabilities in (0, 1).
+    :param sample_weight: Optional sample weights.
+    :return: Weighted mean cross-entropy loss.
+    """
+    eps = 1e-15
+    y_pred = np.clip(y_pred, eps, 1 - eps)
+    loss = -(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
+    if sample_weight is not None:
+        return float(np.average(loss, weights=sample_weight))
+    return float(np.mean(loss))
+
+
+# pyre-ignore[16]: Setting __name__ so wrap_sklearn_metric_func
+# identifies this metric as "log_loss" for early-stopping heuristics.
+soft_label_log_loss.__name__ = "log_loss"
 
 
 class _ScoreFunctionInterface(Protocol):

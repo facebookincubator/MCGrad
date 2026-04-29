@@ -106,7 +106,7 @@ def get_segment_masks(
             )
         )
         chunk = np.zeros((chunk_size, len(df)), dtype=np.bool_)
-        feature_values_list: list[pd.DataFrame] = []
+        feature_values_rows: list[tuple[str, int | float | str, int]] = []
         n_segments_in_chunk = 0
         idx_segment = 0
         for depth in range(min_depth, max_depth + 1):
@@ -118,32 +118,26 @@ def get_segment_masks(
                     if mask.sum() >= min_samples_per_segment:
                         chunk[n_segments_in_chunk] = mask
                         n_segments_in_chunk += 1
-                        feature_values_list.append(
-                            _format_segment_feature_values(product, idx_segment)
-                        )
+                        for value, column in product:
+                            feature_values_rows.append((column, value, idx_segment))
                         idx_segment += 1
                         if n_segments_in_chunk == chunk_size:
-                            df_feature_values = _concat_feature_values(
-                                feature_values_list
+                            df_feature_values = pd.DataFrame(
+                                feature_values_rows,
+                                columns=["segment_column", "value", "idx_segment"],
                             )
                             yield chunk.copy(), n_segments_in_chunk, df_feature_values
                             chunk[:] = 0
                             n_segments_in_chunk = 0
-                            feature_values_list = []
+                            feature_values_rows = []
 
         # Yield remaining segments if any
         if n_segments_in_chunk > 0:
-            df_feature_values = _concat_feature_values(feature_values_list)
+            df_feature_values = pd.DataFrame(
+                feature_values_rows,
+                columns=["segment_column", "value", "idx_segment"],
+            )
             yield chunk.copy(), n_segments_in_chunk, df_feature_values
-
-
-def _format_segment_feature_values(
-    product: tuple[tuple[int | float | str, str], ...],
-    idx_segment: int,
-) -> pd.DataFrame:
-    df_feature_values = pd.DataFrame(product, columns=["value", "segment_column"])
-    df_feature_values["idx_segment"] = idx_segment
-    return df_feature_values[["segment_column", "value", "idx_segment"]]
 
 
 def _label_values_with_colname(

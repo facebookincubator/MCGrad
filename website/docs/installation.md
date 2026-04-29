@@ -9,19 +9,31 @@ description: How to install MCGrad for Python. Requirements, pip installation, a
 
 MCGrad requires Python 3.10 or later.
 
-### Pip (recommended)
+### Pip
 
 Install the latest stable release from PyPI:
 ```bash
 pip install mcgrad
 ```
 
-Install the latest development version from GitHub:
+To install the latest development version from GitHub:
 ```bash
 pip install git+https://github.com/facebookincubator/MCGrad.git
 ```
 
 See [Verification](#verification) below to confirm the install worked.
+
+### Conda / Mamba
+
+MCGrad is also available via conda:
+```bash
+conda install mcgrad
+```
+
+Or, using [mamba](https://mamba.readthedocs.io/):
+```bash
+mamba install mcgrad
+```
 
 ### From Source (advanced/contributors)
 
