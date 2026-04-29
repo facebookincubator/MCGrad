@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `num_rounds_trained` property on `MCGrad` / `RegressionMCGrad`, returning the number of boosting rounds actually trained — useful after early stopping, where this can be strictly less than the configured `num_rounds`.
+- Schema versioning for serialized models via a `schema_version` field in the JSON payload. Deserialize rejects unknown versions with a clear error; pre-existing serialized models without this field continue to load unchanged (with a deprecation warning).
+
+### Changed
+- Bumped serialization `schema_version` from `1` to `2`. The new version uses an identical wire format; the bump signals that downstream consumers should enforce explicit version checks. `deserialize()` accepts both `1` and `2`.
+- `MCGrad.serialize()` / `deserialize()` now round-trip the full set of JSON-serializable constructor arguments (e.g. `monotone_t`, `early_stopping`, `patience`, `n_folds`, `lightgbm_params`, timeouts). Previously only a small subset survived a round-trip. Non-JSON-serializable state — custom `early_stopping_score_func`, `early_stopping_minimize_score`, `monitored_metrics_during_training`, and `random_state` — is still reset to defaults; re-fit flows that depend on those must set them explicitly after `deserialize`.
+- Behavior change on `num_rounds` after `deserialize`: in schema v1, `self.num_rounds` is restored to the configured upper bound rather than being overwritten with the trained-booster count. Callers that relied on `num_rounds == len(mr)` should read `num_rounds_trained` instead.
+
 ### Fixed
 - Fixed `_BaseMCGrad.deserialize()` not restoring `allow_missing_segment_feature_values`, causing models serialized with `allow_missing_segment_feature_values=False` to silently revert to the default (`True`) after deserialization.
 
