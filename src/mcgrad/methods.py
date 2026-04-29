@@ -1485,19 +1485,23 @@ class _BaseMCGrad(
         state, and the full JSON-serializable configuration, allowing the
         model to be saved and restored later.
 
-        The output carries a ``schema_version`` field. Version 1 persists the
-        simple scalar and dict-valued ``__init__`` kwargs (see
-        :attr:`_SCHEMA_V1_INIT_KWARGS`). Fields backed by callables or RNG
-        objects (custom ``early_stopping_score_func``,
-        ``early_stopping_minimize_score``, ``monitored_metrics_during_training``,
-        ``random_state``) are **not** persisted in schema v1; a deserialized
-        model uses subclass defaults for those.
+        The output carries a ``schema_version`` field.
+
+        - ``2``: identical structure to version 1; the bump signals that
+          downstream consumers should enforce version checks.
+        - ``1``: persists the simple scalar and dict-valued ``__init__`` kwargs
+          (see :attr:`_SCHEMA_V1_INIT_KWARGS`).
+
+        Fields backed by callables or RNG objects (custom
+        ``early_stopping_score_func``, ``early_stopping_minimize_score``,
+        ``monitored_metrics_during_training``, ``random_state``) are **not**
+        persisted; a deserialized model uses subclass defaults for those.
 
         :return: JSON string containing the serialized model
         """
         serialized_boosters = [booster.model_to_string() for booster in self.mr]
         json_obj: dict[str, Any] = {
-            "schema_version": 1,
+            "schema_version": 2,
             self._SERIALIZATION_KEY: [
                 {
                     "booster": serialized_booster,
@@ -1567,10 +1571,11 @@ class _BaseMCGrad(
         Reconstructs a fitted MCGrad model from a previously serialized
         representation. The behavior depends on the ``schema_version`` field:
 
-        - ``schema_version == 1``: full configuration round-trip for the
-          fields listed in :attr:`_SCHEMA_V1_INIT_KWARGS`. ``self.num_rounds``
-          is restored to the configured upper bound; use
-          :attr:`num_rounds_trained` to get the actual booster count.
+        - ``schema_version == 2`` or ``schema_version == 1``: full
+          configuration round-trip for the fields listed in
+          :attr:`_SCHEMA_V1_INIT_KWARGS`. ``self.num_rounds`` is restored to
+          the configured upper bound; use :attr:`num_rounds_trained` to get
+          the actual booster count.
         - no ``schema_version`` field (legacy): boosters and encoder are
           restored; all other configuration falls back to defaults and a
           warning is logged.
@@ -1579,15 +1584,16 @@ class _BaseMCGrad(
         :param model_str: JSON string containing the serialized model
         :return: A fitted MCGrad instance with all state restored
         """
+        _SUPPORTED_SCHEMA_VERSIONS = {1, 2}
         json_obj = json.loads(model_str)
         schema_version = json_obj.get("schema_version")
         if schema_version is None:
             return cls._deserialize_legacy(json_obj)
-        if schema_version != 1:
+        if schema_version not in _SUPPORTED_SCHEMA_VERSIONS:
             raise ValueError(
                 f"{cls.__name__}.deserialize: unsupported schema_version="
-                f"{schema_version!r}. This version only knows how to read "
-                f"schema_version=1 (and the legacy pre-schema format)."
+                f"{schema_version!r}. Supported versions: "
+                f"{_SUPPORTED_SCHEMA_VERSIONS} (and the legacy pre-schema format)."
             )
 
         params = json_obj.get("params", {})
