@@ -19,7 +19,6 @@ import math
 import os
 import threading
 import time
-import warnings
 from collections.abc import Callable, Iterator
 from typing import Any, Protocol
 
@@ -28,8 +27,6 @@ import numpy.typing as npt
 import pandas as pd
 import psutil
 from scipy import stats
-from scipy.optimize._linesearch import LineSearchWarning
-from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OrdinalEncoder
 
@@ -43,120 +40,27 @@ BIN_EPSILON: float = 1e-8
 MIN_LOGIT_EPSILON: float = 1e-304
 
 
-def unshrink(
-    y: npt.NDArray[Any],
-    logits: npt.NDArray[Any],
-    w: npt.NDArray[Any] | None = None,
-    logit_epsilon: float | None = 10,
-) -> float:
-    """
-    Compute an unshrinkage coefficient using logistic regression.
-
-    Fits a logistic regression model without intercept to find a scaling coefficient
-    that adjusts for shrinkage in the logits. Uses Newton-CG solver primarily, with
-    LBFGS as fallback if Newton-CG fails to converge.
-
-    :param y: Array of binary labels (0 or 1).
-    :param logits: Array of logit values (log-odds) to unshrink.
-    :param w: Optional array of sample weights. If None, uniform weights are used.
-    :param logit_epsilon: Clipping bound for logits to avoid extreme coefficients.
-        Set to None to disable clipping.
-    :return: The unshrinkage coefficient. Returns 1 if both solvers fail.
-    """
-    if w is None:
-        w = np.ones_like(y)
-    logits = logits.reshape(-1, 1)
-
-    # Clip logits to avoid extreme coefficient driven by outliers
-    if logit_epsilon is not None:
-        logits = np.clip(logits, -logit_epsilon, logit_epsilon)
-
-    primary_solver = LogisticRegression(
-        C=np.inf, fit_intercept=False, solver="newton-cg"
-    )
-    with warnings.catch_warnings(record=True) as recorded_warnings:
-        warnings.simplefilter("always")
-        # Suppress sklearn 1.8+ UserWarning which is a known bug. Will be fixed in sklearn 1.8.1
-        # See: https://github.com/scikit-learn/scikit-learn/issues/32927
-        warnings.filterwarnings(
-            "ignore",
-            message="Setting penalty=None will ignore the C and l1_ratio parameters",
-            category=UserWarning,
-        )
-        primary_solver.fit(logits, y, sample_weight=w)
-    for rec_warn in recorded_warnings:
-        if isinstance(rec_warn.message, LineSearchWarning):
-            logger.info(
-                "Line search warning (unshrink): %s. Solution is approximately "
-                "optimal - no ideal step size for the gradient descent update "
-                "can be found. These warnings are generally harmless.",
-                rec_warn.message,
-            )
-        else:
-            logger.debug(rec_warn)
-            warnings.warn_explicit(
-                message=str(rec_warn.message),
-                category=rec_warn.category,
-                filename=rec_warn.filename,
-                lineno=rec_warn.lineno,
-                source=rec_warn.source,
-            )
-
-    # Return result if logistic regression with Newton-CG converged to a solution,
-    # if not try LBFGS.
-    # pyre-ignore, coef_ is available after `fit()` has been called
-    if not np.isnan(primary_solver.coef_).any():
-        if primary_solver.coef_[0][0] < 0.95 or primary_solver.coef_[0][0] > 1.05:
-            logger.warning(
-                "Unshrink is not close to 1: %s. This may create a problem "
-                "with the multicalibration of the model.",
-                primary_solver.coef_[0][0],
-            )
-
-        return primary_solver.coef_[0][0]
-
-    fallback_solver = LogisticRegression(C=np.inf, fit_intercept=False, solver="lbfgs")
-    # Suppress sklearn 1.8+ UserWarning which is a known bug. Will be fixed in sklearn 1.8.1
-    # See: https://github.com/scikit-learn/scikit-learn/issues/32927
-    with warnings.catch_warnings():
-        warnings.filterwarnings(
-            "ignore",
-            message="Setting penalty=None will ignore the C and l1_ratio parameters",
-            category=UserWarning,
-        )
-        fallback_solver.fit(logits, y, sample_weight=w)
-    if not np.isnan(fallback_solver.coef_).any():
-        if primary_solver.coef_[0][0] < 0.95 or primary_solver.coef_[0][0] > 1.05:
-            logger.warning(
-                "Unshrink is not close to 1: %s. This may create a problem "
-                "with the multicalibration of the model.",
-                primary_solver.coef_[0][0],
-            )
-        return fallback_solver.coef_[0][0]
-
-    # If both solvers fail, return default value. Not disastrous, but requires GBDT to do more heavy-lifting.
-    return 1
-
-
-def logistic(logits: float) -> float:
+def logistic(
+    logits: float | npt.NDArray[Any],
+) -> float | npt.NDArray[Any]:
     """
     Compute the logistic (sigmoid) function in a numerically stable way.
 
-    Uses a computational trick to avoid overflow/underflow by choosing
-    different formulations based on the sign of the input.
+    Accepts both scalar and array inputs. Uses ``np.where`` to select the
+    appropriate formulation based on the sign of each element, avoiding
+    overflow/underflow.
 
-    :param logits: Input value in log-odds space.
-    :return: Probability value in (0, 1).
+    :param logits: Input value(s) in log-odds space (scalar or array).
+    :return: Probability value(s) in (0, 1).
     """
-    if logits >= 0:
-        return 1.0 / (1.0 + math.exp(-logits))
-    else:
-        return math.exp(logits) / (1.0 + math.exp(logits))
-
-
-logistic_vectorized: Callable[[npt.NDArray[Any]], npt.NDArray[Any]] = np.vectorize(
-    logistic
-)
+    logits = np.asarray(logits)
+    with np.errstate(over="ignore", invalid="ignore"):
+        result = np.where(
+            logits >= 0,
+            1.0 / (1.0 + np.exp(-logits)),
+            np.exp(logits) / (1.0 + np.exp(logits)),
+        )
+    return result.item() if result.ndim == 0 else result
 
 
 def logit(
@@ -755,6 +659,6 @@ def predictions_to_labels(
         thresholds, on=segmentation_columns, how="left"
     )
     data_w_thresholds["predicted_label"] = (
-        data_w_thresholds[prediction_column] >= data_w_thresholds.threshold
+        data_w_thresholds[prediction_column] >= data_w_thresholds[threshold_column]
     ).astype(int)
     return data_w_thresholds

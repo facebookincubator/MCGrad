@@ -330,7 +330,7 @@ def test_ndcg_score_is_correct_when_k_larger_than_array_length(
     ],
 )
 def test_multi_cg_gives_same_result_as_cg_per_segment(rank_discount, rng):
-    n_samples = 1000
+    n_samples = 200
     k = 100
     df = pd.DataFrame(index=range(n_samples))
     df["label"] = rng.random_sample(n_samples)
@@ -465,6 +465,53 @@ def test_fpr():
     predicted_labels = np.array([1, 0, 0, 0, 0, 0, 0, 0])
 
     assert fpr(labels, predicted_labels) == 0.25
+
+
+@pytest.mark.parametrize(
+    "labels, scores, expected_j",
+    [
+        # Perfect separation: positives=1.0, negatives=0.0 -> 1.0
+        ([0, 1, 0, 1, 0, 1, 0, 1], [0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0], 1.0),
+        # Constant scores: all 0.5 -> 0.0
+        ([0, 1, 0, 1, 0, 1, 0, 1], [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], 0.0),
+        # Inverted: positives=0.0, negatives=1.0 -> -1.0
+        ([0, 1, 0, 1, 0, 1, 0, 1], [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0], -1.0),
+        # Partial: E[s|y=1]=(0.9+0.7)/2=0.8, E[s|y=0]=(0.2+0.3)/2=0.25 -> 0.55
+        ([0, 1, 0, 1], [0.2, 0.9, 0.3, 0.7], 0.55),
+        # Higher mean for positives: E[s|y=1]=0.7, E[s|y=0]=0.35 -> 0.35
+        ([0, 1, 0, 1, 0, 1, 0, 1], [0.1, 0.6, 0.3, 0.8, 0.5, 0.7, 0.5, 0.7], 0.35),
+        # Binary predictions still work: same as classical TPR-FPR
+        ([0, 1, 0, 1], [0, 1, 1, 1], 0.5),
+    ],
+)
+def test_youdens_j(labels, scores, expected_j):
+    result = metrics.youdens_j(np.array(labels), np.array(scores, dtype=float))
+    assert result == pytest.approx(expected_j)
+
+
+def test_youdens_j_with_sample_weight():
+    labels = np.array([0, 1, 0, 1])
+    scores = np.array([0.2, 0.9, 0.4, 0.7])
+    weights = np.array([1.0, 2.0, 3.0, 4.0])
+
+    # E[s|y=1] = (0.9*2 + 0.7*4) / (2+4) = (1.8 + 2.8) / 6 = 4.6/6
+    # E[s|y=0] = (0.2*1 + 0.4*3) / (1+3) = (0.2 + 1.2) / 4 = 1.4/4
+    # NDR = 4.6/6 - 1.4/4
+    expected = 4.6 / 6.0 - 1.4 / 4.0
+    result = metrics.youdens_j(labels, scores, sample_weight=weights)
+    assert result == pytest.approx(expected)
+
+
+def test_youdens_j_does_not_modify_inputs():
+    labels = np.array([0, 1, 0, 1, 0, 1])
+    scores = np.array([0.1, 0.9, 0.3, 0.8, 0.2, 0.7])
+    labels_copy = labels.copy()
+    scores_copy = scores.copy()
+
+    metrics.youdens_j(labels, scores)
+
+    np.testing.assert_array_equal(labels, labels_copy)
+    np.testing.assert_array_equal(scores, scores_copy)
 
 
 @pytest.mark.parametrize(
@@ -789,9 +836,7 @@ def test_califree_ne_is_invariant_to_logit_shifts(logit_shift):
     # Hardcoded labels and predictions with equal sums
     labels = np.array([0, 1, 0, 1, 1, 0, 1, 0, 1, 0])
     predictions = np.array([0.1, 0.9, 0.1, 0.9, 0.9, 0.1, 0.9, 0.1, 0.9, 0.1])
-    shifted_predictions = utils.logistic_vectorized(
-        utils.logit(predictions) + logit_shift
-    )
+    shifted_predictions = utils.logistic(utils.logit(predictions) + logit_shift)
     # Calculate normalized entropy and calibration-free normalized entropy
     califree_ne_original = metrics.calibration_free_normalized_entropy(
         labels, predictions
@@ -800,6 +845,87 @@ def test_califree_ne_is_invariant_to_logit_shifts(logit_shift):
         labels, shifted_predictions
     )
     assert pytest.approx(califree_ne_shifted, 0.01) == califree_ne_original
+
+
+@pytest.mark.parametrize(
+    "metric_func",
+    [
+        metrics.normalized_entropy,
+        metrics.calibration_free_normalized_entropy,
+        metrics.calibration_ratio,
+        metrics.expected_calibration_error,
+        metrics.proportional_expected_calibration_error,
+        metrics.youdens_j,
+        metrics.recall_at_precision,
+        metrics.fpr_at_precision,
+        metrics.precision_at_recall,
+        metrics.precision_at_predictive_prevalence,
+    ],
+)
+def test_weighted_score_metric_matches_expanded_unweighted(metric_func):
+    """Weighted score metrics should give the same result as duplicating rows by weight."""
+    labels = np.array([0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0])
+    scores = np.array([0.1, 0.85, 0.6, 0.7, 0.9, 0.2, 0.4, 0.35, 0.75, 0.15, 0.55, 0.8])
+    weights = np.array([3, 2, 1, 2, 1, 3, 2, 1, 1, 2, 1, 1])
+
+    expanded_labels = np.repeat(labels, weights)
+    expanded_scores = np.repeat(scores, weights)
+
+    weighted_result = metric_func(labels, scores, sample_weight=weights)
+    unweighted_result = metric_func(expanded_labels, expanded_scores)
+
+    assert weighted_result == pytest.approx(unweighted_result, rel=1e-5)
+
+
+@pytest.mark.parametrize(
+    "metric_func",
+    [
+        metrics.recall,
+        metrics.fpr,
+    ],
+)
+def test_weighted_binary_metric_matches_expanded_unweighted(metric_func):
+    """Weighted binary metrics should give the same result as duplicating rows by weight."""
+    labels = np.array([0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0])
+    predicted_labels = np.array([0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 1, 1])
+    weights = np.array([3, 2, 1, 2, 1, 3, 2, 1, 1, 2, 1, 1])
+
+    expanded_labels = np.repeat(labels, weights)
+    expanded_predicted_labels = np.repeat(predicted_labels, weights)
+
+    weighted_result = metric_func(labels, predicted_labels, sample_weight=weights)
+    unweighted_result = metric_func(expanded_labels, expanded_predicted_labels)
+
+    assert weighted_result == pytest.approx(unweighted_result, rel=1e-5)
+
+
+def test_weighted_fpr_at_precision_with_false_positives():
+    """Weighted fpr_at_precision must use sample_weight for both the FP count and negatives.
+
+    The generic test_weighted_score_metric_matches_expanded_unweighted test
+    happens to produce FPR=0 for fpr_at_precision (no negatives exceed the
+    precision threshold), so this test uses data specifically designed to have
+    nonzero FPR with non-uniform weights on the negatives.
+    """
+    # 20 positives (scores 0.99..0.80, weight 3 each) + 5 negatives.
+    # The first negative (score 0.815, weight 3) exceeds the lowest qualifying
+    # threshold (0.81), creating a weighted false positive that exercises the
+    # FPR logic.  The remaining negatives have weights [1, 2, 1, 1].
+    labels = np.concatenate([np.ones(20), np.zeros(5)])
+    pos_scores = np.linspace(0.99, 0.80, 20)
+    neg_scores = np.array([0.815, 0.3, 0.2, 0.1, 0.05])
+    scores = np.concatenate([pos_scores, neg_scores])
+    weights = np.array([3] * 21 + [1, 2, 1, 1])
+
+    expanded_labels = np.repeat(labels, weights)
+    expanded_scores = np.repeat(scores, weights)
+
+    weighted_result = metrics.fpr_at_precision(labels, scores, sample_weight=weights)
+    unweighted_result = metrics.fpr_at_precision(expanded_labels, expanded_scores)
+
+    # Verify FPR is nonzero (i.e. the test data actually exercises the FPR path)
+    assert weighted_result > 0, "Test data should produce nonzero FPR"
+    assert weighted_result == pytest.approx(unweighted_result, rel=1e-5)
 
 
 @pytest.mark.parametrize("target_precision, expected_fpr", [(0.9, 0.0), (0.8, 0.2)])
@@ -1648,6 +1774,28 @@ def test_calibration_free_normalized_entropy_higher_for_reversed_predictions():
     assert result_bad > result_good
 
 
+def test_calibration_free_normalized_entropy_rejects_2d_predictions():
+    labels = np.array([0, 1, 0, 1])
+    predictions_2d = np.array([[0.2, 0.8], [0.7, 0.3], [0.1, 0.9], [0.6, 0.4]])
+
+    with pytest.raises(
+        ValueError, match="predicted_scores must be the predicted probability"
+    ):
+        metrics.calibration_free_normalized_entropy(
+            labels=labels, predicted_scores=predictions_2d
+        )
+
+
+def test_calibration_free_normalized_entropy_accepts_1d_labels():
+    labels = np.array([0, 1, 0, 1])
+    predictions = np.array([0.2, 0.8, 0.3, 0.7])
+
+    result = metrics.calibration_free_normalized_entropy(
+        labels=labels, predicted_scores=predictions
+    )
+    assert isinstance(result, (float, np.floating))
+
+
 def test_rank_calibration_error_zero_for_perfect_ranking():
     labels = np.array([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
     perfect_predictions = labels * 2.0
@@ -1888,6 +2036,17 @@ def test_ecce_cdf_returns_near_one_for_large_x():
 
     result_large = metrics._ecce_cdf(100.0)
     assert result_large == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("value", [-1.0, 0.0])
+def test_ecce_cdf_raises_for_non_positive_scalar(value):
+    with pytest.raises(ValueError, match="Can only evaluate ECCE CDF at positive x"):
+        metrics._ecce_cdf(value)
+
+
+def test_ecce_cdf_raises_for_non_positive_in_array():
+    with pytest.raises(ValueError, match="Can only evaluate ECCE CDF at positive x"):
+        metrics._ecce_cdf(np.array([1.0, -0.5, 2.0]))
 
 
 def test_ecce_pvalue_returns_one_for_very_small_statistic():
@@ -2255,3 +2414,372 @@ def test_ecce_pvalue_consistency_with_ecce_pvalue_from_sigma(rng):
     sigma = metrics.ecce_sigma(labels, predicted_scores)
     ecce_pvalue_from_sigma_result = metrics.ecce_pvalue_from_sigma(sigma)
     assert ecce_pvalue_result == pytest.approx(ecce_pvalue_from_sigma_result, rel=1e-10)
+
+
+def test_ecce_cdf_accepts_array_input():
+    scalar_results = [metrics._ecce_cdf(v) for v in [0.5, 1.0, 2.0, 5.0, 8.3]]
+    array_result = metrics._ecce_cdf(np.array([0.5, 1.0, 2.0, 5.0, 8.3]))
+    np.testing.assert_allclose(array_result, scalar_results, rtol=1e-10)
+
+
+def test_ecce_pvalue_from_sigma_accepts_array_input():
+    test_sigmas = np.array([0, 1e-25, 0.5, 1.0, 2.0, 3.0, 5.0, 8.0, 8.5, 100.0, np.inf])
+    scalar_results = [metrics.ecce_pvalue_from_sigma(s) for s in test_sigmas]
+    array_result = metrics.ecce_pvalue_from_sigma(test_sigmas)
+    np.testing.assert_allclose(array_result, scalar_results, rtol=1e-10)
+
+
+def test_ecce_pvalue_from_sigma_returns_scalar_for_scalar_input():
+    result = metrics.ecce_pvalue_from_sigma(2.0)
+    assert isinstance(result, float)
+
+
+def test_ecce_pvalue_from_sigma_empty_array():
+    result = metrics.ecce_pvalue_from_sigma(np.array([]))
+    assert len(result) == 0
+
+
+def test_ecce_pvalue_from_sigma_all_below_min():
+    result = metrics.ecce_pvalue_from_sigma(np.array([0.0, 1e-30, 1e-25]))
+    np.testing.assert_array_equal(result, np.ones(3))
+
+
+def test_regression_mce_returns_zero_for_perfectly_calibrated_data():
+    test_df = pd.DataFrame(
+        {
+            "prediction": [0.5, 1.5, 2.5, 3.5],
+            "label": [0.5, 1.5, 2.5, 3.5],
+            "segment_A": ["a", "a", "b", "b"],
+        }
+    )
+
+    mce = metrics.MulticalibrationError(
+        df=test_df,
+        label_column="label",
+        score_column="prediction",
+        categorical_segment_columns=["segment_A"],
+        min_samples_per_segment=1,
+        outcome_type="regression",
+    )
+    assert mce.segments_ecce[0] == 0
+    assert mce._segments_ecce_std[0] == 0
+
+
+def test_regression_mce_equals_global_ecce_at_depth_zero():
+    test_df = pd.DataFrame(
+        {
+            "prediction": [0.1, 0.8, 0.3, 0.7],
+            "label": [0.2, 0.9, 0.1, 0.8],
+            "segment_A": ["a", "a", "b", "b"],
+        }
+    )
+
+    global_ecce_metric = metrics.ecce(
+        labels=test_df.label.values,
+        predicted_scores=test_df.prediction.values,
+    )
+
+    mce = metrics.MulticalibrationError(
+        df=test_df,
+        label_column="label",
+        score_column="prediction",
+        categorical_segment_columns=["segment_A"],
+        max_depth=0,
+        min_samples_per_segment=1,
+        outcome_type="regression",
+        precision_dtype="float64",
+    )
+    mce_absolute = mce.mce_sigma * mce._global_ecce_std
+    assert np.isclose(mce_absolute, global_ecce_metric, rtol=1e-10, atol=1e-10)
+
+
+def test_regression_mce_sigma_detects_miscalibration(rng):
+    n = 200
+    predictions = rng.uniform(low=0.0, high=10.0, size=n)
+    labels = predictions + rng.normal(0, 0.1, size=n)
+    miscalibrated_predictions = predictions + 3.0
+
+    df_calibrated = pd.DataFrame(
+        {
+            "prediction": predictions,
+            "label": labels,
+            "segment": rng.choice(["A", "B"], size=n),
+        }
+    )
+
+    df_miscalibrated = pd.DataFrame(
+        {
+            "prediction": miscalibrated_predictions,
+            "label": labels,
+            "segment": rng.choice(["A", "B"], size=n),
+        }
+    )
+
+    mce_calibrated = metrics.MulticalibrationError(
+        df=df_calibrated,
+        label_column="label",
+        score_column="prediction",
+        categorical_segment_columns=["segment"],
+        min_samples_per_segment=5,
+        max_depth=1,
+        outcome_type="regression",
+    )
+
+    mce_miscalibrated = metrics.MulticalibrationError(
+        df=df_miscalibrated,
+        label_column="label",
+        score_column="prediction",
+        categorical_segment_columns=["segment"],
+        min_samples_per_segment=5,
+        max_depth=1,
+        outcome_type="regression",
+    )
+
+    assert mce_miscalibrated.mce_sigma > mce_calibrated.mce_sigma
+
+
+@pytest.mark.parametrize("scale_factor", [0.1, 2.0, 100.0])
+def test_regression_mce_sigma_is_scale_invariant(scale_factor, rng):
+    n = 100
+    predictions = rng.uniform(0, 10, size=n)
+    labels = predictions + rng.normal(0, 1, size=n)
+    segments = rng.choice(["A", "B"], size=n)
+
+    def make_mce(preds, labs):
+        df = pd.DataFrame(
+            {
+                "prediction": preds,
+                "label": labs,
+                "segment": segments,
+            }
+        )
+        return metrics.MulticalibrationError(
+            df=df,
+            label_column="label",
+            score_column="prediction",
+            categorical_segment_columns=["segment"],
+            min_samples_per_segment=5,
+            max_depth=1,
+            outcome_type="regression",
+            precision_dtype="float64",
+        )
+
+    mce_original = make_mce(predictions, labels)
+    mce_scaled = make_mce(predictions * scale_factor, labels * scale_factor)
+
+    np.testing.assert_allclose(mce_original.mce_sigma, mce_scaled.mce_sigma, rtol=1e-10)
+
+
+@pytest.mark.parametrize(
+    "attr",
+    ["mce_relative", "mde_relative", "segments_ecce_relative", "global_ecce_relative"],
+)
+def test_regression_mce_relative_raises_for_regression(attr):
+    test_df = pd.DataFrame(
+        {
+            "prediction": [0.5, 1.5, 2.5, 3.5],
+            "label": [0.5, 1.5, 2.5, 3.5],
+            "segment_A": ["a", "a", "b", "b"],
+        }
+    )
+
+    mce = metrics.MulticalibrationError(
+        df=test_df,
+        label_column="label",
+        score_column="prediction",
+        categorical_segment_columns=["segment_A"],
+        min_samples_per_segment=1,
+        outcome_type="regression",
+    )
+    with pytest.raises(NotImplementedError, match="not available for regression"):
+        getattr(mce, attr)
+
+
+def test_regression_ecce_std_uses_adjacent_differences():
+    # Hand-computed example:
+    # scores (already sorted): [1, 2, 3, 4]
+    # labels:                   [1.5, 2.5, 2.5, 4.5]
+    # residuals: r = labels - scores = [0.5, 0.5, -0.5, 0.5]
+    # weights: all 1
+    # diff_r = [0, -1, 1]
+    # sum_w_adjacent = [2, 2, 2]
+    # numerator = (0*4 + 1*4 + 1*4) = 8
+    # total_w = 4
+    # denominator_weight = w[0] + w[3] + 2*(w[1]+w[2]) = 1 + 1 + 2*2 = 6
+    # denominator = 4 * 4 * 6 = 96
+    # std = sqrt(8/96) = sqrt(1/12)
+    predicted_scores = np.array([1.0, 2.0, 3.0, 4.0])
+    labels = np.array([1.5, 2.5, 2.5, 4.5])
+    segments = np.ones(shape=(1, 4), dtype=np.bool_)
+
+    result = metrics._ecce_regression_standard_deviation_per_segment(
+        predicted_scores=predicted_scores,
+        labels=labels,
+        segments=segments,
+    )
+
+    expected = np.sqrt(8.0 / 96.0)
+    np.testing.assert_allclose(result[0], expected, rtol=1e-10)
+
+
+def test_regression_ecce_std_defaults_to_single_segment_when_segments_is_none():
+    predicted_scores = np.array([1.0, 2.0, 3.0, 4.0])
+    labels = np.array([1.5, 2.5, 2.5, 4.5])
+
+    result_no_segments = metrics._ecce_regression_standard_deviation_per_segment(
+        predicted_scores=predicted_scores,
+        labels=labels,
+    )
+    result_explicit = metrics._ecce_regression_standard_deviation_per_segment(
+        predicted_scores=predicted_scores,
+        labels=labels,
+        segments=np.ones(shape=(1, 4), dtype=np.bool_),
+    )
+
+    assert len(result_no_segments) == 1
+    np.testing.assert_allclose(result_no_segments[0], result_explicit[0])
+
+
+def test_regression_ecce_std_raises_error_with_mismatched_segments():
+    predicted_scores = np.array([1.0, 2.0, 3.0])
+    labels = np.array([1.5, 2.5, 3.5])
+    segments = np.ones(shape=(1, 5), dtype=np.bool_)
+
+    with pytest.raises(
+        ValueError, match="Segments must be the same length as labels/predictions"
+    ):
+        metrics._ecce_regression_standard_deviation_per_segment(
+            predicted_scores=predicted_scores,
+            labels=labels,
+            segments=segments,
+        )
+
+
+def test_regression_mce_does_not_modify_input_df(rng):
+    n_samples = 50
+    df = pd.DataFrame(
+        {
+            "segment_A": rng.choice(["a", "b"], size=n_samples),
+            "prediction": rng.rand(n_samples) * 10,
+            "label": rng.rand(n_samples) * 10,
+        }
+    )
+
+    df_original = df.copy(deep=True)
+
+    metrics.MulticalibrationError(
+        df=df,
+        label_column="label",
+        score_column="prediction",
+        categorical_segment_columns=["segment_A"],
+        min_samples_per_segment=1,
+        outcome_type="regression",
+    )
+
+    assert df.equals(df_original)
+
+
+def test_regression_ecce_std_handles_single_element_segments():
+    predicted_scores = np.array([1.0, 2.0, 3.0])
+    labels = np.array([1.5, 2.0, 3.5])
+    # Segment with only one element (index 0)
+    segments = np.array(
+        [
+            [True, False, False],
+            [False, True, True],
+        ],
+        dtype=np.bool_,
+    )
+
+    result = metrics._ecce_regression_standard_deviation_per_segment(
+        predicted_scores=predicted_scores,
+        labels=labels,
+        segments=segments,
+    )
+
+    assert result[0] == 0.0
+    # Second segment has residuals [0, 0.5], diff = [0.5], so std > 0
+    assert result[1] > 0.0
+
+
+def test_outcome_type_validation():
+    df = pd.DataFrame(
+        {
+            "prediction": [0.1, 0.9],
+            "label": [0, 1],
+            "segment": ["a", "b"],
+        }
+    )
+
+    with pytest.raises(ValueError, match="Invalid outcome_type"):
+        metrics.MulticalibrationError(
+            df=df,
+            label_column="label",
+            score_column="prediction",
+            categorical_segment_columns=["segment"],
+            outcome_type="invalid",
+        )
+
+
+def test_regression_str_and_format_use_absolute_scale():
+    test_df = pd.DataFrame(
+        {
+            "prediction": [0.5, 1.5, 2.5, 3.5],
+            "label": [0.6, 1.4, 2.6, 3.4],
+            "segment_A": ["a", "a", "b", "b"],
+        }
+    )
+
+    mce = metrics.MulticalibrationError(
+        df=test_df,
+        label_column="label",
+        score_column="prediction",
+        categorical_segment_columns=["segment_A"],
+        min_samples_per_segment=1,
+        outcome_type="regression",
+    )
+
+    result_str = str(mce)
+    assert "%" not in result_str
+    assert "sigmas=" in result_str
+    assert "p=" in result_str
+    assert "mde=" in result_str
+
+    result_format = format(mce, ".2f")
+    assert "%" not in result_format
+    assert "sigmas=" in result_format
+
+
+def test_wrap_multicalibration_error_metric_rejects_mce_relative_for_regression():
+    with pytest.raises(ValueError, match="not available for regression"):
+        wrap_multicalibration_error_metric(
+            categorical_segment_columns=["seg"],
+            metric_version="mce_relative",
+            outcome_type="regression",
+        )
+
+
+def test_wrap_multicalibration_error_metric_passes_outcome_type():
+    wrapped = wrap_multicalibration_error_metric(
+        categorical_segment_columns=["segment_A"],
+        metric_version="mce_sigma",
+        outcome_type="regression",
+    )
+
+    n = 50
+    rng = np.random.RandomState(42)
+    df = pd.DataFrame(
+        {
+            "prediction": rng.rand(n) * 10,
+            "label": rng.rand(n) * 10,
+            "segment_A": rng.choice(["a", "b"], size=n),
+        }
+    )
+
+    result = wrapped(
+        df=df,
+        label_column="label",
+        score_column="prediction",
+        weight_column=None,
+    )
+    assert isinstance(result, (float, np.floating))

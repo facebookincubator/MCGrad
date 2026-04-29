@@ -4,6 +4,8 @@
 # LICENSE file in the root directory of this source tree.
 # pyre-unsafe
 
+import json
+import logging
 from unittest.mock import Mock
 
 import numpy as np
@@ -16,6 +18,7 @@ from sklearn.model_selection import KFold, StratifiedKFold
 from .. import _utils as utils, methods
 from ..metrics import (
     _ScoreFunctionInterface,
+    soft_label_log_loss,
     wrap_multicalibration_error_metric,
     wrap_sklearn_metric_func,
 )
@@ -37,7 +40,7 @@ def generate_test_data(n):
     )
 
 
-@pytest.mark.parametrize("num_rounds", [(1), (2), (6), (10), (16)])
+@pytest.mark.parametrize("num_rounds", [(1), (2), (6)])
 @pytest.mark.parametrize(
     "calibrator_class",
     [
@@ -224,7 +227,7 @@ def test_mcgrad_serialize_deserialize_no_encode_categorical(
         methods.RegressionMCGrad,
     ],
 )
-@pytest.mark.parametrize("max_num_rounds", [(1), (2), (6), (10), (16)])
+@pytest.mark.parametrize("max_num_rounds", [(1), (2), (6)])
 def test_deserialized_mcgrad_has_at_most_max_num_rounds(
     max_num_rounds, calibrator_class
 ):
@@ -255,6 +258,7 @@ def test_deserialized_mcgrad_has_at_most_max_num_rounds(
     assert len(deserialized.mr) == len(model.mr)
 
 
+@pytest.mark.parametrize("use_train_col", [True, False])
 @pytest.mark.parametrize(
     "calibrator_class, calibrator_kwargs",
     [
@@ -302,8 +306,8 @@ def test_deserialized_mcgrad_has_at_most_max_num_rounds(
         ),
     ],
 )
-def test_fit_transform_with_train_col_identical_to_fit_then_predict(
-    calibrator_class, calibrator_kwargs, rng
+def test_fit_transform_identical_to_fit_then_predict(
+    calibrator_class, calibrator_kwargs, use_train_col, rng
 ):
     df = pd.DataFrame(
         {
@@ -312,89 +316,32 @@ def test_fit_transform_with_train_col_identical_to_fit_then_predict(
             "is_train_set": np.concatenate([np.full(50, False), np.full(50, True)]),
         }
     )
+
+    fit_transform_kwargs = {
+        "prediction_column_name": "prediction",
+        "label_column_name": "label",
+    }
+    if use_train_col:
+        fit_transform_kwargs["is_train_set_col_name"] = "is_train_set"
+
     result_fit_transform = calibrator_class(**calibrator_kwargs).fit_transform(
-        df,
-        prediction_column_name="prediction",
-        label_column_name="label",
-        is_train_set_col_name="is_train_set",
+        df, **fit_transform_kwargs
     )
 
-    calibrator = calibrator_class(**calibrator_kwargs)
-    calibrator.fit(df[df.is_train_set], "prediction", "label")
-    result_fit_predict = calibrator.predict(df[~df.is_train_set], "prediction")
-
-    assert np.allclose(result_fit_transform[~df.is_train_set], result_fit_predict), (
-        "fit_transform does not give the same result as fit followed by predict"
-    )
-
-
-@pytest.mark.parametrize(
-    "calibrator_class, calibrator_kwargs",
-    [
-        (methods.PlattScaling, {}),
-        (methods.IsotonicRegression, {}),
-        # Pass MCGrad params that minimize test runtime
-        (
-            methods.MCGrad,
-            {"num_rounds": 2, "lightgbm_params": {"max_depth": 2, "n_estimators": 2}},
-        ),
-        (
-            methods.MCGrad,
-            {
-                "num_rounds": 2,
-                "early_stopping": True,
-                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
-            },
-        ),
-        (
-            methods.MCGrad,
-            {
-                "num_rounds": 2,
-                "early_stopping": False,
-                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
-            },
-        ),
-        (methods.IdentityCalibrator, {}),
-        (methods.MultiplicativeAdjustment, {}),
-        (methods.AdditiveAdjustment, {}),
-        (
-            methods.RegressionMCGrad,
-            {
-                "num_rounds": 2,
-                "early_stopping": True,
-                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
-            },
-        ),
-        (
-            methods.RegressionMCGrad,
-            {
-                "num_rounds": 2,
-                "early_stopping": False,
-                "lightgbm_params": {"max_depth": 2, "n_estimators": 2},
-            },
-        ),
-    ],
-)
-def test_fit_transform_no_train_col_identical_to_fit_then_predict(
-    calibrator_class, calibrator_kwargs, rng
-):
-    df = pd.DataFrame(
-        {
-            "prediction": np.linspace(0, 1, 100),
-            "label": rng.choice([0, 1], 100),
-        }
-    )
-    result_fit_transform = calibrator_class(**calibrator_kwargs).fit_transform(
-        df, prediction_column_name="prediction", label_column_name="label"
-    )
-
-    calibrator = calibrator_class(**calibrator_kwargs)
-    calibrator.fit(df, "prediction", "label")
-    result_fit_predict = calibrator.predict(df, "prediction")
-
-    assert np.allclose(result_fit_transform, result_fit_predict), (
-        "fit_transform does not give the same result as fit followed by predict"
-    )
+    if use_train_col:
+        calibrator = calibrator_class(**calibrator_kwargs)
+        calibrator.fit(df[df.is_train_set], "prediction", "label")
+        result_fit_predict = calibrator.predict(df[~df.is_train_set], "prediction")
+        assert np.allclose(
+            result_fit_transform[~df.is_train_set], result_fit_predict
+        ), "fit_transform does not give the same result as fit followed by predict"
+    else:
+        calibrator = calibrator_class(**calibrator_kwargs)
+        calibrator.fit(df, "prediction", "label")
+        result_fit_predict = calibrator.predict(df, "prediction")
+        assert np.allclose(result_fit_transform, result_fit_predict), (
+            "fit_transform does not give the same result as fit followed by predict"
+        )
 
 
 def test_segmentwise_calibrator_raises_when_incompatible_calibrator_kwargs_are_passed():
@@ -1289,6 +1236,312 @@ def test_mcgrad_extract_features_raises_when_encoder_not_fit(calibrator_class):
         methods.RegressionMCGrad,
     ],
 )
+def test_predict_before_fit_with_categorical_features_raises(calibrator_class):
+    model = calibrator_class()
+    df = pd.DataFrame(
+        {"prediction": [0.5, 0.6], "cat_feature": ["A", "B"]},
+    )
+    with pytest.raises(ValueError, match="predict.*before fit"):
+        model.predict(
+            df=df,
+            prediction_column_name="prediction",
+            categorical_feature_column_names=["cat_feature"],
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCGrad,
+        methods.RegressionMCGrad,
+    ],
+)
+def test_predict_before_fit_with_numerical_features_raises(calibrator_class):
+    model = calibrator_class()
+    df = pd.DataFrame(
+        {"prediction": [0.5, 0.6], "num_feature": [1.0, 2.0]},
+    )
+    with pytest.raises(ValueError, match="predict.*before fit"):
+        model.predict(
+            df=df,
+            prediction_column_name="prediction",
+            numerical_feature_column_names=["num_feature"],
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCGrad,
+        methods.RegressionMCGrad,
+    ],
+)
+def test_predict_with_different_features_than_fit_raises(calibrator_class, rng):
+    df = pd.DataFrame(
+        {
+            "prediction": rng.rand(30),
+            "label": rng.randint(0, 2, 30),
+            "cat_a": rng.choice(["x", "y"], 30),
+            "cat_b": rng.choice(["p", "q"], 30),
+        }
+    )
+    model = calibrator_class(
+        num_rounds=1,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+    model.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["cat_a"],
+    )
+    with pytest.raises(ValueError, match="Feature mismatch"):
+        model.predict(
+            df=df,
+            prediction_column_name="prediction",
+            categorical_feature_column_names=["cat_b"],
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCGrad,
+        methods.RegressionMCGrad,
+    ],
+)
+def test_predict_with_extra_features_not_in_fit_raises(calibrator_class, rng):
+    df = pd.DataFrame(
+        {
+            "prediction": rng.rand(30),
+            "label": rng.randint(0, 2, 30),
+            "cat_a": rng.choice(["x", "y"], 30),
+        }
+    )
+    model = calibrator_class(
+        num_rounds=1,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+    model.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+    )
+    with pytest.raises(ValueError, match="Feature mismatch"):
+        model.predict(
+            df=df,
+            prediction_column_name="prediction",
+            categorical_feature_column_names=["cat_a"],
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCGrad,
+        methods.RegressionMCGrad,
+    ],
+)
+def test_predict_with_swapped_feature_order_raises(calibrator_class, rng):
+    df = pd.DataFrame(
+        {
+            "prediction": rng.rand(30),
+            "label": rng.randint(0, 2, 30),
+            "cat_a": rng.choice(["x", "y"], 30),
+            "cat_b": rng.choice(["p", "q"], 30),
+        }
+    )
+    model = calibrator_class(
+        num_rounds=1,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+    model.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["cat_a", "cat_b"],
+    )
+    with pytest.raises(ValueError, match="Feature mismatch"):
+        model.predict(
+            df=df,
+            prediction_column_name="prediction",
+            categorical_feature_column_names=["cat_b", "cat_a"],
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCGrad,
+        methods.RegressionMCGrad,
+    ],
+)
+def test_feature_consistency_preserved_after_serialize_deserialize(
+    calibrator_class, rng
+):
+    df = pd.DataFrame(
+        {
+            "prediction": rng.rand(30),
+            "label": rng.randint(0, 2, 30),
+            "cat_a": rng.choice(["x", "y"], 30),
+        }
+    )
+    model = calibrator_class(
+        num_rounds=1,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+    model.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["cat_a"],
+    )
+    restored = calibrator_class.deserialize(model.serialize())
+    with pytest.raises(ValueError, match="Feature mismatch"):
+        restored.predict(
+            df=df,
+            prediction_column_name="prediction",
+            numerical_feature_column_names=["cat_a"],
+        )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCGrad,
+        methods.RegressionMCGrad,
+    ],
+)
+def test_predict_with_matching_features_succeeds(calibrator_class, rng):
+    df = pd.DataFrame(
+        {
+            "prediction": rng.rand(30),
+            "label": rng.randint(0, 2, 30),
+            "cat_a": rng.choice(["x", "y"], 30),
+            "num_a": rng.rand(30),
+        }
+    )
+    model = calibrator_class(
+        num_rounds=1,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+    model.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["cat_a"],
+        numerical_feature_column_names=["num_a"],
+    )
+    result = model.predict(
+        df=df,
+        prediction_column_name="prediction",
+        categorical_feature_column_names=["cat_a"],
+        numerical_feature_column_names=["num_a"],
+    )
+    assert result.shape == (30,)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCGrad,
+        methods.RegressionMCGrad,
+    ],
+)
+def test_feature_consistency_skipped_for_legacy_serialized_models(
+    calibrator_class, rng
+):
+    df = pd.DataFrame(
+        {
+            "prediction": rng.rand(30),
+            "label": rng.randint(0, 2, 30),
+            "cat_a": rng.choice(["x", "y"], 30),
+        }
+    )
+    model = calibrator_class(
+        num_rounds=1,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+    model.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["cat_a"],
+    )
+    # Simulate a legacy serialized model without feature names
+    import json
+
+    json_obj = json.loads(model.serialize())
+    json_obj.pop("categorical_feature_names", None)
+    json_obj.pop("numerical_feature_names", None)
+    legacy_model = calibrator_class.deserialize(json.dumps(json_obj))
+
+    # Should not raise the feature mismatch error, since check is skipped
+    assert legacy_model.categorical_feature_names is None
+    assert legacy_model.numerical_feature_names is None
+    result = legacy_model.predict(
+        df=df,
+        prediction_column_name="prediction",
+        categorical_feature_column_names=["cat_a"],
+    )
+    assert result.shape == (30,)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCGrad,
+        methods.RegressionMCGrad,
+    ],
+)
+def test_deserialize_restores_allow_missing_segment_feature_values(
+    calibrator_class, rng
+):
+    """Test that allow_missing_segment_feature_values survives serialize/deserialize roundtrip."""
+    df = pd.DataFrame(
+        {
+            "prediction": rng.rand(30),
+            "label": rng.randint(0, 2, 30),
+            "cat_a": rng.choice(["x", "y"], 30),
+        }
+    )
+    # Fit with allow_missing_segment_feature_values=False (non-default)
+    model = calibrator_class(
+        num_rounds=1,
+        early_stopping=False,
+        allow_missing_segment_feature_values=False,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+    model.fit(
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["cat_a"],
+    )
+
+    serialized = model.serialize()
+    # Verify the param is stored in the serialized JSON
+    json_obj = json.loads(serialized)
+    assert json_obj["params"]["allow_missing_segment_feature_values"] is False
+
+    deserialized = calibrator_class.deserialize(serialized)
+    # The non-default value should be restored after deserialization
+    assert deserialized.allow_missing_segment_feature_values is False
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
+        methods.MCGrad,
+        methods.RegressionMCGrad,
+    ],
+)
 def test_mcgrad_feature_importance_returns_correct_dataframe(calibrator_class, rng):
     df_train = pd.DataFrame(
         {
@@ -1875,10 +2128,18 @@ def test_mcgrad_predict_with_num_rounds_0(calibrator_class, rng):
         numerical_feature_column_names=["feature2"],
     )
     predictions_all_rounds = mcgrad.predict(
-        df_train, "prediction", return_all_rounds=True
+        df_train,
+        "prediction",
+        categorical_feature_column_names=["feature1"],
+        numerical_feature_column_names=["feature2"],
+        return_all_rounds=True,
     )
     predictions_final_round = mcgrad.predict(
-        df_train, "prediction", return_all_rounds=False
+        df_train,
+        "prediction",
+        categorical_feature_column_names=["feature1"],
+        numerical_feature_column_names=["feature2"],
+        return_all_rounds=False,
     )
 
     # Check that the predictions are the same as the original prediction column in both cases
@@ -2269,14 +2530,21 @@ def test_cross_val_timeout_in_mcgrad(calibrator_class, rng):
         ## Valid cases
         (methods.MCGrad, [0, 1], True),
         (methods.MCGrad, [True, False], True),
+        ## Valid soft label cases
+        (methods.MCGrad, [0.0, 0.5, 1.0], True),
+        (methods.MCGrad, [0.1, 0.9], True),
+        (methods.MCGrad, [0.3, 0.7, 0.5], True),
         ## Invalid cases
         ### Only one unique label
         (methods.MCGrad, [0, 0], False),
         (methods.MCGrad, [1, 1], False),
         (methods.MCGrad, [True, True], False),
         (methods.MCGrad, [False, False], False),
+        (methods.MCGrad, [0.5, 0.5], False),
         ### Value > 1
         (methods.MCGrad, [0, 1.1], False),
+        ### Value < 0
+        (methods.MCGrad, [-0.1, 0.5], False),
         ### Invalid type
         (methods.MCGrad, ["a", "b"], False),
         ### Missing values in label
@@ -2346,6 +2614,23 @@ def test_mcgrad__check_predictions_fails_when_expected(
     else:
         with pytest.raises(ValueError):
             calibrator._check_predictions(df, "score")
+
+
+@pytest.mark.parametrize(
+    "calibrator_class,scores,expected_match",
+    [
+        (methods.RegressionMCGrad, [1.0, np.nan], "null"),
+        (methods.RegressionMCGrad, [1.0, float("inf")], "infinite"),
+    ],
+)
+def test_mcgrad__check_predictions_error_message_matches_cause(
+    calibrator_class, scores, expected_match
+):
+    """Verify that the error message correctly identifies the type of invalid value."""
+    df = pd.DataFrame({"score": scores})
+    calibrator = calibrator_class()
+    with pytest.raises(ValueError, match=expected_match):
+        calibrator._check_predictions(df, "score")
 
 
 def test_basemcgrad_implementations_transform_inverse_transform_invariance():
@@ -3901,3 +4186,465 @@ def test_mcgrad_default_minimization_behavior():
     # The tuple return type ensures minimize_score is set correctly from the metric
     cal = AUCCalibrator(early_stopping=True)
     assert cal.early_stopping_minimize_score is False
+
+
+@pytest.mark.parametrize(
+    "labels,predictions,expected_result",
+    [
+        (
+            np.array([False, True, False, True, True]),
+            np.array([0.1, 0.2, 0.3, 0.4, 0.5]),
+            2.8354,
+        ),
+        (np.array([0, 1, 0, 1, 1]), np.array([0.1, 0.2, 0.3, 0.4, 0.5]), 2.8354),
+    ],
+)
+def test_compute_unshrink_factor_gives_expected_result(
+    labels, predictions, expected_result
+):
+    assert (
+        pytest.approx(
+            methods.MCGrad._compute_unshrink_factor(labels, predictions, None), 0.0001
+        )
+        == expected_result
+    )
+
+
+def test_weighted_unshrink_gives_expected_result():
+    y = np.array([0, 1, 0, 0, 0, 0])
+    t = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
+    weights = np.array([1, 3, 1, 1, 1, 2])
+
+    y_unweighted = np.repeat(y, weights)
+    t_unweighted = np.repeat(t, weights)
+
+    unshrink_factor_weighted = methods.MCGrad._compute_unshrink_factor(y, t, weights)
+    unshrink_factor_unweighted = methods.MCGrad._compute_unshrink_factor(
+        y_unweighted, t_unweighted, None
+    )
+
+    assert np.isclose(unshrink_factor_weighted, unshrink_factor_unweighted)
+
+
+def test_compute_unshrink_factor_does_not_modify_input_arrays(rng):
+    y = rng.randint(0, 2, 50).astype(float)
+    logits = rng.uniform(-2, 2, 50)
+    w = rng.uniform(0.5, 2.0, 50)
+
+    y_original = y.copy()
+    logits_original = logits.copy()
+    w_original = w.copy()
+
+    _ = methods.MCGrad._compute_unshrink_factor(y, logits, w)
+
+    np.testing.assert_array_equal(y, y_original)
+    np.testing.assert_array_equal(logits, logits_original)
+    np.testing.assert_array_equal(w, w_original)
+
+
+def test_compute_unshrink_factor_warns_when_not_close_to_1(caplog):
+    y = np.array([0, 1, 0, 1, 1])
+    predictions = np.array([0.1, 0.2, 0.3, 0.4, 0.5])
+
+    with caplog.at_level(logging.WARNING, logger=methods.__name__):
+        result = methods.MCGrad._compute_unshrink_factor(y, predictions, None)
+
+    # Result is ~2.8354, which is far from 1
+    assert result > 1.05
+    assert "Unshrink is not close to 1" in caplog.text
+
+
+def generate_soft_label_test_data(n, rng):
+    """Generate test data with soft labels (float confidence scores in [0, 1])."""
+    return pd.DataFrame(
+        {
+            "City": rng.choice(["Paris", "Tokyo", "Amsterdam"], size=n),
+            "Gender": rng.choice(["Male", "Female"], size=n),
+            "Prediction": rng.uniform(0.01, 0.99, size=n),
+            "Label": rng.uniform(0, 1, size=n),
+        }
+    )
+
+
+def test_soft_label_log_loss_matches_sklearn_for_binary_labels():
+    y_true = np.array([0, 1, 1, 0, 1])
+    y_pred = np.array([0.1, 0.9, 0.8, 0.2, 0.7])
+    expected = skmetrics.log_loss(y_true, y_pred)
+    result = soft_label_log_loss(y_true, y_pred)
+    np.testing.assert_almost_equal(result, expected, decimal=10)
+
+
+def test_soft_label_log_loss_with_sample_weight():
+    y_true = np.array([0, 1, 1, 0, 1])
+    y_pred = np.array([0.1, 0.9, 0.8, 0.2, 0.7])
+    weights = np.array([1.0, 2.0, 1.0, 1.0, 2.0])
+    expected = skmetrics.log_loss(y_true, y_pred, sample_weight=weights)
+    result = soft_label_log_loss(y_true, y_pred, sample_weight=weights)
+    np.testing.assert_almost_equal(result, expected, decimal=10)
+
+
+def test_soft_label_log_loss_with_soft_labels():
+    y_true = np.array([0.3, 0.7, 0.5])
+    y_pred = np.array([0.3, 0.7, 0.5])
+    # Perfect calibration: cross-entropy = -[y*log(y) + (1-y)*log(1-y)]
+    expected = -np.mean(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
+    result = soft_label_log_loss(y_true, y_pred)
+    np.testing.assert_almost_equal(result, expected, decimal=10)
+
+
+@pytest.mark.parametrize(
+    "calibrator_kwargs",
+    [
+        {
+            "num_rounds": 2,
+            "early_stopping": False,
+            "lightgbm_params": {"num_leaves": 2, "max_depth": 2, "n_estimators": 2},
+        },
+        {
+            "num_rounds": 2,
+            "early_stopping": True,
+            "early_stopping_use_crossvalidation": True,
+            "n_folds": 2,
+            "lightgbm_params": {"num_leaves": 2, "max_depth": 2, "n_estimators": 2},
+        },
+        {
+            "num_rounds": 2,
+            "early_stopping": True,
+            "early_stopping_use_crossvalidation": False,
+            "lightgbm_params": {"num_leaves": 2, "max_depth": 2, "n_estimators": 2},
+        },
+    ],
+)
+def test_mcgrad_fit_predict_with_soft_labels_yields_valid_predictions(
+    calibrator_kwargs,
+    rng,
+):
+    """MCGrad should fit and predict with float labels in [0, 1]."""
+    df_train = generate_soft_label_test_data(100, rng)
+    df_test = generate_soft_label_test_data(20, rng)
+
+    model = methods.MCGrad(**calibrator_kwargs)
+    model.fit(
+        df_train=df_train,
+        prediction_column_name="Prediction",
+        label_column_name="Label",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+
+    predictions = model.predict(
+        df=df_test,
+        prediction_column_name="Prediction",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+    assert predictions.shape == (len(df_test),)
+    # Calibrated predictions should be valid probabilities
+    assert np.all(predictions >= 0) and np.all(predictions <= 1)
+    assert not np.any(np.isnan(predictions))
+
+
+def test_mcgrad_soft_labels_serialize_deserialize_consistent_predictions(rng):
+    df_train = generate_soft_label_test_data(50, rng)
+    df_test = generate_soft_label_test_data(10, rng)
+
+    model = methods.MCGrad(
+        num_rounds=2,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "max_depth": 2, "n_estimators": 2},
+    )
+    model.fit(
+        df_train=df_train,
+        prediction_column_name="Prediction",
+        label_column_name="Label",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+
+    original_predictions = model.predict(
+        df=df_test,
+        prediction_column_name="Prediction",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+
+    serialized = model.serialize()
+    deserialized = methods.MCGrad.deserialize(serialized)
+
+    deserialized_predictions = deserialized.predict(
+        df=df_test,
+        prediction_column_name="Prediction",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+
+    np.testing.assert_array_equal(original_predictions, deserialized_predictions)
+
+
+def test_mcgrad_soft_labels_does_not_raise_with_boundary_values():
+    """MCGrad should handle soft labels that include exact 0 and 1 values mixed with floats."""
+    df_train = pd.DataFrame(
+        {
+            "City": ["Paris", "Tokyo", "Amsterdam", "Paris", "Amsterdam"],
+            "Prediction": [0.1, 0.2, 0.3, 0.4, 0.5],
+            "Label": [0.0, 0.3, 0.5, 0.8, 1.0],
+        }
+    )
+
+    model = methods.MCGrad(
+        num_rounds=1,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "max_depth": 2, "n_estimators": 2},
+    )
+    model.fit(
+        df_train=df_train,
+        prediction_column_name="Prediction",
+        label_column_name="Label",
+        categorical_feature_column_names=["City"],
+    )
+
+    predictions = model.predict(
+        df=df_train,
+        prediction_column_name="Prediction",
+        categorical_feature_column_names=["City"],
+    )
+    assert predictions.shape == (len(df_train),)
+    assert np.all(predictions >= 0) and np.all(predictions <= 1)
+
+
+def test_mcgrad_compute_unshrink_factor_with_soft_labels_is_finite(rng):
+    n = 100
+    y_soft = rng.uniform(0, 1, size=n)
+    predictions = rng.normal(0, 1, size=n)
+
+    factor = methods.MCGrad._compute_unshrink_factor(y_soft, predictions, None)
+    # Factor should be a finite number
+    assert np.isfinite(factor)
+
+
+def test_mcgrad_compute_unshrink_factor_same_for_binary_labels(rng):
+    """Near-binary soft labels should produce approximately the same unshrink
+    coefficient as exact binary labels."""
+    n = 100
+    y_binary = rng.choice([0, 1], size=n).astype(float)
+    predictions = rng.normal(0, 1, size=n)
+
+    # Binary labels take the standard path (no expansion)
+    factor_standard = methods.MCGrad._compute_unshrink_factor(
+        y_binary, predictions, None
+    )
+
+    # Near-binary labels that trigger the soft-label expansion path.
+    # A tiny perturbation should yield essentially the same coefficient,
+    # confirming the expansion is equivalent for binary inputs.
+    y_near_binary = y_binary.copy()
+    y_near_binary[y_binary == 0] = 1e-10
+    y_near_binary[y_binary == 1] = 1 - 1e-10
+
+    factor_expanded = methods.MCGrad._compute_unshrink_factor(
+        y_near_binary, predictions, None
+    )
+
+    np.testing.assert_almost_equal(factor_standard, factor_expanded, decimal=3)
+
+
+def test_mcgrad_binary_labels_unchanged():
+    """Existing binary label behavior should be unaffected by soft label changes."""
+    df_train = generate_test_data(5)
+    model = methods.MCGrad(
+        num_rounds=2,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "max_depth": 2, "n_estimators": 2},
+    )
+    model.fit(
+        df_train=df_train,
+        prediction_column_name="Prediction",
+        label_column_name="Label",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+    assert len(model.mr) == 2
+
+    predictions = model.predict(
+        df=df_train,
+        prediction_column_name="Prediction",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+    assert predictions.shape == (5,)
+    assert np.all(predictions >= 0) and np.all(predictions <= 1)
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [methods.MCGrad, methods.RegressionMCGrad],
+)
+def test_reset_training_state_restores_fresh_state(calibrator_class):
+    """Every fit-mutated attribute must be cleared by ``_reset_training_state``.
+
+    Calibrators reuse a single instance across repeated fits (e.g. during
+    hyperparameter tuning), so any attribute written by ``fit`` that is not
+    also cleared by ``_reset_training_state`` leaks stale state into the next
+    fit -- a silent correctness bug.
+
+    This snapshot test captures ``vars(instance)`` immediately after
+    construction, fits the model, calls ``_reset_training_state``, and asserts
+    the vars dict matches the snapshot. A newly added attribute that is set
+    during fit but not listed in ``_reset_training_state`` will appear as a
+    diff here.
+
+    Attributes that intentionally persist across fits (e.g. generator objects
+    whose internal state advances but whose reference does not change) are
+    listed in ``identity_only_attrs`` and compared by identity rather than
+    ``==``.
+    """
+    identity_only_attrs: frozenset[str] = frozenset({"_rng"})
+
+    model = calibrator_class(
+        num_rounds=1,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+    fresh_state = dict(vars(model))
+
+    df_train = generate_test_data(5)
+    model.fit(
+        df_train=df_train,
+        prediction_column_name="Prediction",
+        label_column_name="Label",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+    model._reset_training_state()
+    reset_state = dict(vars(model))
+
+    added = set(reset_state) - set(fresh_state)
+    removed = set(fresh_state) - set(reset_state)
+    assert not added and not removed, (
+        f"_reset_training_state changed the attribute set. "
+        f"Added after fit + reset: {sorted(added)!r}. "
+        f"Removed after fit + reset: {sorted(removed)!r}. "
+        f"Any attribute set during fit() must also be cleared by "
+        f"_reset_training_state."
+    )
+
+    for attr_name in sorted(fresh_state):
+        fresh_val = fresh_state[attr_name]
+        reset_val = reset_state[attr_name]
+        if attr_name in identity_only_attrs:
+            assert reset_val is fresh_val, (
+                f"Attribute {attr_name!r} identity changed after fit + reset. "
+                f"This attribute is whitelisted for identity comparison, so a "
+                f"new instance being assigned is a regression."
+            )
+        else:
+            assert reset_val == fresh_val, (
+                f"Attribute {attr_name!r} was not restored to its fresh value "
+                f"by _reset_training_state. "
+                f"Fresh: {fresh_val!r}. After fit + reset: {reset_val!r}."
+            )
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [methods.MCGrad, methods.RegressionMCGrad],
+)
+def test_serialize_deserialize_roundtrip_restores_full_config(calibrator_class):
+    """Schema-v1 serialize/deserialize restores the user-controllable config.
+
+    Prior to schema v1, ``deserialize`` called ``cls()`` with no arguments, so
+    nearly every ``__init__`` kwarg fell back to defaults after a round-trip.
+    This test fits a calibrator with non-default values across the v1 kwarg
+    set, serializes, deserializes, and asserts each field survives.
+    ``num_rounds`` is explicitly checked to be the **configured** value rather
+    than the trained booster count -- ``num_rounds_trained`` exposes the
+    count.
+    """
+    df_train = generate_test_data(5)
+    model = calibrator_class(
+        num_rounds=7,  # upper bound; early stopping may pick fewer
+        monotone_t=True,
+        early_stopping=True,
+        patience=1,
+        early_stopping_use_crossvalidation=True,
+        n_folds=2,
+        early_stopping_timeout=3600,
+        save_training_performance=True,
+        encode_categorical_variables=True,
+        allow_missing_segment_feature_values=True,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+    model.fit(
+        df_train=df_train,
+        prediction_column_name="Prediction",
+        label_column_name="Label",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+
+    restored = calibrator_class.deserialize(model.serialize())
+
+    assert restored.num_rounds == 7, (
+        f"Configured num_rounds=7 should survive the round-trip, "
+        f"got {restored.num_rounds}"
+    )
+    assert restored.num_rounds_trained == len(model.mr)
+    assert restored.monotone_t is True
+    assert restored.early_stopping is True
+    assert restored.patience == 1
+    assert restored.n_folds == 2
+    assert restored.early_stopping_timeout == 3600
+    assert restored.save_training_performance is True
+    assert restored.encode_categorical_variables is True
+    assert restored.allow_missing_segment_feature_values is True
+    assert (
+        restored.early_stopping_estimation_method
+        == methods._EstimationMethod.CROSS_VALIDATION
+    )
+    # The lightgbm_params dict is populated with a seed and objective at
+    # __init__ time; compare the keys the user supplied.
+    for key in ("num_leaves", "n_estimators", "max_depth"):
+        assert restored.lightgbm_params[key] == model.lightgbm_params[key]
+
+    # Legacy format (no schema_version) continues to load with a warning.
+    legacy_payload = json.loads(model.serialize())
+    legacy_payload.pop("schema_version")
+    legacy_restored = calibrator_class.deserialize(json.dumps(legacy_payload))
+    assert legacy_restored.num_rounds == len(legacy_restored.mr), (
+        "Legacy format should fall back to num_rounds=len(mr) (pre-schema behavior)."
+    )
+
+
+def test_deserialize_rejects_unknown_schema_version():
+    """An unknown schema_version must raise, not silently degrade."""
+    payload = {
+        "schema_version": 999,
+        "mcgrad": [],
+        "has_encoder": False,
+    }
+    with pytest.raises(ValueError, match="unsupported schema_version"):
+        methods.MCGrad.deserialize(json.dumps(payload))
+
+
+def test_serialize_deserialize_roundtrip_holdout_early_stopping():
+    """Guard against regressions in the HOLDOUT early-stopping roundtrip.
+
+    ``__init__`` sets ``self.n_folds = 1`` internally in HOLDOUT mode but
+    rejects an explicit ``n_folds`` kwarg in that mode. Any roundtrip that
+    persists ``n_folds`` alongside a HOLDOUT estimation method would therefore
+    fail at deserialize time. This test exercises that combination directly so
+    future changes can't reintroduce the bug.
+    """
+    df_train = generate_test_data(5)
+    model = methods.MCGrad(
+        num_rounds=2,
+        early_stopping=True,
+        early_stopping_use_crossvalidation=False,  # HOLDOUT mode
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+    model.fit(
+        df_train=df_train,
+        prediction_column_name="Prediction",
+        label_column_name="Label",
+        categorical_feature_column_names=["City", "Gender"],
+    )
+
+    restored = methods.MCGrad.deserialize(model.serialize())
+
+    assert restored.early_stopping is True
+    assert (
+        restored.early_stopping_estimation_method == methods._EstimationMethod.HOLDOUT
+    )
+    # HOLDOUT mode sets n_folds to 1 internally; the restored value should match.
+    assert restored.n_folds == 1

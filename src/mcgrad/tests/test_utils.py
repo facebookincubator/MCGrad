@@ -69,22 +69,6 @@ def test_make_equispaced_bins_gives_similar_results_for_data_with_similar_range_
 
 
 @pytest.mark.parametrize(
-    "labels,predictions,expected_result",
-    [
-        (
-            np.array([False, True, False, True, True]),
-            np.array([0.1, 0.2, 0.3, 0.4, 0.5]),
-            2.8354,
-        ),
-        (np.array([0, 1, 0, 1, 1]), np.array([0.1, 0.2, 0.3, 0.4, 0.5]), 2.8354),
-        (np.array([0, 1, 0, 1, 1]), np.array([0.1, 0.2, 0.3, 0.4, 0.5]), 2.8354),
-    ],
-)
-def test_unshrink(labels, predictions, expected_result):
-    assert pytest.approx(utils.unshrink(labels, predictions), 0.0001) == expected_result
-
-
-@pytest.mark.parametrize(
     "log_odds, expected",
     [
         (0, 0.5),
@@ -129,8 +113,7 @@ def test_logit(probs, expected):
     "probabilities", [(np.linspace(0.1, 0.9, num=10)), (np.linspace(0.1, 0.9, num=100))]
 )
 def test_logistic_is_inverse_function_of_logit(probabilities):
-    vectorized_logistic = np.vectorize(utils.logistic)
-    result = vectorized_logistic(utils.logit(probabilities))
+    result = utils.logistic(utils.logit(probabilities))
     np.testing.assert_allclose(result, probabilities, rtol=1e-9)
 
 
@@ -142,8 +125,7 @@ def test_logistic_is_inverse_function_of_logit(probabilities):
     ],
 )
 def test_logit_is_inverse_function_of_logistic(log_odds):
-    vectorized_logistic = np.vectorize(utils.logistic)
-    result = utils.logit(vectorized_logistic(log_odds))
+    result = utils.logit(utils.logistic(log_odds))
     np.testing.assert_allclose(result, log_odds, rtol=1e-9)
 
 
@@ -151,7 +133,7 @@ def test_logits_and_probs_conversions_maintain_same_scale_with_clipping():
     probabilities = np.array([0, 1e-400, 1e-350, 1e-200, 1e-100, 0.1, 0.2, 0.5, 0.99])
     logits = utils.logit(probs=probabilities)
 
-    recovered_probs = utils.logistic_vectorized(logits)
+    recovered_probs = utils.logistic(logits)
 
     assert np.all(recovered_probs > 0.0), "Recovered probabilities should be > 0"
 
@@ -336,21 +318,6 @@ def test_encoder_serialize_deserialize_preserves_numeric_string_keys():
     assert deserialized_transformed[1, 0] == -1
 
 
-def test_weighted_unshrink_gives_expected_result():
-    # unshrink with duplicates should give same result as without duplicates but with weights
-    y = np.array([0, 1, 0, 0, 0, 0])
-    t = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
-    weights = np.array([1, 3, 1, 1, 1, 2])
-
-    y_unweighted = np.repeat(y, weights)
-    t_unweighted = np.repeat(t, weights)
-
-    unshrink_factor_weighted = utils.unshrink(y, t, weights)
-    unshrink_factor_unweighted = utils.unshrink(y_unweighted, t_unweighted)
-
-    assert np.isclose(unshrink_factor_weighted, unshrink_factor_unweighted)
-
-
 @pytest.mark.parametrize(
     "x, y, expected_x, expected_y",
     [
@@ -491,15 +458,15 @@ def test_convert_arrow_to_numpy_with_unsupported_type_remains_unchanged():
     assert result_df["col1"].dtype == object
 
 
-def test_logistic_vectorized_returns_valid_probabilities():
+def test_logistic_returns_valid_probabilities():
     log_odds = np.array([-10, -1, 0, 1, 10])
-    result = utils.logistic_vectorized(log_odds)
+    result = utils.logistic(log_odds)
     assert np.all(result > 0) and np.all(result < 1)
 
 
-def test_logistic_vectorized_with_extreme_values():
+def test_logistic_with_extreme_values():
     log_odds = np.array([-1000, -100, 100, 1000])
-    result = utils.logistic_vectorized(log_odds)
+    result = utils.logistic(log_odds)
     assert result[0] < 1e-300
     assert result[1] < 1e-40
     assert result[2] > 0.999  # Very close to 1
@@ -635,22 +602,6 @@ def test_make_equisized_bins_does_not_modify_input_array(rng):
     np.testing.assert_array_equal(predicted_scores, predicted_scores_original)
 
 
-def test_unshrink_does_not_modify_input_arrays(rng):
-    y = rng.randint(0, 2, 50).astype(float)
-    logits = rng.uniform(-2, 2, 50)
-    w = rng.uniform(0.5, 2.0, 50)
-
-    y_original = y.copy()
-    logits_original = logits.copy()
-    w_original = w.copy()
-
-    _ = utils.unshrink(y, logits, w)
-
-    np.testing.assert_array_equal(y, y_original)
-    np.testing.assert_array_equal(logits, logits_original)
-    np.testing.assert_array_equal(w, w_original)
-
-
 def test_logit_does_not_modify_input_array(rng):
     probs = rng.uniform(0.1, 0.9, 100)
     probs_original = probs.copy()
@@ -723,13 +674,34 @@ def test_geometric_mean_does_not_modify_input_array(rng):
     np.testing.assert_array_equal(x, x_original)
 
 
-def test_logistic_vectorized_does_not_modify_input_array(rng):
+def test_logistic_does_not_modify_input_array(rng):
     log_odds = rng.uniform(-5, 5, 100)
     log_odds_original = log_odds.copy()
 
-    _ = utils.logistic_vectorized(log_odds)
+    _ = utils.logistic(log_odds)
 
     np.testing.assert_array_equal(log_odds, log_odds_original)
+
+
+def test_logistic_scalar_returns_scalar():
+    result = utils.logistic(0.0)
+    assert isinstance(result, float)
+    assert result == 0.5
+
+
+def test_logistic_array_returns_array():
+    log_odds = np.array([-1.0, 0.0, 1.0])
+    result = utils.logistic(log_odds)
+    assert isinstance(result, np.ndarray)
+    assert result.shape == (3,)
+
+
+def test_logistic_no_overflow_warning_on_extreme_inputs():
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        result = utils.logistic(np.array([-1e20, -1000, 1000, 1e20]))
+        assert result[0] == 0.0
+        assert result[3] == 1.0
 
 
 def test_predictions_to_labels_gives_expected_result():
@@ -765,6 +737,38 @@ def test_predictions_to_labels_gives_expected_result():
     )
 
     pd.testing.assert_frame_equal(data_with_predicted_labels_and_thresholds, expected)
+
+
+def test_predictions_to_labels_with_custom_threshold_column_name():
+    data = pd.DataFrame(
+        {
+            "prediction": [0.1, 0.2, 0.4, 0.8, 0.9],
+            "segment_a": ["a", "a", "b", "b", "a"],
+        }
+    )
+    thresholds = pd.DataFrame(
+        {
+            "segment_a": ["a", "b"],
+            "cutoff": [0.5, 0.6],
+        }
+    )
+    expected = pd.DataFrame(
+        {
+            "prediction": [0.1, 0.2, 0.4, 0.8, 0.9],
+            "segment_a": ["a", "a", "b", "b", "a"],
+            "cutoff": [0.5, 0.5, 0.6, 0.6, 0.5],
+            "predicted_label": [0, 0, 0, 1, 1],
+        }
+    )
+
+    result = utils.predictions_to_labels(
+        data=data,
+        prediction_column="prediction",
+        thresholds=thresholds,
+        threshold_column="cutoff",
+    )
+
+    pd.testing.assert_frame_equal(result, expected)
 
 
 def test_predictions_to_labels_does_not_modify_input_dataframes():

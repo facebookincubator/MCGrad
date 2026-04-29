@@ -51,7 +51,7 @@ df['prediction'] = np.clip(rng.uniform(0.3, 0.7, size=n_samples), 0.01, 0.99)
 
 MCGrad requires consistency between the categorical and numerical features passed to `fit` and `predict`.
 
-Although this example uses the same DataFrame for both methods, in practice the training and prediction DataFrames are typically different.
+Although this example uses the same DataFrame for both methods, in practice the training and prediction DataFrames are typically different. Like other calibration methods (Platt Scaling, Isotonic Regression), MCGrad should be trained on a held-out set (e.g., a validation set) rather than the same data used to train the base model. This prevents overfitting and ensures the calibration generalizes to new data.
 
 ```python
 # Apply MCGrad
@@ -99,7 +99,7 @@ df['prediction_isotonic'] = isotonic_regression.predict(
 )
 ```
 
-See the [methods API](api/methods.md) for other available global calibration methods.
+See the [API Reference](https://mcgrad.readthedocs.io/en/latest/api/methods.html) for other available global calibration methods.
 
 
 ### 4. Model Evaluation: The Multicalibration Error Metric
@@ -128,7 +128,7 @@ print(f"MCE p-value: {mce.mce_pvalue:.4f}")
 print(f"Minimum Detectable Error (MDE): {mce.mde:.3f}%")
 ```
 
-See the [metrics API](api/metrics.md) for additional evaluation options.
+See the [API Reference](https://mcgrad.readthedocs.io/en/latest/api/metrics.html) for additional evaluation options.
 
 ### 5. Compare Calibration Methods
 
@@ -222,11 +222,11 @@ for feature in features_to_plot:
 <img src={require('../static/img/mcgrad_content.png').default} alt="local calibration content mcgrad" width="80%" />
 </div>
 
-See the [plotting API](api/plotting.md) for additional visualization options.
+See the [API Reference](https://mcgrad.readthedocs.io/en/latest/api/plotting.html) for additional visualization options.
 
 ## Next Steps
 
 - [Methodology](methodology.md) — Understand how MCGrad works formally.
 - [Measuring Multicalibration](measuring-multicalibration.md) — Understand the Multicalibration Error metric in detail.
-- [API Reference](api/methods.md) — Explore all available methods.
+- [API Reference](https://mcgrad.readthedocs.io/) — Explore all available methods.
 - [Contributing](contributing.md) — Contribute to the project.
