@@ -62,11 +62,11 @@ class BaseCalibrator(ABC):
             contains the ground truth labels.
         :param weight_column_name: Name of the column in dataframe df that
             contains the instance weights.
-        :param categorical_feature_column_names: List of column names in the df
+        :param categorical_feature_column_names: List of column names in df_train
             that contain the categorical dimensions that are part of the segment
             space. This argument is ignored by methods that merely calibrate and
             do not multicalibrate (e.g., Isotonic regression and Platt scaling).
-        :param numerical_feature_column_names: List of column names in the df
+        :param numerical_feature_column_names: List of column names in df_train
             that contain the numerical dimensions that are part of the segment
             space. This argument is ignored by methods that merely calibrate and
             do not multicalibrate (e.g., Isotonic regression and Platt scaling).
