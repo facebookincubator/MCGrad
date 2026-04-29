@@ -455,7 +455,8 @@ def _dcg_sample_scores(
         with the discount factor for each sample
     :param k: If not None, the DCG score is calculated only for the top k samples. If None, the DCG score is calculated for all samples.
         k cannot be smaller than 1 and cannot be larger than the number of samples.
-    :return: the array of size n_samples with the DCG score for each sample. If k is not None, then elements after the k-th one are 0.
+    :return: the array of size n_samples with the DCG score for each sample. If k is not None, then elements after the k-th one
+        plateau at the k-th cumulative value (because the discount is zeroed out, so no further gains are accumulated).
     """
     discount = rank_discount(labels.shape[0])
 
@@ -519,7 +520,8 @@ def _ndcg_sample_scores(
         with the discount factor for each sample
     :param k: If not None, the NDCG score is calculated only for the top k samples. If None, the NDCG score is calculated for all samples.
         k cannot be smaller than 1 and cannot be larger than the number of samples.
-    :return: the array of size n_samples with the NDCG score for each sample. If k is not None, then elements after the k-th one are 0.
+    :return: the array of size n_samples with the NDCG score for each sample. If k is not None, then elements after the k-th one
+        plateau at the k-th cumulative value (because the discount is zeroed out, so no further gains are accumulated).
     """
     gain = _dcg_sample_scores(
         labels, predicted_labels, rank_discount=rank_discount, k=k
@@ -723,18 +725,18 @@ def multi_cg_score(
     metric: _MulticalibrationRankErrorMetricsInterface = ndcg_score,
     rank_discount: Callable[[int], npt.NDArray] = utils.rank_no_discount,
     k: int | None = None,
-) -> npt.NDArray:
+) -> pd.Series:
     """
     Calculates the metric score for each segment.
 
     :param labels: Array of true labels.
-    :param predictions: Array of predicted labels.
+    :param predictions: Array of predicted scores.
     :param segments_df: Dataframe with the segments to calculate the error
     :param metric: The cumulative gain metric to use. Defaults to ndcg_score.
     :param rank_discount: rank discount function of the metric. Defaults to no discount.
     :param k: If not None, the metric is calculated only based on the top k samples.
         k cannot be smaller than 1 and cannot be larger than the number of samples.
-    :return: an array of size n_segments with the metric score for each segment.
+    :return: a Series of size n_segments with the metric score for each segment.
     """
     if metric not in (ndcg_score, dcg_score):
         raise ValueError("Only ndcg_score and dcg_score are supported")
@@ -1313,7 +1315,7 @@ def _rank_multicalibration_error(
     :param predicted_labels: Array of predicted labels.
     :param segments_df: Dataframe with the segments to calculate the error
     :param num_bins: Number of bins to use for the rank calibration error calculation.
-    :return: an array of size n_segments with the tuple of (RCE, label_cdfs, prediction_cdfs) for each segment.
+    :return: a Series of size n_segments with the tuple of (RCE, label_cdfs, prediction_cdfs) for each segment.
     """
     segments_df = segments_df.copy()
     segmentation_cols = list(segments_df.columns)
@@ -1362,7 +1364,7 @@ def normalized_entropy(
     :param labels: Ground truth (correct) labels for n_samples samples.
     :param predicted_scores: Predicted probabilities, as returned by a classifier's predict_proba method.
     :param sample_weight: Optional array of sample weights for each instance.
-    :returns: the normalized entropy
+    :return: the normalized entropy
     """
     if sample_weight is None:
         sample_weight = np.ones_like(predicted_scores)
@@ -1398,8 +1400,10 @@ def calibration_free_normalized_entropy(
     :param max_iter: Maximum number of iterations for the calibration adjustment. Defaults to 10000.
     :return: the calibration-free NE.
     """
-    if len(labels.shape) != 1:
-        raise ValueError("y_pred must be the predicted probability for class 1 only.")
+    if len(predicted_scores.shape) != 1:
+        raise ValueError(
+            "predicted_scores must be the predicted probability for class 1 only."
+        )
 
     current_calibration = calibration_ratio(labels, predicted_scores, sample_weight)
 
