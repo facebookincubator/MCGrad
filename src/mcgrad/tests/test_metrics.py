@@ -1778,7 +1778,9 @@ def test_calibration_free_normalized_entropy_rejects_2d_predictions():
     labels = np.array([0, 1, 0, 1])
     predictions_2d = np.array([[0.2, 0.8], [0.7, 0.3], [0.1, 0.9], [0.6, 0.4]])
 
-    with pytest.raises(ValueError, match="y_pred must be the predicted probability"):
+    with pytest.raises(
+        ValueError, match="predicted_scores must be the predicted probability"
+    ):
         metrics.calibration_free_normalized_entropy(
             labels=labels, predicted_scores=predictions_2d
         )

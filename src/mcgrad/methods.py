@@ -478,6 +478,14 @@ class _BaseMCGrad(
         ).sort_values("importance", ascending=False)
 
     def _reset_training_state(self) -> None:
+        """Clear every attribute that :meth:`fit` writes to.
+
+        Calibrators reuse a single instance across multiple ``fit()`` calls
+        (e.g., during hyperparameter tuning). Every attribute written by a
+        ``fit()`` code path -- including attributes added in subclasses or
+        helper methods -- must be cleared here, otherwise stale state leaks
+        into the next fit and produces silently incorrect models.
+        """
         self.mr = []
         self.unshrink_factors = []
         self.mce_below_initial = None
@@ -654,9 +662,9 @@ class _BaseMCGrad(
         :param prediction_column_name: Name of the column in dataframe df that contains the uncalibrated predictions
         :param label_column_name: Name of the column in dataframe df that contains the ground truth labels
         :param weight_column_name: Name of the column in dataframe df that contains the instance weights
-        :param categorical_feature_column_names: List of column names in the df that contain the categorical
+        :param categorical_feature_column_names: List of column names in df_train that contain the categorical
             segmentation features
-        :param numerical_feature_column_names: List of column names in the df that contain the numerical
+        :param numerical_feature_column_names: List of column names in df_train that contain the numerical
             segmentation features
         :param df_val: Optional validation dataframe for early stopping. When provided with early stopping enabled,
             this validation set will be used instead of a holdout from the training data. early_stopping_use_crossvalidation has
@@ -1376,16 +1384,124 @@ class _BaseMCGrad(
         """
         return int(time.time() - start_time)
 
+    @property
+    def num_rounds_trained(self) -> int:
+        """Number of boosting rounds actually trained on this instance.
+
+        This is distinct from :attr:`num_rounds`, which is the **configured**
+        upper bound supplied at construction time. With early stopping, the
+        trained count can be strictly less than the configured upper bound.
+        Returns ``0`` on an unfitted instance (equivalent to ``len(self.mr)``).
+        """
+        return len(self.mr)
+
+    # JSON-serializable ``__init__`` kwargs persisted under ``"params"`` at
+    # serialize time and passed through to ``cls(**kwargs)`` on deserialize.
+    # Fields involving Python callables or RNG objects (``early_stopping_score_func``,
+    # ``early_stopping_minimize_score``, ``monitored_metrics_during_training``,
+    # ``random_state``) are intentionally not round-tripped in schema v1 --
+    # deserialized models reset them to subclass defaults. This is acceptable
+    # for the dominant predict-only reuse case; re-fitting a deserialized model
+    # with a custom score function is not supported without re-configuring.
+    _SCHEMA_V1_INIT_KWARGS: tuple[str, ...] = (
+        "num_rounds",
+        "monotone_t",
+        "lightgbm_params",
+        "early_stopping",
+        "patience",
+        "n_folds",
+        "early_stopping_timeout",
+        "save_training_performance",
+        "encode_categorical_variables",
+        "allow_missing_segment_feature_values",
+    )
+
+    def _collect_schema_v1_params(self) -> dict[str, Any]:
+        """Snapshot the user-configurable state that defines this model.
+
+        Includes only fields that are JSON-serializable and safe to pass back
+        into ``__init__``. Interdependent fields are omitted when their
+        enclosing mode would cause ``__init__`` to reject them: ``patience``
+        and ``n_folds`` are skipped when early stopping is disabled, and
+        ``n_folds`` is skipped when the estimation method is ``HOLDOUT``
+        (``__init__`` sets ``n_folds`` to ``1`` internally in HOLDOUT mode
+        but rejects it as an explicit kwarg).
+        """
+        params: dict[str, Any] = {
+            "num_rounds": self.num_rounds,
+            "monotone_t": self.monotone_t,
+            "lightgbm_params": self.lightgbm_params,
+            "early_stopping": self.early_stopping,
+            "early_stopping_timeout": self.early_stopping_timeout,
+            "save_training_performance": self.save_training_performance,
+            "encode_categorical_variables": self.encode_categorical_variables,
+            "allow_missing_segment_feature_values": self.allow_missing_segment_feature_values,
+            "early_stopping_estimation_method": self.early_stopping_estimation_method.name,
+        }
+        if self.early_stopping:
+            params["patience"] = self.patience
+            if self.early_stopping_estimation_method != _EstimationMethod.HOLDOUT:
+                params["n_folds"] = self.n_folds
+        return params
+
+    @classmethod
+    def _init_kwargs_from_schema_v1_params(
+        cls, params: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Translate a serialized ``params`` dict back into ``__init__`` kwargs.
+
+        ``early_stopping_estimation_method`` is remapped to the tri-state
+        ``early_stopping_use_crossvalidation`` argument. Early-stopping-only
+        kwargs (``patience``, ``n_folds``, ``early_stopping_use_crossvalidation``)
+        are dropped when early stopping is disabled, because ``__init__``
+        rejects them in that case.
+        """
+        kwargs: dict[str, Any] = {
+            k: params[k] for k in cls._SCHEMA_V1_INIT_KWARGS if k in params
+        }
+        estimation_method_name = params.get("early_stopping_estimation_method")
+        if estimation_method_name == _EstimationMethod.CROSS_VALIDATION.name:
+            kwargs["early_stopping_use_crossvalidation"] = True
+        elif estimation_method_name == _EstimationMethod.HOLDOUT.name:
+            kwargs["early_stopping_use_crossvalidation"] = False
+        # _EstimationMethod.AUTO -> leave the kwarg unset (it defaults to None).
+
+        if kwargs.get("early_stopping") is False:
+            for forbidden in (
+                "patience",
+                "n_folds",
+                "early_stopping_use_crossvalidation",
+            ):
+                kwargs.pop(forbidden, None)
+        elif kwargs.get("early_stopping_use_crossvalidation") is False:
+            # HOLDOUT mode: ``__init__`` rejects an explicit ``n_folds``.
+            kwargs.pop("n_folds", None)
+        return kwargs
+
     def serialize(self) -> str:
         """Serializes the fitted MCGrad model to a JSON string.
 
-        The serialized model includes all boosters, unshrink factors, encoder state, and configuration parameters,
-        allowing the model to be saved and restored later.
+        The serialized model includes all boosters, unshrink factors, encoder
+        state, and the full JSON-serializable configuration, allowing the
+        model to be saved and restored later.
+
+        The output carries a ``schema_version`` field.
+
+        - ``2``: identical structure to version 1; the bump signals that
+          downstream consumers should enforce version checks.
+        - ``1``: persists the simple scalar and dict-valued ``__init__`` kwargs
+          (see :attr:`_SCHEMA_V1_INIT_KWARGS`).
+
+        Fields backed by callables or RNG objects (custom
+        ``early_stopping_score_func``, ``early_stopping_minimize_score``,
+        ``monitored_metrics_during_training``, ``random_state``) are **not**
+        persisted; a deserialized model uses subclass defaults for those.
 
         :return: JSON string containing the serialized model
         """
         serialized_boosters = [booster.model_to_string() for booster in self.mr]
         json_obj: dict[str, Any] = {
+            "schema_version": 2,
             self._SERIALIZATION_KEY: [
                 {
                     "booster": serialized_booster,
@@ -1395,9 +1511,7 @@ class _BaseMCGrad(
                     serialized_boosters, self.unshrink_factors
                 )
             ],
-            "params": {
-                "allow_missing_segment_feature_values": self.allow_missing_segment_feature_values,
-            },
+            "params": self._collect_schema_v1_params(),
         }
         json_obj["has_encoder"] = self.encode_categorical_variables
         if hasattr(self, "enc") and self.enc is not None:
@@ -1411,43 +1525,100 @@ class _BaseMCGrad(
         return cls(**kwargs)
 
     @classmethod
-    def deserialize(cls, model_str: str) -> Self:
-        """Deserializes an MCGrad model from a JSON string.
+    def _deserialize_legacy(cls, json_obj: dict[str, Any]) -> Self:
+        """Restore a model serialized before ``schema_version`` was added.
 
-        Reconstructs a fitted MCGrad model from a previously serialized representation.
-
-        :param model_str: JSON string containing the serialized model
-        :return: A fitted MCGrad instance with all state restored
+        Only the fields persisted by the pre-schema format are restored;
+        everything else falls back to ``__init__`` defaults, and
+        ``self.num_rounds`` is set to the trained booster count (legacy
+        behavior). Emits a warning so callers know to re-serialize.
         """
-        json_obj = json.loads(model_str)
+        logger.warning(
+            "%s.deserialize: input has no 'schema_version' field (legacy "
+            "format). Restoring boosters and encoder only; all other "
+            "configuration falls back to defaults. Re-serialize this model "
+            "to upgrade it to schema_version=1 and preserve the full "
+            "configuration.",
+            cls.__name__,
+        )
         model = cls()
         model.mr = []
         model.unshrink_factors = []
-
         for model_info in json_obj[cls._SERIALIZATION_KEY]:
             booster = lgb.Booster(model_str=model_info["booster"])
             model.mr.append(booster)
             model.unshrink_factors.append(model_info["unshrink_factor"])
-
         model.num_rounds = len(model.mr)
-
         model.encode_categorical_variables = json_obj["has_encoder"]
         if json_obj["has_encoder"] and "encoder" in json_obj:
             model.enc = utils.OrdinalEncoderWithUnknownSupport.deserialize(
                 json_obj["encoder"]
             )
-
         model._is_fitted = True
         model.categorical_feature_names = json_obj.get("categorical_feature_names")
         model.numerical_feature_names = json_obj.get("numerical_feature_names")
-
-        # Restore params that were saved during serialization
         params = json_obj.get("params", {})
         if "allow_missing_segment_feature_values" in params:
             model.allow_missing_segment_feature_values = params[
                 "allow_missing_segment_feature_values"
             ]
+        return model
 
+    @classmethod
+    def deserialize(cls, model_str: str) -> Self:
+        """Deserializes an MCGrad model from a JSON string.
+
+        Reconstructs a fitted MCGrad model from a previously serialized
+        representation. The behavior depends on the ``schema_version`` field:
+
+        - ``schema_version == 2`` or ``schema_version == 1``: full
+          configuration round-trip for the fields listed in
+          :attr:`_SCHEMA_V1_INIT_KWARGS`. ``self.num_rounds`` is restored to
+          the configured upper bound; use :attr:`num_rounds_trained` to get
+          the actual booster count.
+        - no ``schema_version`` field (legacy): boosters and encoder are
+          restored; all other configuration falls back to defaults and a
+          warning is logged.
+        - unknown ``schema_version``: raises :class:`ValueError`.
+
+        :param model_str: JSON string containing the serialized model
+        :return: A fitted MCGrad instance with all state restored
+        """
+        _SUPPORTED_SCHEMA_VERSIONS = {1, 2}
+        json_obj = json.loads(model_str)
+        schema_version = json_obj.get("schema_version")
+        if schema_version is None:
+            return cls._deserialize_legacy(json_obj)
+        if schema_version not in _SUPPORTED_SCHEMA_VERSIONS:
+            raise ValueError(
+                f"{cls.__name__}.deserialize: unsupported schema_version="
+                f"{schema_version!r}. Supported versions: "
+                f"{_SUPPORTED_SCHEMA_VERSIONS} (and the legacy pre-schema format)."
+            )
+
+        params = json_obj.get("params", {})
+        init_kwargs = cls._init_kwargs_from_schema_v1_params(params)
+        model = cls(**init_kwargs)
+
+        model.mr = []
+        model.unshrink_factors = []
+        for model_info in json_obj[cls._SERIALIZATION_KEY]:
+            booster = lgb.Booster(model_str=model_info["booster"])
+            model.mr.append(booster)
+            model.unshrink_factors.append(model_info["unshrink_factor"])
+
+        # ``encode_categorical_variables`` was already restored from
+        # ``params`` via ``cls(**init_kwargs)`` above. ``"has_encoder"`` in
+        # the JSON is a redundant mirror of the same value kept only for
+        # backward compatibility with the legacy (no ``schema_version``)
+        # format, which is handled separately by ``_deserialize_legacy``.
+        if model.encode_categorical_variables and "encoder" in json_obj:
+            model.enc = utils.OrdinalEncoderWithUnknownSupport.deserialize(
+                json_obj["encoder"]
+            )
+        model._is_fitted = True
+        model.categorical_feature_names = json_obj.get("categorical_feature_names")
+        model.numerical_feature_names = json_obj.get("numerical_feature_names")
         return model
 
     def _compute_effective_sample_size(self, weights: npt.NDArray) -> float:
@@ -2346,9 +2517,9 @@ class PlattScalingWithFeatures(BaseCalibrator):
         :param prediction_column_name: Name of the column in dataframe df that contains the predictions
         :param label_column_name: Name of the column in dataframe df that contains the ground truth labels
         :param weight_column_name: Name of the column in dataframe df that contains the instance weights
-        :param categorical_feature_column_names: List of column names in the df that contain the categorical
+        :param categorical_feature_column_names: List of column names in df_train that contain the categorical
             segmentation features (these will be one-hot encoded)
-        :param numerical_feature_column_names: List of column names in the df that contain the numerical
+        :param numerical_feature_column_names: List of column names in df_train that contain the numerical
             segmentation features (these will be discretized into bins)
         :param kwargs: Additional keyword arguments
         :return: The fitted calibrator instance
@@ -2489,9 +2660,9 @@ class SegmentwiseCalibrator(Generic[TCalibrator], BaseCalibrator):
         :param prediction_column_name: Name of the column in dataframe df that contains the predictions
         :param label_column_name: Name of the column in dataframe df that contains the ground truth labels
         :param weight_column_name: Name of the column in dataframe df that contains the instance weights
-        :param categorical_feature_column_names: List of column names in the df that contain the categorical
+        :param categorical_feature_column_names: List of column names in df_train that contain the categorical
             segmentation features (passed to individual calibrators)
-        :param numerical_feature_column_names: List of column names in the df that contain the numerical
+        :param numerical_feature_column_names: List of column names in df_train that contain the numerical
             segmentation features (passed to individual calibrators)
         :param kwargs: Additional keyword arguments
         :return: The fitted calibrator instance

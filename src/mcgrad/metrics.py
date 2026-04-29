@@ -1364,7 +1364,7 @@ def normalized_entropy(
     :param labels: Ground truth (correct) labels for n_samples samples.
     :param predicted_scores: Predicted probabilities, as returned by a classifier's predict_proba method.
     :param sample_weight: Optional array of sample weights for each instance.
-    :returns: the normalized entropy
+    :return: the normalized entropy
     """
     if sample_weight is None:
         sample_weight = np.ones_like(predicted_scores)
@@ -1401,7 +1401,9 @@ def calibration_free_normalized_entropy(
     :return: the calibration-free NE.
     """
     if len(predicted_scores.shape) != 1:
-        raise ValueError("y_pred must be the predicted probability for class 1 only.")
+        raise ValueError(
+            "predicted_scores must be the predicted probability for class 1 only."
+        )
 
     current_calibration = calibration_ratio(labels, predicted_scores, sample_weight)
 
