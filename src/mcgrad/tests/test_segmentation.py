@@ -89,7 +89,9 @@ def test_that_get_segment_masks_returns_correct_number_of_segments_when_using_mi
     assert np.array_equal(np.where(masks[1])[0], np.array([1]))
 
 
-def test_that_get_segment_masks_returns_whole_dataset_if_no_features_are_specified():
+def test_that_get_segment_masks_returns_whole_dataset_if_no_features_are_specified() -> (
+    None
+):
     test_df = pd.DataFrame({"segment_A": ["a", "b"]})
     generator = segmentation.get_segment_masks(
         test_df, min_samples_per_segment=1, chunk_size=5
@@ -300,7 +302,8 @@ def test_that_collapse_numeric_values_returns_correct_number_of_values_with_max_
 
 def test_that_get_segment_masks_works_with_arbitrary_input_index():
     test_df = pd.DataFrame(
-        {"segment_A": ["a", "a", "b", "b", "c", "d"]}, index=[3, 5, 2, 0, 4, 1]
+        {"segment_A": ["a", "a", "b", "b", "c", "d"]},
+        index=pd.Index([3, 5, 2, 0, 4, 1]),
     )
     generator = segmentation.get_segment_masks(
         test_df,
@@ -320,7 +323,8 @@ def test_that_get_segment_masks_works_with_arbitrary_input_index():
 
 def test_that_get_segment_masks_works_with_arbitrary_input_index_when_missing_values_exist():
     test_df = pd.DataFrame(
-        {"segment_A": ["a", "a", None, None, "c", "d"]}, index=[3, 5, 2, 0, 4, 1]
+        {"segment_A": ["a", "a", None, None, "c", "d"]},
+        index=pd.Index([3, 5, 2, 0, 4, 1]),
     )
     generator = segmentation.get_segment_masks(
         test_df,
@@ -369,7 +373,7 @@ def test_concat_feature_values_with_empty_list():
     assert list(result.columns) == ["segment_column", "value", "idx_segment"]
 
 
-def test_concat_feature_values_with_all_empty_dataframes():
+def test_concat_feature_values_with_all_empty_dataframes() -> None:
     df1 = pd.DataFrame(columns=["segment_column", "value", "idx_segment"])
     df2 = pd.DataFrame(columns=["segment_column", "value", "idx_segment"])
 
