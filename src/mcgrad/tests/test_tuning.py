@@ -699,10 +699,10 @@ def test_tune_mcgrad_params_pass_df_val_into_tuning_false(
 
 @pytest.mark.arm64_incompatible
 def test_tune_mcgrad_params_pass_df_val_into_final_fit_true(
-    sample_data,
-    sample_val_data,
-    mock_mcgrad_model,
-):
+    sample_data: pd.DataFrame,
+    sample_val_data: pd.DataFrame,
+    mock_mcgrad_model: Mock,
+) -> None:
     """Test that df_val is passed to model.fit during final fit when pass_df_val_into_final_fit=True."""
     tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -950,10 +950,10 @@ def test_tune_mcgrad_params_with_regression_model_returns_trial_results(
 
 @pytest.mark.arm64_incompatible
 def test_tune_mcgrad_params_with_regression_model_passes_weights_to_score_func(
-    regression_sample_data,
-    regression_val_data,
-    mock_regression_model,
-):
+    regression_sample_data: pd.DataFrame,
+    regression_val_data: pd.DataFrame,
+    mock_regression_model: Mock,
+) -> None:
     result_model, trial_results = tune_mcgrad_params(
         model=mock_regression_model,
         df_train=regression_sample_data,
