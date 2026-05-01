@@ -613,8 +613,12 @@ def test_ecce_sigma_gives_expected_result_for_scores_resulting_in_zero_variance(
     ],
 )
 def test_proportional_expected_calibration_error_gives_expected_result(
-    labels, predicted_scores, sample_weight, num_bins, expected
-):
+    labels: np.ndarray,
+    predicted_scores: np.ndarray,
+    sample_weight: np.ndarray,
+    num_bins: int,
+    expected: float,
+) -> None:
     result = metrics.proportional_expected_calibration_error(
         labels, predicted_scores, sample_weight, num_bins
     )
@@ -2640,7 +2644,7 @@ def test_regression_ecce_std_defaults_to_single_segment_when_segments_is_none():
     np.testing.assert_allclose(result_no_segments[0], result_explicit[0])
 
 
-def test_regression_ecce_std_raises_error_with_mismatched_segments():
+def test_regression_ecce_std_raises_error_with_mismatched_segments() -> None:
     predicted_scores = np.array([1.0, 2.0, 3.0])
     labels = np.array([1.5, 2.5, 3.5])
     segments = np.ones(shape=(1, 5), dtype=np.bool_)
