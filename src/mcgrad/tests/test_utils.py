@@ -172,7 +172,7 @@ def test_OrdinalEncoderWithUnknownSupport_fit_transform_known_categories():
     np.testing.assert_array_equal(transformed, expected)
 
 
-def test_OrdinalEncoderWithUnknownSupport_transform_known_categories():
+def test_OrdinalEncoderWithUnknownSupport_transform_known_categories() -> None:
     encoder = utils.OrdinalEncoderWithUnknownSupport()
     df = pd.DataFrame(
         {
@@ -674,7 +674,7 @@ def test_geometric_mean_does_not_modify_input_array(rng):
     np.testing.assert_array_equal(x, x_original)
 
 
-def test_logistic_does_not_modify_input_array(rng):
+def test_logistic_does_not_modify_input_array(rng: np.random.RandomState) -> None:
     log_odds = rng.uniform(-5, 5, 100)
     log_odds_original = log_odds.copy()
 
