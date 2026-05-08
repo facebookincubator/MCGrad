@@ -450,7 +450,7 @@ def test_convert_arrow_to_numpy_with_null_values_converts_correctly():
             assert actual == expected, f"Expected {expected}, but got {actual}"
 
 
-def test_convert_arrow_to_numpy_with_unsupported_type_remains_unchanged():
+def test_convert_arrow_to_numpy_with_unsupported_type_remains_unchanged() -> None:
     df = pd.DataFrame({"col1": [object(), object(), object()]})
     assert df["col1"].dtype == object
     result_df = utils.convert_arrow_columns_to_numpy(df)
@@ -516,7 +516,7 @@ def test_ordinal_encoder_fit_does_not_modify_input_array():
     np.testing.assert_array_equal(data, data_original)
 
 
-def test_ordinal_encoder_fit_does_not_modify_input_dataframe():
+def test_ordinal_encoder_fit_does_not_modify_input_dataframe() -> None:
     df = pd.DataFrame(
         {
             "City": ["Paris", "Tokyo", "Amsterdam"],
