@@ -201,7 +201,9 @@ def test_that_collapse_infrequent_values_is_identity_when_unique_values_lt_max_v
     assert np.array_equal(results, test_array)
 
 
-def test_that_collapse_infrequent_values_collapses_all_values_to_collapse_value_if_max_unique_is_1():
+def test_that_collapse_infrequent_values_collapses_all_values_to_collapse_value_if_max_unique_is_1() -> (
+    None
+):
     test_array = pd.Series(["a", "a", "b", "c"])
     results = segmentation.collapse_infrequent_values(test_array, max_unique_values=1)
     expected = np.array([segmentation.CATEGORICAL_COLLAPSE_VALUE] * 4)
