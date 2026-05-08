@@ -1035,7 +1035,9 @@ def test_precision_at_recall(y_true, y_scores, recall_target, sample_weight, exp
     assert result == pytest.approx(expected)
 
 
-def test_that_multicalibrationerror_returns_correct_value_on_perfectly_calibrated_data():
+def test_that_multicalibrationerror_returns_correct_value_on_perfectly_calibrated_data() -> (
+    None
+):
     test_df = pd.DataFrame(
         {
             "prediction": [0.0, 1.0, 0.0, 1.0],
@@ -1750,7 +1752,9 @@ def test_metric_does_not_modify_input_arrays(
         (metrics.rank_calibration_error, {}),
     ],
 )
-def test_ranking_metric_does_not_modify_input_arrays(rng, metric_func, metric_kwargs):
+def test_ranking_metric_does_not_modify_input_arrays(
+    rng: np.random.RandomState, metric_func: Callable, metric_kwargs: dict
+) -> None:
     labels = rng.random_sample(100)
     predicted_labels = rng.random_sample(100)
 
