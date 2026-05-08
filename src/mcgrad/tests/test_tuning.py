@@ -5,6 +5,7 @@
 # pyre-unsafe
 
 import warnings
+from typing import Any
 from unittest.mock import Mock, patch
 
 import numpy as np
@@ -147,9 +148,9 @@ def test_tune_mcgrad_params_without_weights(
 
 @pytest.mark.arm64_incompatible
 def test_tune_mcgrad_params_default_parameters(
-    sample_data,
-    mock_mcgrad_model,
-):
+    sample_data: pd.DataFrame,
+    mock_mcgrad_model: Mock,
+) -> None:
     result_model, trial_results = tune_mcgrad_params(
         model=mock_mcgrad_model,
         df_train=sample_data,
@@ -394,7 +395,9 @@ def test_all_default_configs_are_range_parameter_configs():
 
 
 @pytest.mark.arm64_incompatible
-def test_tuning_selects_parameters_with_lowest_score(rng):
+def test_tuning_selects_parameters_with_lowest_score(
+    rng: np.random.RandomState,
+) -> None:
     """Verify that tuning minimizes the score (optimization direction is correct).
 
     This is the critical test for the optimization direction. We mock the model's
@@ -441,7 +444,9 @@ def test_tuning_selects_parameters_with_lowest_score(rng):
     learning_rates_evaluated: list[float] = []
     original_set_lightgbm_params = methods.MCGrad._set_lightgbm_params
 
-    def tracking_set_lightgbm_params(self, params):
+    def tracking_set_lightgbm_params(
+        self: methods.MCGrad, params: dict[str, Any]
+    ) -> None:
         if "learning_rate" in params:
             learning_rates_evaluated.append(params["learning_rate"])
         return original_set_lightgbm_params(self, params)
@@ -451,7 +456,12 @@ def test_tuning_selects_parameters_with_lowest_score(rng):
     # Trial with score 0.7 would be selected if incorrectly maximizing
     scores_returned = []
 
-    def mock_score_func(df, label_column, score_column, weight_column) -> float:
+    def mock_score_func(
+        df: pd.DataFrame,
+        label_column: str,
+        score_column: str,
+        weight_column: str | None,
+    ) -> float:
         scores_sequence = [0.5, 0.3, 0.7]
         idx = len(scores_returned)
         score = scores_sequence[idx % len(scores_sequence)]
