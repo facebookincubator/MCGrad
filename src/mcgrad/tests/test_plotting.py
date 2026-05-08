@@ -210,7 +210,9 @@ def test_plot_learning_curve_basic(mcgrad_training_df):
     assert fig is not None
 
 
-def test_plot_learning_curve_raises_without_early_stopping(mcgrad_training_df):
+def test_plot_learning_curve_raises_without_early_stopping(
+    mcgrad_training_df: pd.DataFrame,
+) -> None:
     model = _fit_mcgrad_model(mcgrad_training_df, early_stopping=False)
     with pytest.raises(
         ValueError,
@@ -219,7 +221,7 @@ def test_plot_learning_curve_raises_without_early_stopping(mcgrad_training_df):
         plotting.plot_learning_curve(model)
 
 
-def test_plot_learning_curve_with_show_all(mcgrad_training_df):
+def test_plot_learning_curve_with_show_all(mcgrad_training_df: pd.DataFrame) -> None:
     model = _fit_mcgrad_model(mcgrad_training_df, save_training_performance=True)
     fig = plotting.plot_learning_curve(model, show_all=True)
     assert fig is not None
