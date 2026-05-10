@@ -2125,7 +2125,7 @@ def wrap_multicalibration_error_metric(
             min_samples_per_segment: int = DEFAULT_MCE_MIN_SAMPLES_PER_SEGMENT,
             max_n_segments: int | None = DEFAULT_MCE_N_SEGMENTS,
             outcome_type: str = "classification",
-        ):
+        ) -> None:
             self.categorical_segment_columns = categorical_segment_columns
             self.numerical_segment_columns = numerical_segment_columns
             self.max_depth = max_depth
