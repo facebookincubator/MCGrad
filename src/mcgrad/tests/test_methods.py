@@ -1380,8 +1380,9 @@ def test_predict_with_swapped_feature_order_raises(calibrator_class, rng):
     ],
 )
 def test_feature_consistency_preserved_after_serialize_deserialize(
-    calibrator_class, rng
-):
+    calibrator_class: type[methods.MCGrad] | type[methods.RegressionMCGrad],
+    rng: np.random.RandomState,
+) -> None:
     df = pd.DataFrame(
         {
             "prediction": rng.rand(30),
@@ -1848,7 +1849,10 @@ def test_mcgrad_calls_score_func_during_early_stopping(calibrator_class, rng):
         methods.RegressionMCGrad,
     ],
 )
-def test_early_stopping_with_multicalibration_error_metric(calibrator_class, rng):
+def test_early_stopping_with_multicalibration_error_metric(
+    calibrator_class: type[methods.MCGrad] | type[methods.RegressionMCGrad],
+    rng: np.random.RandomState,
+) -> None:
     df_train = pd.DataFrame(
         {
             "feature1": rng.randint(0, 3, 50),
