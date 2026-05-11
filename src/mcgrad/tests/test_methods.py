@@ -3,6 +3,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 # pyre-unsafe
+from __future__ import annotations
 
 import json
 import logging
@@ -1417,7 +1418,10 @@ def test_feature_consistency_preserved_after_serialize_deserialize(
         methods.RegressionMCGrad,
     ],
 )
-def test_predict_with_matching_features_succeeds(calibrator_class, rng):
+def test_predict_with_matching_features_succeeds(
+    calibrator_class: type[methods.MCGrad] | type[methods.RegressionMCGrad],
+    rng: np.random.RandomState,
+) -> None:
     df = pd.DataFrame(
         {
             "prediction": rng.rand(30),
