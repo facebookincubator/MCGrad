@@ -80,7 +80,10 @@ def test_plot_segment_calibration_errors_basic(mce_with_all_segments):
     "quantity",
     ["segments_ecce_relative", "segments_ecce_pvalue", "segments_ecce"],
 )
-def test_plot_segment_calibration_errors_quantities(mce_with_all_segments, quantity):
+def test_plot_segment_calibration_errors_quantities(
+    mce_with_all_segments: metrics.MulticalibrationError,
+    quantity: plotting.SegmentQuantity,
+) -> None:
     fig = plotting.plot_segment_calibration_errors(
         mce=mce_with_all_segments, quantity=quantity
     )
@@ -204,7 +207,7 @@ def _fit_mcgrad_model(
     return model
 
 
-def test_plot_learning_curve_basic(mcgrad_training_df):
+def test_plot_learning_curve_basic(mcgrad_training_df: pd.DataFrame) -> None:
     model = _fit_mcgrad_model(mcgrad_training_df)
     fig = plotting.plot_learning_curve(model)
     assert fig is not None

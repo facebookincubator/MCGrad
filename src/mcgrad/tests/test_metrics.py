@@ -705,8 +705,11 @@ def test_calibration_ratio_gives_correct_results(
     ],
 )
 def test_calibration_ratio__with_unjoined_adjustment_gives_correct_results(
-    labels, predicted_scores, sample_weight, expected
-):
+    labels: np.ndarray,
+    predicted_scores: np.ndarray,
+    sample_weight: np.ndarray | None,
+    expected: float,
+) -> None:
     predicted_scores_unjoined, labels_unjoined = utils.make_unjoined(
         predicted_scores, labels
     )
@@ -1623,7 +1626,9 @@ def test_precision_dtype_is_extended_for_large_weights(rng):
     assert len(mce_float16.df.dropna(subset=["weights"], how="all")) == len(df)
 
 
-def test_ecce_and_standard_deviation_return_zero_for_empty_segment(rng):
+def test_ecce_and_standard_deviation_return_zero_for_empty_segment(
+    rng: np.random.RandomState,
+) -> None:
     n_samples = 100
 
     df = pd.DataFrame(
@@ -2408,7 +2413,7 @@ def test_dcg_score_returns_nan_on_empty_arrays():
     assert np.isnan(result), f"Expected NaN for empty arrays, got {result}"
 
 
-def test_ndcg_score_returns_nan_on_empty_arrays():
+def test_ndcg_score_returns_nan_on_empty_arrays() -> None:
     labels = np.array([])
     predicted_labels = np.array([])
     result = metrics.ndcg_score(labels, predicted_labels)
@@ -2553,7 +2558,7 @@ def test_regression_mce_sigma_is_scale_invariant(scale_factor, rng):
     labels = predictions + rng.normal(0, 1, size=n)
     segments = rng.choice(["A", "B"], size=n)
 
-    def make_mce(preds, labs):
+    def make_mce(preds: np.ndarray, labs: np.ndarray) -> metrics.MulticalibrationError:
         df = pd.DataFrame(
             {
                 "prediction": preds,
