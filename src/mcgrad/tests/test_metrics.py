@@ -613,8 +613,12 @@ def test_ecce_sigma_gives_expected_result_for_scores_resulting_in_zero_variance(
     ],
 )
 def test_proportional_expected_calibration_error_gives_expected_result(
-    labels, predicted_scores, sample_weight, num_bins, expected
-):
+    labels: np.ndarray,
+    predicted_scores: np.ndarray,
+    sample_weight: np.ndarray,
+    num_bins: int,
+    expected: float,
+) -> None:
     result = metrics.proportional_expected_calibration_error(
         labels, predicted_scores, sample_weight, num_bins
     )
@@ -701,8 +705,11 @@ def test_calibration_ratio_gives_correct_results(
     ],
 )
 def test_calibration_ratio__with_unjoined_adjustment_gives_correct_results(
-    labels, predicted_scores, sample_weight, expected
-):
+    labels: np.ndarray,
+    predicted_scores: np.ndarray,
+    sample_weight: np.ndarray | None,
+    expected: float,
+) -> None:
     predicted_scores_unjoined, labels_unjoined = utils.make_unjoined(
         predicted_scores, labels
     )
@@ -1031,7 +1038,9 @@ def test_precision_at_recall(y_true, y_scores, recall_target, sample_weight, exp
     assert result == pytest.approx(expected)
 
 
-def test_that_multicalibrationerror_returns_correct_value_on_perfectly_calibrated_data():
+def test_that_multicalibrationerror_returns_correct_value_on_perfectly_calibrated_data() -> (
+    None
+):
     test_df = pd.DataFrame(
         {
             "prediction": [0.0, 1.0, 0.0, 1.0],
@@ -1617,7 +1626,9 @@ def test_precision_dtype_is_extended_for_large_weights(rng):
     assert len(mce_float16.df.dropna(subset=["weights"], how="all")) == len(df)
 
 
-def test_ecce_and_standard_deviation_return_zero_for_empty_segment(rng):
+def test_ecce_and_standard_deviation_return_zero_for_empty_segment(
+    rng: np.random.RandomState,
+) -> None:
     n_samples = 100
 
     df = pd.DataFrame(
@@ -1746,7 +1757,9 @@ def test_metric_does_not_modify_input_arrays(
         (metrics.rank_calibration_error, {}),
     ],
 )
-def test_ranking_metric_does_not_modify_input_arrays(rng, metric_func, metric_kwargs):
+def test_ranking_metric_does_not_modify_input_arrays(
+    rng: np.random.RandomState, metric_func: Callable, metric_kwargs: dict
+) -> None:
     labels = rng.random_sample(100)
     predicted_labels = rng.random_sample(100)
 
@@ -2400,7 +2413,7 @@ def test_dcg_score_returns_nan_on_empty_arrays():
     assert np.isnan(result), f"Expected NaN for empty arrays, got {result}"
 
 
-def test_ndcg_score_returns_nan_on_empty_arrays():
+def test_ndcg_score_returns_nan_on_empty_arrays() -> None:
     labels = np.array([])
     predicted_labels = np.array([])
     result = metrics.ndcg_score(labels, predicted_labels)
@@ -2545,7 +2558,7 @@ def test_regression_mce_sigma_is_scale_invariant(scale_factor, rng):
     labels = predictions + rng.normal(0, 1, size=n)
     segments = rng.choice(["A", "B"], size=n)
 
-    def make_mce(preds, labs):
+    def make_mce(preds: np.ndarray, labs: np.ndarray) -> metrics.MulticalibrationError:
         df = pd.DataFrame(
             {
                 "prediction": preds,
@@ -2640,7 +2653,7 @@ def test_regression_ecce_std_defaults_to_single_segment_when_segments_is_none():
     np.testing.assert_allclose(result_no_segments[0], result_explicit[0])
 
 
-def test_regression_ecce_std_raises_error_with_mismatched_segments():
+def test_regression_ecce_std_raises_error_with_mismatched_segments() -> None:
     predicted_scores = np.array([1.0, 2.0, 3.0])
     labels = np.array([1.5, 2.5, 3.5])
     segments = np.ones(shape=(1, 5), dtype=np.bool_)

@@ -11,6 +11,7 @@ Interactive Jupyter notebooks demonstrating how to use MCGrad for multicalibrati
 | Tutorial | Description | Launch |
 |----------|-------------|--------|
 | **MCGrad Core Algorithm** | Complete introduction to multicalibration with MCGrad | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/facebookincubator/MCGrad/blob/main/tutorials/01_mcgrad_core.ipynb) |
+| **Trustworthy LLM Confidence for Downstream Decisions with MCGrad** | Apply MCGrad to a Claude Opus classifier so confidence-based decisions (auto-action thresholds, human-routing, prevalence estimation) hold up across segments of your data | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/facebookincubator/MCGrad/blob/main/tutorials/02_calibrating_llm_outputs.ipynb) |
 
 ## What You'll Learn
 
@@ -23,6 +24,16 @@ This comprehensive tutorial covers:
 3. **Measuring Multicalibration** - Use the Multicalibration Error (MCE) metric to evaluate calibration quality
 4. **Visualization** - Plot global and segment-level calibration curves
 5. **Advanced Features** - Explore feature importance, model serialization, numerical features, and custom hyperparameters
+
+### 02. Trustworthy LLM Confidence for Downstream Decisions with MCGrad
+
+This tutorial applies the MCGrad workflow to an LLM classifier (Claude Opus 4.6 on Comparative Agendas Project documents) and covers:
+
+1. **Why Raw LLM Confidence Isn't Trustworthy** - Diagnose how an LLM's elicited probabilities over-estimate prevalence per country, by different amounts each time
+2. **Global Calibration Isn't Enough** - See why isotonic regression closes the global gap but leaves significant per-segment miscalibration
+3. **Fitting MCGrad on LLM Outputs** - Train MCGrad with document metadata as segment features
+4. **Risk-Calibrated Thresholds** - Set a confidence threshold once and get the same per-item risk in every country, content type, or cohort
+5. **Per-Segment Prevalence Estimation** - Recover unbiased positive rates within any sub-population, ready for stakeholder breakdowns
 
 ## Running Tutorials
 

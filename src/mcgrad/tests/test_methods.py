@@ -3,6 +3,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 # pyre-unsafe
+from __future__ import annotations
 
 import json
 import logging
@@ -1003,7 +1004,9 @@ def test_mcgrad_raises_when_custom_score_func_without_minimize_score(calibrator_
         methods.RegressionMCGrad,
     ],
 )
-def test_mcgrad_raises_when_patience_set_without_early_stopping(calibrator_class):
+def test_mcgrad_raises_when_patience_set_without_early_stopping(
+    calibrator_class: type[methods.MCGrad] | type[methods.RegressionMCGrad],
+) -> None:
     with pytest.raises(
         ValueError,
         match="`patience` must be None when argument `early_stopping` is disabled",
@@ -1380,8 +1383,9 @@ def test_predict_with_swapped_feature_order_raises(calibrator_class, rng):
     ],
 )
 def test_feature_consistency_preserved_after_serialize_deserialize(
-    calibrator_class, rng
-):
+    calibrator_class: type[methods.MCGrad] | type[methods.RegressionMCGrad],
+    rng: np.random.RandomState,
+) -> None:
     df = pd.DataFrame(
         {
             "prediction": rng.rand(30),
@@ -1416,7 +1420,10 @@ def test_feature_consistency_preserved_after_serialize_deserialize(
         methods.RegressionMCGrad,
     ],
 )
-def test_predict_with_matching_features_succeeds(calibrator_class, rng):
+def test_predict_with_matching_features_succeeds(
+    calibrator_class: type[methods.MCGrad] | type[methods.RegressionMCGrad],
+    rng: np.random.RandomState,
+) -> None:
     df = pd.DataFrame(
         {
             "prediction": rng.rand(30),
@@ -1848,7 +1855,10 @@ def test_mcgrad_calls_score_func_during_early_stopping(calibrator_class, rng):
         methods.RegressionMCGrad,
     ],
 )
-def test_early_stopping_with_multicalibration_error_metric(calibrator_class, rng):
+def test_early_stopping_with_multicalibration_error_metric(
+    calibrator_class: type[methods.MCGrad] | type[methods.RegressionMCGrad],
+    rng: np.random.RandomState,
+) -> None:
     df_train = pd.DataFrame(
         {
             "feature1": rng.randint(0, 3, 50),
@@ -4606,7 +4616,7 @@ def test_serialize_deserialize_roundtrip_restores_full_config(calibrator_class):
     )
 
 
-def test_deserialize_rejects_unknown_schema_version():
+def test_deserialize_rejects_unknown_schema_version() -> None:
     """An unknown schema_version must raise, not silently degrade."""
     payload = {
         "schema_version": 999,

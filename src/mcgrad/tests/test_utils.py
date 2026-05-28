@@ -159,7 +159,7 @@ def test_logits_and_probs_conversions_maintain_same_scale_with_clipping():
         )
 
 
-def test_OrdinalEncoderWithUnknownSupport_fit_transform_known_categories():
+def test_OrdinalEncoderWithUnknownSupport_fit_transform_known_categories() -> None:
     encoder = utils.OrdinalEncoderWithUnknownSupport()
     df = pd.DataFrame(
         {
@@ -172,7 +172,7 @@ def test_OrdinalEncoderWithUnknownSupport_fit_transform_known_categories():
     np.testing.assert_array_equal(transformed, expected)
 
 
-def test_OrdinalEncoderWithUnknownSupport_transform_known_categories():
+def test_OrdinalEncoderWithUnknownSupport_transform_known_categories() -> None:
     encoder = utils.OrdinalEncoderWithUnknownSupport()
     df = pd.DataFrame(
         {
@@ -222,7 +222,7 @@ def test_encoder_serialize_deserialize():
     np.testing.assert_array_equal(deserialized_transformed, original_transformed)
 
 
-def test_encoder_serialize_deserialize_with_integer_category_keys():
+def test_encoder_serialize_deserialize_with_integer_category_keys() -> None:
     df = pd.DataFrame({"Code": [100, 200, 300, 100, 200]})
 
     encoder = utils.OrdinalEncoderWithUnknownSupport()
@@ -450,7 +450,7 @@ def test_convert_arrow_to_numpy_with_null_values_converts_correctly():
             assert actual == expected, f"Expected {expected}, but got {actual}"
 
 
-def test_convert_arrow_to_numpy_with_unsupported_type_remains_unchanged():
+def test_convert_arrow_to_numpy_with_unsupported_type_remains_unchanged() -> None:
     df = pd.DataFrame({"col1": [object(), object(), object()]})
     assert df["col1"].dtype == object
     result_df = utils.convert_arrow_columns_to_numpy(df)
@@ -516,7 +516,7 @@ def test_ordinal_encoder_fit_does_not_modify_input_array():
     np.testing.assert_array_equal(data, data_original)
 
 
-def test_ordinal_encoder_fit_does_not_modify_input_dataframe():
+def test_ordinal_encoder_fit_does_not_modify_input_dataframe() -> None:
     df = pd.DataFrame(
         {
             "City": ["Paris", "Tokyo", "Amsterdam"],
@@ -674,7 +674,7 @@ def test_geometric_mean_does_not_modify_input_array(rng):
     np.testing.assert_array_equal(x, x_original)
 
 
-def test_logistic_does_not_modify_input_array(rng):
+def test_logistic_does_not_modify_input_array(rng: np.random.RandomState) -> None:
     log_odds = rng.uniform(-5, 5, 100)
     log_odds_original = log_odds.copy()
 

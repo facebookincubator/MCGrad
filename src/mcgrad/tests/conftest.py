@@ -3,7 +3,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-# pyre-unsafe
+# pyre-strict
 """
 Pytest configuration for MCGrad test suite.
 
@@ -17,7 +17,7 @@ import sys
 import pytest
 
 
-def pytest_configure(config):
+def pytest_configure(config: pytest.Config) -> None:
     """Configure pytest with custom markers."""
     config.addinivalue_line(
         "markers",
@@ -25,7 +25,9 @@ def pytest_configure(config):
     )
 
 
-def pytest_collection_modifyitems(config, items):
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: list[pytest.Item]
+) -> None:
     """
     Automatically skip tests marked as arm64_incompatible on Apple Silicon.
 
