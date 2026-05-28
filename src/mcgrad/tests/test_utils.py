@@ -159,7 +159,7 @@ def test_logits_and_probs_conversions_maintain_same_scale_with_clipping():
         )
 
 
-def test_OrdinalEncoderWithUnknownSupport_fit_transform_known_categories():
+def test_OrdinalEncoderWithUnknownSupport_fit_transform_known_categories() -> None:
     encoder = utils.OrdinalEncoderWithUnknownSupport()
     df = pd.DataFrame(
         {
@@ -222,7 +222,7 @@ def test_encoder_serialize_deserialize():
     np.testing.assert_array_equal(deserialized_transformed, original_transformed)
 
 
-def test_encoder_serialize_deserialize_with_integer_category_keys():
+def test_encoder_serialize_deserialize_with_integer_category_keys() -> None:
     df = pd.DataFrame({"Code": [100, 200, 300, 100, 200]})
 
     encoder = utils.OrdinalEncoderWithUnknownSupport()

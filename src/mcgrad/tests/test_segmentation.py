@@ -35,7 +35,7 @@ def test_that_get_segment_masks_returns_full_data_at_depth_zero():
     assert np.array_equal(np.where(masks[0])[0], np.arange(10))
 
 
-def test_that_get_segment_masks_works_as_expected_with_nans():
+def test_that_get_segment_masks_works_as_expected_with_nans() -> None:
     # Expected behavior is that NaN values are treated as a separate segment
     test_df = pd.DataFrame({"segment_A": ["a", np.nan, "b", np.nan]})
     generator = segmentation.get_segment_masks(
@@ -137,7 +137,7 @@ def test_that_get_segment_masks_collapses_numerical_feature_correctly():
     assert np.array_equal(np.where(masks[2])[0], np.array([3, 4, 5]))
 
 
-def test_that_get_segment_masks_collapses_categorical_feature_correctly():
+def test_that_get_segment_masks_collapses_categorical_feature_correctly() -> None:
     test_df = pd.DataFrame({"segment_A": ["a", "a", "b", "b", "c", "d"]})
     generator = segmentation.get_segment_masks(
         test_df,
