@@ -1004,7 +1004,9 @@ def test_mcgrad_raises_when_custom_score_func_without_minimize_score(calibrator_
         methods.RegressionMCGrad,
     ],
 )
-def test_mcgrad_raises_when_patience_set_without_early_stopping(calibrator_class):
+def test_mcgrad_raises_when_patience_set_without_early_stopping(
+    calibrator_class: type[methods.MCGrad] | type[methods.RegressionMCGrad],
+) -> None:
     with pytest.raises(
         ValueError,
         match="`patience` must be None when argument `early_stopping` is disabled",
@@ -4614,7 +4616,7 @@ def test_serialize_deserialize_roundtrip_restores_full_config(calibrator_class):
     )
 
 
-def test_deserialize_rejects_unknown_schema_version():
+def test_deserialize_rejects_unknown_schema_version() -> None:
     """An unknown schema_version must raise, not silently degrade."""
     payload = {
         "schema_version": 999,

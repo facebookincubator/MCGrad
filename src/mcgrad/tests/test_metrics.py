@@ -705,8 +705,11 @@ def test_calibration_ratio_gives_correct_results(
     ],
 )
 def test_calibration_ratio__with_unjoined_adjustment_gives_correct_results(
-    labels, predicted_scores, sample_weight, expected
-):
+    labels: np.ndarray,
+    predicted_scores: np.ndarray,
+    sample_weight: np.ndarray | None,
+    expected: float,
+) -> None:
     predicted_scores_unjoined, labels_unjoined = utils.make_unjoined(
         predicted_scores, labels
     )
@@ -2410,7 +2413,7 @@ def test_dcg_score_returns_nan_on_empty_arrays():
     assert np.isnan(result), f"Expected NaN for empty arrays, got {result}"
 
 
-def test_ndcg_score_returns_nan_on_empty_arrays():
+def test_ndcg_score_returns_nan_on_empty_arrays() -> None:
     labels = np.array([])
     predicted_labels = np.array([])
     result = metrics.ndcg_score(labels, predicted_labels)
