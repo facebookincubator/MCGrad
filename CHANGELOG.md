@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-06-03
+
 ### Added
 - `num_rounds_trained` property on `MCGrad` / `RegressionMCGrad`, returning the number of boosting rounds actually trained — useful after early stopping, where this can be strictly less than the configured `num_rounds`.
 - Schema versioning for serialized models via a `schema_version` field in the JSON payload. Deserialize rejects unknown versions with a clear error; pre-existing serialized models without this field continue to load unchanged (with a deprecation warning).
@@ -83,5 +85,6 @@ Note: Early pre-release versions (i.e., 0.0.0 and 0.1.0) were yanked due to pack
 - Sphinx API documentation at mcgrad.readthedocs.io
 
 
-[Unreleased]: https://github.com/facebookincubator/MCGrad/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/facebookincubator/MCGrad/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/facebookincubator/MCGrad/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/facebookincubator/MCGrad/compare/v0.1.3...v0.1.4
