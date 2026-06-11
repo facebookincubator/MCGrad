@@ -752,6 +752,7 @@ def multi_cg_score(
     samples_per_segment = (
         segments_df.groupby(grouping_cols)["sample_weight"]
         .sum()
+        # pyrefly: ignore [no-matching-overload]
         .rename("segment_total_weight")
     )
 
@@ -1197,6 +1198,7 @@ def _rank_calibration_error(
     :return: tuple (RCE, label_cdfs, prediction_cdfs)
     """
     # break ties
+    # pyrefly: ignore [bad-argument-type]
     rng = np.random.RandomState(42) if rng is None else rng
     eps = rng.uniform(0, 1, labels.shape[0]) * CALIBRATION_ERROR_EPSILON
     labels = labels + eps
@@ -1275,6 +1277,7 @@ def rank_multicalibration_error(
     samples_per_segment = (
         segments_df.groupby(grouping_cols)["sample_weight"]
         .sum()
+        # pyrefly: ignore [no-matching-overload]
         .rename("segment_total_weight")
     )
 
@@ -1329,6 +1332,7 @@ def _rank_multicalibration_error(
     samples_per_segment = (
         segments_df.groupby(grouping_cols)["sample_weight"]
         .sum()
+        # pyrefly: ignore [no-matching-overload]
         .rename("segment_total_weight")
     )
 
