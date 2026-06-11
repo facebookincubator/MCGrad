@@ -52,6 +52,7 @@ class BaseCalibrator(ABC):
         categorical_feature_column_names: list[str] | None = None,
         numerical_feature_column_names: list[str] | None = None,
         **kwargs: Any,
+        # pyrefly: ignore [not-a-type]
     ) -> Self:
         """Fit the calibration method on the provided training data.
 
