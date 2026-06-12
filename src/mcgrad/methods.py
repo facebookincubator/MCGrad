@@ -655,7 +655,6 @@ class _BaseMCGrad(
         numerical_feature_column_names: list[str] | None = None,
         df_val: pd.DataFrame | None = None,
         **kwargs: Any,
-        # pyrefly: ignore [not-a-type]
     ) -> Self:
         """Fit the MCGrad calibration model on the provided training data.
 
@@ -1522,12 +1521,10 @@ class _BaseMCGrad(
         return json.dumps(json_obj)
 
     @classmethod
-    # pyrefly: ignore [not-a-type]
     def _create_instance_for_cv(cls, **kwargs: Any) -> Self:
         return cls(**kwargs)
 
     @classmethod
-    # pyrefly: ignore [not-a-type]
     def _deserialize_legacy(cls, json_obj: dict[str, Any]) -> Self:
         """Restore a model serialized before ``schema_version`` was added.
 
@@ -1568,7 +1565,6 @@ class _BaseMCGrad(
         return model
 
     @classmethod
-    # pyrefly: ignore [not-a-type]
     def deserialize(cls, model_str: str) -> Self:
         """Deserializes an MCGrad model from a JSON string.
 
@@ -2021,7 +2017,6 @@ class PlattScaling(BaseCalibrator):
         categorical_feature_column_names: list[str] | None = None,
         numerical_feature_column_names: list[str] | None = None,
         **kwargs: Any,
-        # pyrefly: ignore [not-a-type]
     ) -> Self:
         """Fit the Platt scaling model on the provided training data.
 
@@ -2124,7 +2119,6 @@ class IsotonicRegression(BaseCalibrator):
         categorical_feature_column_names: list[str] | None = None,
         numerical_feature_column_names: list[str] | None = None,
         **kwargs: Any,
-        # pyrefly: ignore [not-a-type]
     ) -> Self:
         """Fit the isotonic regression calibration model on the provided training data.
 
@@ -2203,7 +2197,6 @@ class MultiplicativeAdjustment(BaseCalibrator):
         categorical_feature_column_names: list[str] | None = None,
         numerical_feature_column_names: list[str] | None = None,
         **kwargs: Any,
-        # pyrefly: ignore [not-a-type]
     ) -> Self:
         """Fit the multiplicative adjustment calibration model on the provided training data.
 
@@ -2283,7 +2276,6 @@ class AdditiveAdjustment(BaseCalibrator):
         categorical_feature_column_names: list[str] | None = None,
         numerical_feature_column_names: list[str] | None = None,
         **kwargs: Any,
-        # pyrefly: ignore [not-a-type]
     ) -> Self:
         """Fit the additive adjustment calibration model on the provided training data.
 
@@ -2349,7 +2341,6 @@ class IdentityCalibrator(BaseCalibrator):
         categorical_feature_column_names: list[str] | None = None,
         numerical_feature_column_names: list[str] | None = None,
         **kwargs: Any,
-        # pyrefly: ignore [not-a-type]
     ) -> Self:
         """Fit the identity calibrator (no-op, returns uncalibrated predictions).
 
@@ -2519,7 +2510,6 @@ class PlattScalingWithFeatures(BaseCalibrator):
         categorical_feature_column_names: list[str] | None = None,
         numerical_feature_column_names: list[str] | None = None,
         **kwargs: Any,
-        # pyrefly: ignore [not-a-type]
     ) -> Self:
         """Fit the Platt scaling with features model on the provided training data.
 
@@ -2660,7 +2650,6 @@ class SegmentwiseCalibrator(Generic[TCalibrator], BaseCalibrator):
         categorical_feature_column_names: list[str] | None = None,
         numerical_feature_column_names: list[str] | None = None,
         **kwargs: Any,
-        # pyrefly: ignore [not-a-type]
     ) -> Self:
         """Fit segment-specific calibration models on the provided training data.
 
