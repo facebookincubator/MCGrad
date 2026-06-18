@@ -118,7 +118,7 @@ def test_logistic_is_inverse_function_of_logit(probabilities):
 
 
 @pytest.mark.parametrize(
-    "log_odds,",
+    "log_odds",
     [
         (np.array([-2, -1, 0, 1, 2])),
         (np.zeros(100)),
