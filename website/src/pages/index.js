@@ -95,6 +95,34 @@ const QuickStart = () => (
   </div>
 );
 
+const VideoSection = () => (
+  <div className="section section--video" id="video">
+    <div className="container">
+      <div className="section__header text--center">
+        <h2>See MCGrad in Action</h2>
+      </div>
+      <div className="row">
+        <div className="col col--8 col--offset-2">
+          <div className="video-wrapper">
+            <iframe
+              src="https://www.youtube.com/embed/-U6yoPAoJF4"
+              title="MCGrad: Multicalibration at Web Scale — KDD 2026"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+          <p className="text--center margin-top--md video-caption">
+            🎓 For a full tutorial, watch the{' '}
+            <a href="https://www.youtube.com/watch?v=iAR0NmyS68k" target="_blank" rel="noopener noreferrer">
+              PyData London 2026 talk →
+            </a>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
 const papertitle = `MCGrad: Multicalibration at Web Scale`;
 const paper_bibtex = `
 @inproceedings{tax2026mcgrad,
@@ -135,11 +163,17 @@ const MyPage = () => {
           </div>
           <h1 className="hero__title hero__title--wordmark">MCGrad</h1>
           <p className="hero__subtitle">Production-ready multicalibration</p>
+          <p className="hero__tagline">Your model looks calibrated on average — but specific segments can be badly off. MCGrad fixes that.</p>
           <div className="hero__cta">
             <Link
               to="/docs/installation"
               className="button button--lg button--primary">
               Get Started
+            </Link>
+            <Link
+              to="https://colab.research.google.com/github/facebookincubator/MCGrad/blob/main/tutorials/01_mcgrad_core.ipynb"
+              className="button button--lg button--demo">
+              ▶ Try the Demo
             </Link>
             <Link
               to="/docs/intro"
@@ -169,6 +203,8 @@ const MyPage = () => {
       </div>
 
       <QuickStart />
+
+      <VideoSection />
 
       <Reference />
     </Layout>
