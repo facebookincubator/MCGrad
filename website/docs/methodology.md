@@ -130,7 +130,13 @@ Post-processing methods risk overfitting, potentially harming the base model. MC
 *Proceedings of the 32nd ACM SIGKDD Conference on Knowledge Discovery and Data Mining V.1 (KDD 2026).* DOI: 10.1145/3770854.3783954
 
 [2] **Baldeschi, R. C., Di Gregorio, S., Fioravanti, S., Fusco, F., Guy, I., Haimovich, D., Leonardi, S., Linder, F., Perini, L., Russo, M., & Tax, N.** [Multicalibration yields better matchings](https://arxiv.org/abs/2511.11413).
-*ArXiv preprint, 2025.*
+*In Proceedings of the 43rd International Conference on Machine Learning (ICML), 2026.*
 
 [3] **Arrieta-Ibarra, I., Gujral, P., Tannen, J., Tygert, M., & Xu, C.** [Metrics of calibration for probabilistic predictions](https://www.jmlr.org/papers/volume23/22-0658/22-0658.pdf).
 *Journal of Machine Learning Research, 23(351), 1-54, 2022.*
+
+[4] **Linder, F., Leeper, T., Haimovich, D., Tax, N., Perini, L., & Vojnovic, M.** [Unbiased Prevalence Estimation with Multicalibrated LLMs](https://arxiv.org/abs/2604.21549).
+*arXiv:2604.21549, 2026.*
+
+[5] **Haimovich, D., Linder, F., Perini, L., Tax, N., & Vojnovic, M.** [On the Convergence of Multicalibration Gradient Boosting](https://arxiv.org/abs/2602.06773).
+*arXiv:2602.06773, 2026.*
