@@ -116,6 +116,14 @@ calibrated_predictions = mcgrad.predict(
   - [Methodology](https://mcgrad.dev/docs/methodology) — Deep dive into how MCGrad works
   - [API Reference](https://mcgrad.readthedocs.io/en/latest/) — Full API documentation
 
+## 📺 Videos & Tutorials
+
+- 🎬 **KDD 2026 Paper Talk** (2 min): [Watch on YouTube](https://www.youtube.com/watch?v=-U6yoPAoJF4)
+- 🎓 **PyData London 2026 Tutorial**: [Watch on YouTube](https://www.youtube.com/watch?v=iAR0NmyS68k)
+- 📓 **Interactive Notebooks:**
+  - [MCGrad Core Algorithm](https://colab.research.google.com/github/facebookincubator/MCGrad/blob/main/tutorials/01_mcgrad_core.ipynb) — Complete introduction to multicalibration [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/facebookincubator/MCGrad/blob/main/tutorials/01_mcgrad_core.ipynb)
+  - [Calibrating LLM Outputs](https://colab.research.google.com/github/facebookincubator/MCGrad/blob/main/tutorials/02_calibrating_llm_outputs.ipynb) — Apply MCGrad to LLM confidence scores [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/facebookincubator/MCGrad/blob/main/tutorials/02_calibrating_llm_outputs.ipynb)
+
 ## 💬 Community & Support
 
 - **Questions & Bugs:** Open an issue on [GitHub Issues](https://github.com/facebookincubator/MCGrad/issues)
@@ -143,4 +151,8 @@ Some of our team's other work on multicalibration:
 
 - **A New Metric to Measure Multicalibration:** Guy, I., Haimovich, D., Linder, F., Okati, N., Perini, L., Tax, N., & Tygert, M. (2025). [Measuring multi-calibration](https://arxiv.org/abs/2506.11251). arXiv:2506.11251.
 
-- **Theoretical Results on Value of Multicalibration:** Baldeschi, R. C., Di Gregorio, S., Fioravanti, S., Fusco, F., Guy, I., Haimovich, D., Leonardi, S., et al. (2025). [Multicalibration yields better matchings](https://arxiv.org/abs/2511.11413). arXiv:2511.11413.
+- **Theoretical Results on Value of Multicalibration:** Baldeschi, R. C., Di Gregorio, S., Fioravanti, S., Fusco, F., Guy, I., Haimovich, D., Leonardi, S., et al. [Multicalibration yields better matchings](https://arxiv.org/abs/2511.11413). In *Proceedings of the 43rd International Conference on Machine Learning (ICML)*, 2026.
+
+- **Unbiased Prevalence Estimation:** Linder, F., Leeper, T., Haimovich, D., Tax, N., Perini, L., & Vojnovic, M. [Unbiased Prevalence Estimation with Multicalibrated LLMs](https://arxiv.org/abs/2604.21549). arXiv:2604.21549, 2026.
+
+- **Convergence Theory:** Haimovich, D., Linder, F., Perini, L., Tax, N., & Vojnovic, M. [On the Convergence of Multicalibration Gradient Boosting](https://arxiv.org/abs/2602.06773). arXiv:2602.06773, 2026.

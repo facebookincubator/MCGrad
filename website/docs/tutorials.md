@@ -13,6 +13,8 @@ Interactive Jupyter notebooks demonstrating how to use MCGrad for multicalibrati
 | **MCGrad Core Algorithm** | Complete introduction to multicalibration with MCGrad | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/facebookincubator/MCGrad/blob/main/tutorials/01_mcgrad_core.ipynb) |
 | **Trustworthy LLM Confidence for Downstream Decisions with MCGrad** | Apply MCGrad to a Claude Opus classifier so confidence-based decisions (auto-action thresholds, human-routing, prevalence estimation) hold up across segments of your data | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/facebookincubator/MCGrad/blob/main/tutorials/02_calibrating_llm_outputs.ipynb) |
 
+For a video walkthrough, see the [PyData London 2026 tutorial on YouTube](https://www.youtube.com/watch?v=iAR0NmyS68k).
+
 ## What You'll Learn
 
 ### 01. MCGrad Core Algorithm
