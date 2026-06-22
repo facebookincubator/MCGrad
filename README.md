@@ -10,7 +10,7 @@
 
 [![CI](https://github.com/facebookincubator/MCGrad/actions/workflows/main.yaml/badge.svg)](https://github.com/facebookincubator/MCGrad/actions)
 [![Coverage](https://codecov.io/gh/facebookincubator/MCGrad/branch/main/graph/badge.svg)](https://codecov.io/gh/facebookincubator/MCGrad)
-[![Documentation Status](https://readthedocs.org/projects/mcgrad/badge/?version=latest)](https://mcgrad.dev)
+[![Documentation Status](https://readthedocs.org/projects/mcgrad/badge/?version=latest)](https://mcgrad.dev?utm_source=github&utm_medium=referral&utm_campaign=readme)
 
 [![PyPI version](https://img.shields.io/pypi/v/mcgrad.svg)](https://pypi.org/project/mcgrad/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://pypi.org/project/mcgrad/)
@@ -110,10 +110,10 @@ calibrated_predictions = mcgrad.predict(
 
 ## 📚 Documentation
 
-- **Website & Guides:** [mcgrad.dev](https://mcgrad.dev/)
-  - [Why MCGrad?](https://mcgrad.dev/docs/why-mcgrad) — Learn about the challenges MCGrad solves
-  - [Quick Start](https://mcgrad.dev/docs/quickstart) — Get started quickly
-  - [Methodology](https://mcgrad.dev/docs/methodology) — Deep dive into how MCGrad works
+- **Website & Guides:** [mcgrad.dev](https://mcgrad.dev/?utm_source=github&utm_medium=referral&utm_campaign=readme)
+  - [Why MCGrad?](https://mcgrad.dev/docs/why-mcgrad?utm_source=github&utm_medium=referral&utm_campaign=readme) — Learn about the challenges MCGrad solves
+  - [Quick Start](https://mcgrad.dev/docs/quickstart?utm_source=github&utm_medium=referral&utm_campaign=readme) — Get started quickly
+  - [Methodology](https://mcgrad.dev/docs/methodology?utm_source=github&utm_medium=referral&utm_campaign=readme) — Deep dive into how MCGrad works
   - [API Reference](https://mcgrad.readthedocs.io/en/latest/) — Full API documentation
 
 ## 📺 Videos & Tutorials

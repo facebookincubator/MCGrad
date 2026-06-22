@@ -30,6 +30,8 @@ const config = {
     locales: ['en'],
   },
 
+  clientModules: ['./src/outboundTracking.js'],
+
   presets: [
     [
       'classic',
