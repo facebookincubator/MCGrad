@@ -114,7 +114,6 @@ def get_segment_masks(
                 labeled_segment_column_unique_values, depth
             ):
                 for product in itertools.product(*subset):
-                    # pyrefly: ignore [bad-argument-type]
                     mask = _extract_masks(precomputed_masks, product, len(df_subset))
                     if mask.sum() >= min_samples_per_segment:
                         chunk[n_segments_in_chunk] = mask
@@ -222,7 +221,6 @@ def collapse_numeric_values(
         include_lowest=True,
         duplicates="drop",
     )
-    # pyrefly: ignore [bad-return]
     return transformed_values
 
 

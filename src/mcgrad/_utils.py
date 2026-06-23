@@ -172,7 +172,7 @@ def make_equisized_bins(
     upper_bound = max(1, predicted_scores.max())
     bins = np.array(
         sorted(
-            pd.qcut(  # pyrefly: ignore [missing-attribute]
+            pd.qcut(
                 predicted_scores, q=num_bins, duplicates="drop"
             ).categories.left.tolist()
         )
