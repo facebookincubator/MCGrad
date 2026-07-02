@@ -1333,7 +1333,7 @@ class _BaseMCGrad(
         :param data_train: The processed training data.
         :param data_val: Optional dedicated validation data. When provided, it
             is used for every fold instead of the split-off validation portion.
-        :returns: A tuple of ``(fold_splits, fold_data_train, fold_data_valid,
+        :return: A tuple of ``(fold_splits, fold_data_train, fold_data_valid,
             valid_metric_dfs, train_metric_dfs)``.
         """
         assert data_train.labels is not None
