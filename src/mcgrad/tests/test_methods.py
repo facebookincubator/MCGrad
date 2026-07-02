@@ -1275,6 +1275,20 @@ def test_predict_before_fit_with_numerical_features_raises(calibrator_class):
 @pytest.mark.parametrize(
     "calibrator_class",
     [
+        methods.PlattScaling,
+        methods.PlattScalingWithFeatures,
+    ],
+)
+def test_platt_scaling_predict_before_fit_raises(calibrator_class):
+    model = calibrator_class()
+    df = pd.DataFrame({"prediction": [0.3, 0.6], "label": [0, 1]})
+    with pytest.raises(ValueError, match="predict.*before fit"):
+        model.predict(df=df, prediction_column_name="prediction")
+
+
+@pytest.mark.parametrize(
+    "calibrator_class",
+    [
         methods.MCGrad,
         methods.RegressionMCGrad,
     ],
@@ -1612,7 +1626,8 @@ def test_early_stopping_stops_at_max_num_rounds(num_rounds: int, calibrator_clas
         early_stopping_score_func=wrap_sklearn_metric_func(dummy_score_func),
         early_stopping_minimize_score=False,
         save_training_performance=True,
-        lightgbm_params={"n_estimators": 1},
+        n_folds=2,
+        lightgbm_params={"n_estimators": 1, "num_leaves": 2, "max_depth": 2},
     )
     mcgrad.fit(
         df_train=df_train,
@@ -1671,7 +1686,7 @@ def test_fit_with_provided_df_val_runs_without_errors(calibrator_class, rng):
         early_stopping_minimize_score=False,
         early_stopping_use_crossvalidation=False,
         save_training_performance=True,
-        lightgbm_params={"n_estimators": 1},
+        lightgbm_params={"n_estimators": 1, "num_leaves": 2, "max_depth": 2},
     )
 
     mcgrad.fit(
@@ -1876,6 +1891,7 @@ def test_early_stopping_with_multicalibration_error_metric(
             numerical_segment_columns=["feature2"],
         ),
         early_stopping_minimize_score=True,
+        n_folds=2,
         lightgbm_params={"max_depth": 2, "n_estimators": 2},
     )
     mcgrad.fit(
@@ -2076,6 +2092,7 @@ def test_patience_in_mcgrad(patience: int, calibrator_class, rng):
         early_stopping_score_func=wrap_sklearn_metric_func(dummy_score_func),
         early_stopping_minimize_score=True,
         patience=patience,
+        n_folds=2,
         lightgbm_params={
             "num_leaves": 2,
             "n_estimators": 1,
