@@ -1333,7 +1333,7 @@ class _BaseMCGrad(
         :param data_train: The processed training data.
         :param data_val: Optional dedicated validation data. When provided, it
             is used for every fold instead of the split-off validation portion.
-        :returns: A tuple of ``(fold_splits, fold_data_train, fold_data_valid,
+        :return: A tuple of ``(fold_splits, fold_data_train, fold_data_valid,
             valid_metric_dfs, train_metric_dfs)``.
         """
         assert data_train.labels is not None
@@ -2245,6 +2245,11 @@ class MultiplicativeAdjustment(BaseCalibrator):
         :param kwargs: Additional keyword arguments
         :return: Array of calibrated predictions
         """
+        if self.multiplier is None:
+            raise ValueError(
+                f"predict() was called on {self.__class__.__name__} object before fit(). "
+                "It needs to be fit first."
+            )
         preds = df[prediction_column_name].values * self.multiplier
         if self.clip_to_zero_one:
             preds = np.clip(preds, 0, 1)
@@ -2329,6 +2334,11 @@ class AdditiveAdjustment(BaseCalibrator):
         :param kwargs: Additional keyword arguments
         :return: Array of calibrated predictions
         """
+        if self.offset is None:
+            raise ValueError(
+                f"predict() was called on {self.__class__.__name__} object before fit(). "
+                "It needs to be fit first."
+            )
         preds = df[prediction_column_name].values + self.offset
         if self.clip_to_zero_one:
             preds = np.clip(preds, 0, 1)
