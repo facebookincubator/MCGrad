@@ -1257,7 +1257,7 @@ def rank_multicalibration_error(
     num_bins: int = CALIBRATION_ERROR_NUM_BINS,
 ) -> float:
     """
-    Calculates rank calibration error for each segment.
+    Calculates the weighted average rank calibration error across all segments.
 
     :param labels: Array of true labels.
     :param predicted_labels: Array of predicted labels.
