@@ -4090,6 +4090,43 @@ def test_segmentwise_calibrator_fit_does_not_crash_on_empty_dataframe():
     assert len(preds) == 0
 
 
+def test_segmentwise_calibrator_second_fit_clears_stale_segments(rng):
+    df_first = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.2, 0.8, 60),
+            "label": rng.randint(0, 2, 60),
+            "segment": ["A"] * 30 + ["B"] * 30,
+        }
+    )
+    df_second = pd.DataFrame(
+        {
+            "prediction": rng.uniform(0.2, 0.8, 40),
+            "label": rng.randint(0, 2, 40),
+            "segment": ["A"] * 20 + ["C"] * 20,
+        }
+    )
+
+    calibrator = methods.SegmentwiseCalibrator(methods.PlattScaling)
+    calibrator.fit(
+        df_train=df_first,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["segment"],
+    )
+    assert "('B',)" in calibrator.calibrator_per_segment
+
+    calibrator.fit(
+        df_train=df_second,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["segment"],
+    )
+    # Segment B from the first fit must be gone after refitting
+    assert "('B',)" not in calibrator.calibrator_per_segment
+    assert "('A',)" in calibrator.calibrator_per_segment
+    assert "('C',)" in calibrator.calibrator_per_segment
+
+
 def test_mcgrad_subclass_defaults_missing_lightgbm_params():
     class SubMCGrad(methods._BaseMCGrad):
         DEFAULT_HYPERPARAMS = {
