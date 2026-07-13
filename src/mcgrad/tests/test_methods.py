@@ -4658,3 +4658,17 @@ def test_serialize_deserialize_roundtrip_holdout_early_stopping():
     )
     # HOLDOUT mode sets n_folds to 1 internally; the restored value should match.
     assert restored.n_folds == 1
+
+
+def test_multiplicative_adjustment_predict_before_fit_raises_error():
+    cal = methods.MultiplicativeAdjustment()
+    df = pd.DataFrame({"prediction": [0.1, 0.2, 0.3]})
+    with pytest.raises(ValueError, match="predict.*before fit"):
+        cal.predict(df, "prediction")
+
+
+def test_additive_adjustment_predict_before_fit_raises_error():
+    cal = methods.AdditiveAdjustment()
+    df = pd.DataFrame({"prediction": [0.1, 0.2, 0.3]})
+    with pytest.raises(ValueError, match="predict.*before fit"):
+        cal.predict(df, "prediction")
