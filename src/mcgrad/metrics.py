@@ -1520,7 +1520,8 @@ class MulticalibrationError(
             segmentation. Values are automatically quantile-binned.
         :param max_depth: Maximum depth of segment combinations. Depth 0 = global only,
             depth 1 = single features, depth 2 = pairs of features, etc. Higher depths
-            find more granular miscalibration but increase computation.
+            find more granular miscalibration but increase computation. Set to None to
+            consider all feature combinations up to the maximum possible depth.
         :param max_values_per_segment_feature: Maximum unique values per feature to
             consider. Features with more unique values are binned.
         :param min_samples_per_segment: Minimum samples required for a segment to be
