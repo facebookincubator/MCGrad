@@ -133,8 +133,8 @@ def make_equispaced_bins(
     :param predicted_scores: Array of predicted probability scores.
     :param num_bins: Number of bins to create.
     :param epsilon: Small offset applied to bin edges to ensure all values are captured.
-    :param set_range_to_zero_one: If True, bins span [0, 1]; otherwise, bins span
-        the min/max of predicted_scores.
+    :param set_range_to_zero_one: If True, bins span [0, max(1, predicted_scores.max())];
+        otherwise, bins span the min/max of predicted_scores.
     :return: Array of bin boundaries with length num_bins + 1.
     """
     upper_bound = max(1, predicted_scores.max())
