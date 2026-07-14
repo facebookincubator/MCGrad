@@ -2011,6 +2011,7 @@ class PlattScaling(BaseCalibrator):
 
     def __init__(self) -> None:
         self.log_reg: LogisticRegression | None = None
+        self._is_fitted: bool = False
 
     def fit(
         self,
@@ -2053,6 +2054,7 @@ class PlattScaling(BaseCalibrator):
                 )
                 log_reg.fit(logits, y, sample_weight=w)
             self.log_reg = log_reg
+        self._is_fitted = True
         return self
 
     def predict(
@@ -2074,6 +2076,11 @@ class PlattScaling(BaseCalibrator):
         :param kwargs: Additional keyword arguments
         :return: Array of calibrated predictions
         """
+        if not self._is_fitted:
+            raise ValueError(
+                f"predict() was called on {self.__class__.__name__} object before fit(). "
+                "It needs to be fit first."
+            )
         y_hat = df[prediction_column_name].values.astype(float)
 
         log_reg = self.log_reg
@@ -2424,6 +2431,7 @@ class PlattScalingWithFeatures(BaseCalibrator):
         self.ohe_columns: list[str] | None = None
         self.kbd_columns: list[str] | None = None
         self.features: list[str] | None = None
+        self._is_fitted: bool = False
 
     def _fit_feature_encoders(
         self,
@@ -2565,6 +2573,7 @@ class PlattScalingWithFeatures(BaseCalibrator):
             numerical_feature_column_names,
         )
         self.log_reg = log_reg
+        self._is_fitted = True
         return self
 
     def predict(
@@ -2588,6 +2597,11 @@ class PlattScalingWithFeatures(BaseCalibrator):
         :param kwargs: Additional keyword arguments
         :return: Array of calibrated predictions
         """
+        if not self._is_fitted:
+            raise ValueError(
+                f"predict() was called on {self.__class__.__name__} object before fit(). "
+                "It needs to be fit first."
+            )
         df = df.copy().reset_index().fillna(0)
 
         df = self._convert_df(
