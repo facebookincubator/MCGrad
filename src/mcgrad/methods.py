@@ -2698,7 +2698,7 @@ class SegmentwiseCalibrator(Generic[TCalibrator], BaseCalibrator):
         :param categorical_feature_column_names: List of column names in df_train that contain the categorical
             segmentation features (passed to individual calibrators)
         :param numerical_feature_column_names: List of column names in df_train that contain the numerical
-            segmentation features (passed to individual calibrators)
+            features passed to individual calibrators (not used for segment partitioning)
         :param kwargs: Additional keyword arguments
         :return: The fitted calibrator instance
         """
@@ -2741,7 +2741,7 @@ class SegmentwiseCalibrator(Generic[TCalibrator], BaseCalibrator):
         :param categorical_feature_column_names: List of column names in the df that contain the categorical
             segmentation features (must match the features used during training)
         :param numerical_feature_column_names: List of column names in the df that contain the numerical
-            segmentation features (must match the features used during training)
+            features passed to individual calibrators (must match the features used during training)
         :param kwargs: Additional keyword arguments
         :return: Array of calibrated predictions
         """

@@ -29,6 +29,11 @@ def groupby_apply(
     """
     Wrapper for DataFrame.groupby().apply() that handles the include_groups
     deprecation across pandas versions.
+
+    :param grouped: A grouped DataFrame returned by ``DataFrame.groupby()``.
+    :param func: Function to apply to each group.
+    :param kwargs: Additional keyword arguments forwarded to ``apply()``.
+    :return: Result of ``apply()``, either a DataFrame or a Series.
     """
     if _PANDAS_GROUPBY_INCLUDE_GROUPS:
         return grouped.apply(func, include_groups=False, **kwargs)
@@ -38,9 +43,12 @@ def groupby_apply(
 
 def create_kbins_discretizer(**kwargs: Any) -> KBinsDiscretizer:
     """
-    Factory for KBinsDiscretizer.
-    Enforces 'linear' method on newer sklearn versions to maintain
-    mathematical consistency with older versions and silence warnings.
+    Factory for KBinsDiscretizer that enforces the ``'linear'`` quantile
+    method on newer sklearn versions (>=1.6) to maintain mathematical
+    consistency with older versions and silence ``FutureWarning``.
+
+    :param kwargs: Keyword arguments forwarded to ``KBinsDiscretizer``.
+    :return: A configured ``KBinsDiscretizer`` instance.
     """
     kwargs = kwargs.copy()
 
