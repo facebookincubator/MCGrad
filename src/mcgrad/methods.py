@@ -2709,6 +2709,8 @@ class SegmentwiseCalibrator(Generic[TCalibrator], BaseCalibrator):
         if numerical_feature_column_names is None:
             numerical_feature_column_names = []
 
+        self.calibrator_per_segment = {}
+
         df_train = df_train.copy()
         df_train["segment"] = df_train[categorical_feature_column_names].apply(
             lambda row: repr(tuple(row.values)), axis=1
