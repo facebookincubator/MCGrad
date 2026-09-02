@@ -266,6 +266,81 @@ def test_tune_mcgrad_params_with_subset_of_parameters(
         assert param not in trial_results.columns
 
 
+def _tune_with_reference(model, df, reference):
+    _, trial_results = tune_mcgrad_params(
+        model=model,
+        df_train=df,
+        prediction_column_name="prediction",
+        label_column_name="label",
+        categorical_feature_column_names=["cat_feature"],
+        numerical_feature_column_names=["num_feature"],
+        n_trials=2,
+        reference_parameters=reference,
+    )
+    return trial_results
+
+
+@pytest.mark.arm64_incompatible
+def test_reference_parameters_are_evaluated_as_a_trial(sample_data, mock_mcgrad_model):
+    trial_results = _tune_with_reference(
+        mock_mcgrad_model, sample_data, {"learning_rate": 0.0123, "max_depth": 4}
+    )
+
+    referenced = trial_results[
+        np.isclose(trial_results["learning_rate"], 0.0123)
+        & (trial_results["max_depth"] == 4)
+    ]
+    assert len(referenced) == 1
+    # Tuned parameters absent from the reference are still searched.
+    assert {c.name for c in default_parameter_configurations}.issubset(
+        trial_results.columns
+    )
+
+
+@pytest.mark.arm64_incompatible
+def test_reference_parameters_outside_the_search_space_are_ignored(
+    sample_data, mock_mcgrad_model
+):
+    trial_results = _tune_with_reference(
+        mock_mcgrad_model,
+        sample_data,
+        {"learning_rate": 0.0123, "not_a_tuned_parameter": 99},
+    )
+
+    assert "not_a_tuned_parameter" not in trial_results.columns
+    assert np.isclose(trial_results["learning_rate"], 0.0123).any()
+
+
+@pytest.mark.arm64_incompatible
+def test_reference_parameters_are_not_mutated(sample_data, mock_mcgrad_model):
+    reference = {"learning_rate": 0.0123, "not_a_tuned_parameter": 99}
+    reference_before = dict(reference)
+
+    _tune_with_reference(mock_mcgrad_model, sample_data, reference)
+
+    assert reference == reference_before
+
+
+@pytest.mark.arm64_incompatible
+def test_seed_trial_is_identifiable_from_the_reference_values(
+    sample_data, mock_mcgrad_model
+):
+    # Callers identify the seed trial by matching the values they passed in
+    # against the returned trial results, to a tight relative tolerance. A
+    # round trip that perturbed a value by more than that would leave the seed
+    # trial unidentifiable while every other assertion here still held.
+    reference = {"learning_rate": 0.0123, "max_depth": 4}
+
+    trial_results = _tune_with_reference(mock_mcgrad_model, sample_data, reference)
+
+    is_reference = pd.Series(True, index=trial_results.index)
+    for name, value in reference.items():
+        target = float(value)
+        tolerance = 1e-9 * max(1.0, abs(target))
+        is_reference &= (trial_results[name].astype(float) - target).abs() <= tolerance
+    assert is_reference.sum() == 1
+
+
 def test_mcgrad_and_lightgbm_default_hyperparams_are_within_bounds_for_tuning(
     hyperparams_for_tuning,
 ):

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `reference_parameters` argument on `tune_mcgrad_params`: an optional configuration to seed the search with, for example the one currently deployed. It is evaluated as the first trial, so its score is comparable with every searched trial, and it is eligible to be returned as the best parameterization. Defaults to `None`, which preserves the previous default-only seeding.
 - `unjoined_ecce_sigma`: the standard-deviation-normalized `unjoined_ecce` (companion to `ecce_sigma` for unjoined data). The null standard deviation is estimated over the baseline (`label == 0`) rows; on the joined equivalent of the same data it returns exactly the same value as `ecce_sigma`.
 - `unjoined_ecce`: computes the Estimated Cumulative Calibration Error (ECCE / Kuiper calibration statistic) on data in "unjoined" format, where the per-instance baseline and positive events are logged as separate rows (as produced by `make_unjoined`) rather than joined per instance. Returns exactly the same value as `ecce` on the joined equivalent of the same data.
 

@@ -104,6 +104,53 @@ def _suppress_logger(logger: logging.Logger) -> Generator[None, None, None]:
         logger.setLevel(previous_level)
 
 
+def _build_initial_trial_parameters(
+    model: methods._BaseMCGrad,
+    parameter_configurations: list[RangeParameterConfig],
+    reference_parameters: dict[str, float | int] | None,
+) -> dict[str, float | int]:
+    """
+    Build the configuration for the seed trial evaluated before the search begins.
+
+    Every tuned parameter takes its MCGrad default, falling back to the LightGBM
+    default where MCGrad does not define one. Values in ``reference_parameters`` are
+    then overlaid for names that are being tuned; names outside the search space are
+    ignored, since attaching them as a trial would be rejected.
+
+    :param model: The model whose defaults seed the parameters being tuned.
+    :param parameter_configurations: The parameter configurations being tuned.
+    :param reference_parameters: An optional configuration to overlay onto the defaults.
+
+    :returns: The parameters for the seed trial, covering every tuned parameter.
+    """
+    initial_trial_parameters: dict[str, float | int] = {}
+    mcgrad_defaults = model.DEFAULT_HYPERPARAMS["lightgbm_params"]
+    for config in parameter_configurations:
+        if config.name in mcgrad_defaults:
+            initial_trial_parameters[config.name] = mcgrad_defaults[config.name]
+        else:
+            initial_trial_parameters[config.name] = ORIGINAL_LIGHTGBM_PARAMS[
+                config.name
+            ]
+
+    if reference_parameters is None:
+        return initial_trial_parameters
+
+    recognized = {
+        name: value
+        for name, value in reference_parameters.items()
+        if name in initial_trial_parameters
+    }
+    ignored = sorted(set(reference_parameters) - set(recognized))
+    if ignored:
+        logger.warning(
+            f"Ignoring reference parameters outside the search space: {ignored}"
+        )
+    initial_trial_parameters.update(recognized)
+
+    return initial_trial_parameters
+
+
 def tune_mcgrad_params(
     model: methods._BaseMCGrad,
     df_train: pd.DataFrame,
@@ -119,6 +166,7 @@ def tune_mcgrad_params(
     pass_df_val_into_tuning: bool = False,
     pass_df_val_into_final_fit: bool = False,
     use_model_predictions: bool = False,
+    reference_parameters: dict[str, float | int] | None = None,
     # @oss-disable[end= ]: _telemetry_overrides: dict[str, Any] | None = None,
 ) -> tuple[methods._BaseMCGrad | None, pd.DataFrame]:
     """
@@ -142,6 +190,16 @@ def tune_mcgrad_params(
     :param use_model_predictions: Whether to return the surrogate model's predicted best
            (True) or the actual best observed trial (False). Defaults to False, which is
            safer when running few trials.
+    :param reference_parameters: An optional configuration to seed the search with, for
+           example the configuration currently deployed or one found by a previous, deeper
+           search. Values are overlaid onto the default seed for parameter names that are
+           being tuned; names outside the search space are ignored, and names absent from
+           this mapping keep their default. Defaults to None, which seeds from defaults only.
+
+           Two consequences worth noting. The seed is evaluated as the first trial, so its
+           score is directly comparable with every searched trial on the same data. It is
+           also a completed trial, which means it is eligible to be returned as the best
+           parameterization when it outperforms everything the search finds.
 
     :returns: A tuple containing:
         - The fitted MCGrad model with the best hyperparameters found during tuning.
@@ -257,26 +315,16 @@ def tune_mcgrad_params(
         initialization_budget=initialization_budget,
     )
 
-    # Construct a set of parameters for the first trial which contains the defaults for every parameter that is tuned.
-    # If a default is not available use the LightGBM default
-    initial_trial_parameters: dict[str, float | int] = {}
-    mcgrad_defaults = model.DEFAULT_HYPERPARAMS["lightgbm_params"]
-    for config in parameter_configurations:
-        if config.name in mcgrad_defaults:
-            initial_trial_parameters[config.name] = mcgrad_defaults[config.name]
-        else:
-            initial_trial_parameters[config.name] = ORIGINAL_LIGHTGBM_PARAMS[
-                config.name
-            ]
-
-    logger.info(
-        f"Adding initial configuration from defaults to trials: {initial_trial_parameters}"
+    initial_trial_parameters = _build_initial_trial_parameters(
+        model=model,
+        parameter_configurations=parameter_configurations,
+        reference_parameters=reference_parameters,
     )
 
+    logger.info(f"Adding initial configuration to trials: {initial_trial_parameters}")
+
     with _suppress_logger(methods.logger):
-        # Attach and complete the initial trial with default hyperparameters.
-        # Note that we're only using the defaults for the parameters that are being tuned.
-        # That is, this configuration does not necessarily correspond to the out-of-the-box defaults.
+        # Attach and complete the seed trial before the search begins.
         initial_trial_index = ax_client.attach_trial(
             parameters=initial_trial_parameters
         )
