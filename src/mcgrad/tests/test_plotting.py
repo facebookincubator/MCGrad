@@ -4,21 +4,24 @@
 # LICENSE file in the root directory of this source tree.
 # pyre-unsafe
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import pytest
+from numpy import typing as npt
 
 from .. import methods, metrics, plotting
 
 
 @pytest.fixture
-def rng():
+def rng() -> np.random.RandomState:
     return np.random.RandomState(42)
 
 
 @pytest.fixture
-def sample_data(rng):
+def sample_data(rng: np.random.RandomState) -> dict[str, npt.NDArray]:
     """Fixture providing sample classification data for plotting tests."""
     n_samples = 100
     return {
@@ -29,7 +32,7 @@ def sample_data(rng):
 
 
 @pytest.fixture
-def sample_df(rng):
+def sample_df(rng: np.random.RandomState) -> pd.DataFrame:
     """Fixture providing a DataFrame with segment information."""
     n_cat_fts = 2
     n_num_fts = 2
@@ -57,7 +60,7 @@ def sample_df(rng):
 
 
 @pytest.fixture
-def mce_with_all_segments(sample_df):
+def mce_with_all_segments(sample_df: pd.DataFrame) -> metrics.MulticalibrationError:
     """Fixture providing MulticalibrationError with categorical and numerical segments."""
     return metrics.MulticalibrationError(
         df=sample_df,
@@ -69,7 +72,9 @@ def mce_with_all_segments(sample_df):
     )
 
 
-def test_plot_segment_calibration_errors_basic(mce_with_all_segments):
+def test_plot_segment_calibration_errors_basic(
+    mce_with_all_segments: metrics.MulticalibrationError,
+) -> None:
     fig = plotting.plot_segment_calibration_errors(
         mce=mce_with_all_segments, quantity="segments_ecce_sigma"
     )
@@ -91,11 +96,14 @@ def test_plot_segment_calibration_errors_quantities(
 
 
 def test_plot_segment_calibration_errors_raises_on_invalid_quantity(
-    mce_with_all_segments,
-):
+    mce_with_all_segments: metrics.MulticalibrationError,
+) -> None:
     with pytest.raises(ValueError, match="Invalid quantity"):
         plotting.plot_segment_calibration_errors(
-            mce=mce_with_all_segments, quantity="invalid_quantity"
+            mce=mce_with_all_segments,
+            # Deliberately outside SegmentQuantity to exercise the runtime check.
+            # pyrefly: ignore [bad-argument-type]
+            quantity="invalid_quantity",
         )
 
 
@@ -109,7 +117,9 @@ def test_plot_segment_calibration_errors_raises_on_invalid_quantity(
     ],
     ids=["basic", "with_weights", "equisized", "incomplete_cis"],
 )
-def test_plot_global_calibration_curve(sample_df, kwargs):
+def test_plot_global_calibration_curve(
+    sample_df: pd.DataFrame, kwargs: dict[str, Any]
+) -> None:
     fig = plotting.plot_global_calibration_curve(
         data=sample_df,
         score_col="prediction",
@@ -120,12 +130,16 @@ def test_plot_global_calibration_curve(sample_df, kwargs):
     assert fig is not None
 
 
-def test_plot_global_calibration_curve_invalid_binning_raises_error(sample_df):
+def test_plot_global_calibration_curve_invalid_binning_raises_error(
+    sample_df: pd.DataFrame,
+) -> None:
     with pytest.raises(ValueError, match="Invalid binning_method"):
         plotting.plot_global_calibration_curve(
             data=sample_df,
             score_col="prediction",
             label_col="label",
+            # Deliberately outside BinningMethod to exercise the runtime check.
+            # pyrefly: ignore [bad-argument-type]
             binning_method="invalid",
         )
 
@@ -139,7 +153,9 @@ def test_plot_global_calibration_curve_invalid_binning_raises_error(sample_df):
     ],
     ids=["basic", "with_weights", "equisized"],
 )
-def test_plot_calibration_curve_by_segment(sample_df, kwargs):
+def test_plot_calibration_curve_by_segment(
+    sample_df: pd.DataFrame, kwargs: dict[str, Any]
+) -> None:
     fig = plotting.plot_calibration_curve_by_segment(
         data=sample_df,
         group_var="segment_A_0",
@@ -151,7 +167,7 @@ def test_plot_calibration_curve_by_segment(sample_df, kwargs):
     assert fig is not None
 
 
-def test_plot_calibration_curve_by_segment_empty_data():
+def test_plot_calibration_curve_by_segment_empty_data() -> None:
     empty_df = pd.DataFrame({"group": [], "score": [], "label": []})
 
     fig = plotting.plot_calibration_curve_by_segment(
@@ -166,7 +182,7 @@ def test_plot_calibration_curve_by_segment_empty_data():
 
 
 @pytest.fixture
-def mcgrad_training_df(rng):
+def mcgrad_training_df(rng: np.random.RandomState) -> pd.DataFrame:
     """Fixture providing training data for MCGrad model tests."""
     n_samples = 50
     return pd.DataFrame(
@@ -230,7 +246,9 @@ def test_plot_learning_curve_with_show_all(mcgrad_training_df: pd.DataFrame) -> 
     assert fig is not None
 
 
-def test_plot_global_calibration_curve_does_not_modify_input_dataframe(sample_df):
+def test_plot_global_calibration_curve_does_not_modify_input_dataframe(
+    sample_df: pd.DataFrame,
+) -> None:
     df_original = sample_df.copy()
 
     _ = plotting.plot_global_calibration_curve(
@@ -244,7 +262,9 @@ def test_plot_global_calibration_curve_does_not_modify_input_dataframe(sample_df
     pd.testing.assert_frame_equal(sample_df, df_original)
 
 
-def test_plot_calibration_curve_by_segment_does_not_modify_input_dataframe(sample_df):
+def test_plot_calibration_curve_by_segment_does_not_modify_input_dataframe(
+    sample_df: pd.DataFrame,
+) -> None:
     df_original = sample_df.copy()
 
     _ = plotting.plot_calibration_curve_by_segment(
@@ -259,7 +279,9 @@ def test_plot_calibration_curve_by_segment_does_not_modify_input_dataframe(sampl
     pd.testing.assert_frame_equal(sample_df, df_original)
 
 
-def test_plot_calibration_curve_by_segment_with_integer_groups(rng):
+def test_plot_calibration_curve_by_segment_with_integer_groups(
+    rng: np.random.RandomState,
+) -> None:
     n_samples = 100
     expected_groups = [1, 2, 3]
 
