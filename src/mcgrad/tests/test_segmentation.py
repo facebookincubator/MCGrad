@@ -4,20 +4,25 @@
 # LICENSE file in the root directory of this source tree.
 # pyre-unsafe
 
+from collections.abc import Generator
+
 import numpy as np
 import pandas as pd
 import pytest
+from numpy import typing as npt
 
 from .. import _segmentation as segmentation
 
 
-def _count_segments(generator):
+def _count_segments(
+    generator: Generator[tuple[npt.NDArray[np.bool_], int, pd.DataFrame], None, None],
+) -> tuple[npt.NDArray[np.bool_], int]:
     first_chunk = next(generator)[0]
     segment_count = np.count_nonzero(first_chunk.sum(axis=1))
     return first_chunk, segment_count
 
 
-def test_that_get_segment_masks_returns_full_data_at_depth_zero():
+def test_that_get_segment_masks_returns_full_data_at_depth_zero() -> None:
     test_df = pd.DataFrame(
         {
             "segment_A": [0, 0, 1, 1, 0, 1, 1, 1, 0, 0],
@@ -52,7 +57,7 @@ def test_that_get_segment_masks_works_as_expected_with_nans() -> None:
     assert np.array_equal(np.where(masks[3])[0], np.array([2]))
 
 
-def test_that_get_segment_masks_works_with_single_segment_feature():
+def test_that_get_segment_masks_works_with_single_segment_feature() -> None:
     test_df = pd.DataFrame(
         {
             "segment_A": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
@@ -73,7 +78,9 @@ def test_that_get_segment_masks_works_with_single_segment_feature():
     assert num_segments == (max_values_per_segment_feature + 1)
 
 
-def test_that_get_segment_masks_returns_correct_number_of_segments_when_using_min_depth():
+def test_that_get_segment_masks_returns_correct_number_of_segments_when_using_min_depth() -> (
+    None
+):
     test_df = pd.DataFrame({"segment_A": ["a", "b"]})
     generator = segmentation.get_segment_masks(
         test_df,
@@ -101,7 +108,9 @@ def test_that_get_segment_masks_returns_whole_dataset_if_no_features_are_specifi
     assert np.array_equal(np.where(masks[0])[0], np.array([0, 1]))
 
 
-def test_that_get_segment_masks_works_as_expected_with_nans_in_numerical_feature():
+def test_that_get_segment_masks_works_as_expected_with_nans_in_numerical_feature() -> (
+    None
+):
     # Expected behavior is that NaN values are treated as a separate segment
     df = pd.DataFrame({"segment_A": [0.1, None, 0.3, None, 0.4, 0.5, 0.6]})
     generator = segmentation.get_segment_masks(
@@ -121,7 +130,7 @@ def test_that_get_segment_masks_works_as_expected_with_nans_in_numerical_feature
     assert np.array_equal(np.where(masks[3])[0], np.array([5, 6]))
 
 
-def test_that_get_segment_masks_collapses_numerical_feature_correctly():
+def test_that_get_segment_masks_collapses_numerical_feature_correctly() -> None:
     test_df = pd.DataFrame({"segment_A": [0.1, 0.2, 0.3, 0.7, 0.8, 0.9]})
     generator = segmentation.get_segment_masks(
         test_df,
@@ -155,7 +164,9 @@ def test_that_get_segment_masks_collapses_categorical_feature_correctly() -> Non
     assert np.array_equal(np.where(masks[3])[0], np.array([4, 5]))
 
 
-def test_that_get_segment_masks_collapses_categorical_feature_correctly_when_missing_values_exist():
+def test_that_get_segment_masks_collapses_categorical_feature_correctly_when_missing_values_exist() -> (
+    None
+):
     test_df = pd.DataFrame({"segment_A": ["a", "a", None, None, "c", "d"]})
     generator = segmentation.get_segment_masks(
         test_df,
@@ -173,7 +184,7 @@ def test_that_get_segment_masks_collapses_categorical_feature_correctly_when_mis
     assert np.array_equal(np.where(masks[3])[0], np.array([4, 5]))
 
 
-def test_that_get_segment_masks_returns_correct_number_of_segments():
+def test_that_get_segment_masks_returns_correct_number_of_segments() -> None:
     test_df = pd.DataFrame(
         {
             "segment_A": ["a", "a", "a", "b", "b", "b"],
@@ -195,7 +206,9 @@ def test_that_get_segment_masks_returns_correct_number_of_segments():
     assert num_segments == expected_n_segments
 
 
-def test_that_collapse_infrequent_values_is_identity_when_unique_values_lt_max_values():
+def test_that_collapse_infrequent_values_is_identity_when_unique_values_lt_max_values() -> (
+    None
+):
     test_array = pd.Series(["a", "a", "b", "c"])
     results = segmentation.collapse_infrequent_values(test_array, max_unique_values=4)
     assert np.array_equal(results, test_array)
@@ -254,7 +267,7 @@ def test_that_collapse_infrequent_values_collapses_all_values_to_collapse_value_
 )
 def test_that_collapse_infrequent_values_collapses_correctly_for_happy_path(
     test_array, expected
-):
+) -> None:
     results = segmentation.collapse_infrequent_values(
         values=test_array,
         max_unique_values=2,
@@ -262,25 +275,29 @@ def test_that_collapse_infrequent_values_collapses_correctly_for_happy_path(
     assert np.array_equal(results, expected)
 
 
-def test_that_collapse_numeric_values_returns_identity_for_unique_values_lt_max_values():
+def test_that_collapse_numeric_values_returns_identity_for_unique_values_lt_max_values() -> (
+    None
+):
     test_array = pd.Series([0.1, 0.2, 0.3, 0.4])
     results = segmentation.collapse_numeric_values(test_array, max_unique_values=4)
     assert np.array_equal(results, test_array)
 
 
-def test_that_collapse_numeric_values_returns_identity_for_unique_values_lt_max_values_when_missing_values_exist():
+def test_that_collapse_numeric_values_returns_identity_for_unique_values_lt_max_values_when_missing_values_exist() -> (
+    None
+):
     test_array = pd.Series([0.1, 0.2, None, 0.4])
     results = segmentation.collapse_numeric_values(test_array, max_unique_values=4)
     assert np.array_equal(results, test_array, equal_nan=True)
 
 
-def test_that_collapse_numeric_values_returns_correct_number_of_values():
+def test_that_collapse_numeric_values_returns_correct_number_of_values() -> None:
     test_array = pd.Series([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     results = segmentation.collapse_numeric_values(test_array, max_unique_values=3)
     assert len(np.unique(results)) == 3
 
 
-def test_that_collapse_numeric_values_missing_values_do_not_affect_other_rows():
+def test_that_collapse_numeric_values_missing_values_do_not_affect_other_rows() -> None:
     test_array = pd.Series([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     test_array_with_nan = pd.Series([None, 1, 2, 3, 4, None, 5, 6, 7, 8, 9, 10, None])
     result_without_nan = segmentation.collapse_numeric_values(
@@ -295,14 +312,16 @@ def test_that_collapse_numeric_values_missing_values_do_not_affect_other_rows():
     )
 
 
-def test_that_collapse_numeric_values_returns_correct_number_of_values_with_max_values_1():
+def test_that_collapse_numeric_values_returns_correct_number_of_values_with_max_values_1() -> (
+    None
+):
     test_array = pd.Series([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     results = segmentation.collapse_numeric_values(test_array, max_unique_values=1)
     assert len(np.unique(results)) == 1
     assert np.array_equal(results, np.array([0] * len(test_array)))
 
 
-def test_that_get_segment_masks_works_with_arbitrary_input_index():
+def test_that_get_segment_masks_works_with_arbitrary_input_index() -> None:
     test_df = pd.DataFrame(
         {"segment_A": ["a", "a", "b", "b", "c", "d"]},
         index=pd.Index([3, 5, 2, 0, 4, 1]),
@@ -323,7 +342,9 @@ def test_that_get_segment_masks_works_with_arbitrary_input_index():
     assert np.array_equal(np.where(masks[4])[0], np.array([5]))  # segment_A = 'd'
 
 
-def test_that_get_segment_masks_works_with_arbitrary_input_index_when_missing_values_exist():
+def test_that_get_segment_masks_works_with_arbitrary_input_index_when_missing_values_exist() -> (
+    None
+):
     test_df = pd.DataFrame(
         {"segment_A": ["a", "a", None, None, "c", "d"]},
         index=pd.Index([3, 5, 2, 0, 4, 1]),
@@ -344,8 +365,13 @@ def test_that_get_segment_masks_works_with_arbitrary_input_index_when_missing_va
     assert np.array_equal(np.where(masks[4])[0], np.array([5]))  # segment_A = 'd'
 
 
-def test_extract_masks_returns_empty_mask_when_key_not_found():
-    precomputed_masks = {("column_A", "value1"): np.array([True, False, True])}
+def test_extract_masks_returns_empty_mask_when_key_not_found() -> None:
+    # Annotated explicitly because dict is invariant in its key type: the inferred
+    # dict[tuple[str, str], ...] would not be assignable to the wider key type
+    # _extract_masks declares.
+    precomputed_masks: dict[tuple[str, int | float | str], npt.NDArray[np.bool_]] = {
+        ("column_A", "value1"): np.array([True, False, True])
+    }
     selected_values = (("value2", "column_A"),)
     df_length = 3
 
@@ -356,7 +382,7 @@ def test_extract_masks_returns_empty_mask_when_key_not_found():
     assert np.array_equal(result, expected)
 
 
-def test_concat_feature_values_with_non_empty_dataframes():
+def test_concat_feature_values_with_non_empty_dataframes() -> None:
     df1 = pd.DataFrame({"segment_column": ["A"], "value": [1], "idx_segment": [0]})
     df2 = pd.DataFrame({"segment_column": ["B"], "value": [2], "idx_segment": [1]})
 
@@ -368,7 +394,7 @@ def test_concat_feature_values_with_non_empty_dataframes():
     assert result["idx_segment"].tolist() == [0, 1]
 
 
-def test_concat_feature_values_with_empty_list():
+def test_concat_feature_values_with_empty_list() -> None:
     result = segmentation._concat_feature_values([])
 
     assert result.empty
@@ -385,7 +411,7 @@ def test_concat_feature_values_with_all_empty_dataframes() -> None:
     assert list(result.columns) == ["segment_column", "value", "idx_segment"]
 
 
-def test_concat_feature_values_with_mixed_empty_and_non_empty():
+def test_concat_feature_values_with_mixed_empty_and_non_empty() -> None:
     empty_df = pd.DataFrame(columns=["segment_column", "value", "idx_segment"])
     non_empty_df = pd.DataFrame(
         {"segment_column": ["A", "B"], "value": [1, 2], "idx_segment": [0, 0]}
@@ -397,7 +423,7 @@ def test_concat_feature_values_with_mixed_empty_and_non_empty():
     assert result["segment_column"].tolist() == ["A", "B"]
 
 
-def test_get_segment_masks_does_not_modify_input_dataframe():
+def test_get_segment_masks_does_not_modify_input_dataframe() -> None:
     df = pd.DataFrame(
         {
             "segment_A": ["a", "a", "b", "b", "c", "d"],
@@ -420,7 +446,9 @@ def test_get_segment_masks_does_not_modify_input_dataframe():
     pd.testing.assert_frame_equal(df, df_original)
 
 
-def test_get_segment_masks_does_not_modify_input_dataframe_with_missing_values():
+def test_get_segment_masks_does_not_modify_input_dataframe_with_missing_values() -> (
+    None
+):
     df = pd.DataFrame(
         {
             "segment_A": ["a", "a", None, None, "c", "d"],
@@ -443,7 +471,7 @@ def test_get_segment_masks_does_not_modify_input_dataframe_with_missing_values()
     pd.testing.assert_frame_equal(df, df_original)
 
 
-def test_collapse_infrequent_values_does_not_modify_input_series():
+def test_collapse_infrequent_values_does_not_modify_input_series() -> None:
     values = pd.Series(["a", "a", "b", "c", "d", "e"])
     values_original = values.copy()
 
@@ -452,7 +480,7 @@ def test_collapse_infrequent_values_does_not_modify_input_series():
     pd.testing.assert_series_equal(values, values_original)
 
 
-def test_collapse_numeric_values_does_not_modify_input_series():
+def test_collapse_numeric_values_does_not_modify_input_series() -> None:
     values = pd.Series([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
     values_original = values.copy()
 
@@ -461,7 +489,9 @@ def test_collapse_numeric_values_does_not_modify_input_series():
     pd.testing.assert_series_equal(values, values_original)
 
 
-def test_collapse_numeric_values_does_not_modify_input_series_with_missing_values():
+def test_collapse_numeric_values_does_not_modify_input_series_with_missing_values() -> (
+    None
+):
     values = pd.Series([0.1, None, 0.3, None, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
     values_original = values.copy()
 
@@ -470,7 +500,7 @@ def test_collapse_numeric_values_does_not_modify_input_series_with_missing_value
     pd.testing.assert_series_equal(values, values_original)
 
 
-def test_replace_missing_values_does_not_modify_input_dataframe():
+def test_replace_missing_values_does_not_modify_input_dataframe() -> None:
     df = pd.DataFrame(
         {
             "cat_col": ["a", None, "b", None],
