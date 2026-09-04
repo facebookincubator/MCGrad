@@ -25,12 +25,12 @@ TUNING_MODULE = tuning_module.__name__
 
 
 @pytest.fixture
-def rng():
+def rng() -> np.random.RandomState:
     return np.random.RandomState(42)
 
 
 @pytest.fixture
-def sample_data(rng):
+def sample_data(rng) -> pd.DataFrame:
     n_samples = 50
 
     df = pd.DataFrame(
@@ -47,7 +47,7 @@ def sample_data(rng):
 
 
 @pytest.fixture
-def sample_val_data(rng):
+def sample_val_data(rng) -> pd.DataFrame:
     n_samples = 30
     return pd.DataFrame(
         {
@@ -61,7 +61,7 @@ def sample_val_data(rng):
 
 
 @pytest.fixture
-def mock_mcgrad_model(rng):
+def mock_mcgrad_model(rng) -> Mock:
     model = Mock(spec=methods.MCGrad)
     model.predict = Mock(
         side_effect=lambda df, **kwargs: rng.uniform(0.1, 0.9, len(df))
@@ -76,7 +76,7 @@ def mock_mcgrad_model(rng):
 
 
 @pytest.fixture
-def hyperparams_for_tuning():
+def hyperparams_for_tuning() -> tuple[dict[str, Any], dict[str, Any]]:
     default_hyperparams = methods.MCGrad().DEFAULT_HYPERPARAMS
     lightgbm_params = default_hyperparams["lightgbm_params"]
     return default_hyperparams, lightgbm_params
@@ -86,7 +86,7 @@ def hyperparams_for_tuning():
 def test_tune_mcgrad_params_with_weights(
     sample_data,
     mock_mcgrad_model,
-):
+) -> None:
     result_model, trial_results = tune_mcgrad_params(
         model=mock_mcgrad_model,
         df_train=sample_data,
@@ -118,7 +118,7 @@ def test_tune_mcgrad_params_with_weights(
 def test_tune_mcgrad_params_without_weights(
     sample_data,
     mock_mcgrad_model,
-):
+) -> None:
     result_model, trial_results = tune_mcgrad_params(
         model=mock_mcgrad_model,
         df_train=sample_data,
@@ -176,7 +176,7 @@ def test_tune_mcgrad_params_default_parameters(
 def test_tune_mcgrad_params_ax_client_setup(
     sample_data,
     mock_mcgrad_model,
-):
+) -> None:
     result_model, trial_results = tune_mcgrad_params(
         model=mock_mcgrad_model,
         df_train=sample_data,
@@ -201,7 +201,7 @@ def test_tune_mcgrad_params_data_splitting(
     rng,
     sample_data,
     mock_mcgrad_model,
-):
+) -> None:
     # Setup mock to return specific train/val splits using sklearn's splitter
     train_data, val_data = train_test_split(
         sample_data, test_size=0.2, random_state=rng
@@ -230,7 +230,7 @@ def test_tune_mcgrad_params_data_splitting(
 @pytest.mark.arm64_incompatible
 def test_tune_mcgrad_params_with_subset_of_parameters(
     sample_data,
-):
+) -> None:
     model = methods.MCGrad()
 
     subset_params = ["learning_rate", "max_depth"]
@@ -266,7 +266,7 @@ def test_tune_mcgrad_params_with_subset_of_parameters(
         assert param not in trial_results.columns
 
 
-def _tune_with_reference(model, df, reference):
+def _tune_with_reference(model, df, reference) -> pd.DataFrame:
     _, trial_results = tune_mcgrad_params(
         model=model,
         df_train=df,
@@ -281,7 +281,9 @@ def _tune_with_reference(model, df, reference):
 
 
 @pytest.mark.arm64_incompatible
-def test_reference_parameters_are_evaluated_as_a_trial(sample_data, mock_mcgrad_model):
+def test_reference_parameters_are_evaluated_as_a_trial(
+    sample_data, mock_mcgrad_model
+) -> None:
     trial_results = _tune_with_reference(
         mock_mcgrad_model, sample_data, {"learning_rate": 0.0123, "max_depth": 4}
     )
@@ -300,7 +302,7 @@ def test_reference_parameters_are_evaluated_as_a_trial(sample_data, mock_mcgrad_
 @pytest.mark.arm64_incompatible
 def test_reference_parameters_outside_the_search_space_are_ignored(
     sample_data, mock_mcgrad_model
-):
+) -> None:
     trial_results = _tune_with_reference(
         mock_mcgrad_model,
         sample_data,
@@ -312,7 +314,7 @@ def test_reference_parameters_outside_the_search_space_are_ignored(
 
 
 @pytest.mark.arm64_incompatible
-def test_reference_parameters_are_not_mutated(sample_data, mock_mcgrad_model):
+def test_reference_parameters_are_not_mutated(sample_data, mock_mcgrad_model) -> None:
     reference = {"learning_rate": 0.0123, "not_a_tuned_parameter": 99}
     reference_before = dict(reference)
 
@@ -324,7 +326,7 @@ def test_reference_parameters_are_not_mutated(sample_data, mock_mcgrad_model):
 @pytest.mark.arm64_incompatible
 def test_seed_trial_is_identifiable_from_the_reference_values(
     sample_data, mock_mcgrad_model
-):
+) -> None:
     # Callers identify the seed trial by matching the values they passed in
     # against the returned trial results, to a tight relative tolerance. A
     # round trip that perturbed a value by more than that would leave the seed
@@ -343,7 +345,7 @@ def test_seed_trial_is_identifiable_from_the_reference_values(
 
 def test_mcgrad_and_lightgbm_default_hyperparams_are_within_bounds_for_tuning(
     hyperparams_for_tuning,
-):
+) -> None:
     _, lightgbm_params = hyperparams_for_tuning
 
     for config in default_parameter_configurations:
@@ -372,7 +374,7 @@ def test_mcgrad_and_lightgbm_default_hyperparams_are_within_bounds_for_tuning(
 @pytest.mark.arm64_incompatible
 def test_warm_starting_trials_produces_the_right_number_of_sobol_and_bayesian_trials(
     rng,
-):
+) -> None:
     df_train = pd.DataFrame(
         {
             "feature1": rng.randint(0, 3, 20),
@@ -435,7 +437,7 @@ def test_warm_starting_trials_produces_the_right_number_of_sobol_and_bayesian_tr
 
 
 # Tests for RangeParameterConfig usage
-def test_range_parameter_config_float_with_log_scale():
+def test_range_parameter_config_float_with_log_scale() -> None:
     config = RangeParameterConfig(
         name="learning_rate",
         bounds=(0.01, 0.3),
@@ -449,7 +451,7 @@ def test_range_parameter_config_float_with_log_scale():
     assert config.scaling == "log"
 
 
-def test_range_parameter_config_int_without_log_scale():
+def test_range_parameter_config_int_without_log_scale() -> None:
     config = RangeParameterConfig(
         name="max_depth",
         bounds=(2.0, 15.0),
@@ -463,7 +465,7 @@ def test_range_parameter_config_int_without_log_scale():
     assert config.scaling == "linear"
 
 
-def test_all_default_configs_are_range_parameter_configs():
+def test_all_default_configs_are_range_parameter_configs() -> None:
     for config in default_parameter_configurations:
         assert isinstance(config, RangeParameterConfig)
         assert config.name is not None
@@ -604,7 +606,7 @@ def test_tuning_selects_parameters_with_lowest_score(
 @pytest.mark.arm64_incompatible
 def test_non_default_parameters_preserved_when_not_in_tuning_configurations(
     sample_data,
-):
+) -> None:
     non_default_params = {
         "learning_rate": 0.05,
         "max_depth": 8,
@@ -636,6 +638,7 @@ def test_non_default_parameters_preserved_when_not_in_tuning_configurations(
         parameter_configurations=parameter_configs,
     )
 
+    assert result_model is not None
     assert result_model.lightgbm_params["learning_rate"] == 0.05
     assert result_model.lightgbm_params["max_depth"] == 8
     assert result_model.lightgbm_params["lambda_l2"] == 5.0
@@ -648,7 +651,7 @@ def test_tune_mcgrad_params_with_explicit_validation_set(
     sample_data,
     sample_val_data,
     mock_mcgrad_model,
-):
+) -> None:
     tune_mcgrad_params(
         model=mock_mcgrad_model,
         df_train=sample_data,
@@ -683,7 +686,7 @@ def test_tune_mcgrad_params_fallback_to_train_test_split(
     rng,
     sample_data,
     mock_mcgrad_model,
-):
+) -> None:
     """Test that when df_val is None, train_test_split is used."""
     # Setup mock to return specific train/val splits using sklearn's splitter
     train_data, val_data = train_test_split(
@@ -728,7 +731,7 @@ def test_tune_mcgrad_params_pass_df_val_into_tuning_true(
     sample_data,
     sample_val_data,
     mock_mcgrad_model,
-):
+) -> None:
     """Test that df_val is passed to model.fit during tuning when pass_df_val_into_tuning=True."""
     tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -761,7 +764,7 @@ def test_tune_mcgrad_params_pass_df_val_into_tuning_false(
     sample_data,
     sample_val_data,
     mock_mcgrad_model,
-):
+) -> None:
     """Test that df_val is not passed to model.fit during tuning when pass_df_val_into_tuning=False."""
     tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -820,7 +823,7 @@ def test_tune_mcgrad_params_pass_df_val_into_final_fit_false(
     sample_data,
     sample_val_data,
     mock_mcgrad_model,
-):
+) -> None:
     """Test that df_val is not passed to model.fit during final fit when pass_df_val_into_final_fit=False."""
     tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -846,7 +849,7 @@ def test_tune_mcgrad_params_pass_df_val_into_both_tuning_and_final_fit(
     sample_data,
     sample_val_data,
     mock_mcgrad_model,
-):
+) -> None:
     """Test that df_val is passed to both tuning and final fit when both flags are True."""
     tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -883,7 +886,7 @@ def test_tune_mcgrad_params_df_val_passing_defaults_to_false(
     mock_mcgrad_model,
     pass_df_val_into_tuning,
     pass_df_val_into_final_fit,
-):
+) -> None:
     """Test all combinations of pass_df_val_into_tuning and pass_df_val_into_final_fit flags."""
     tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -917,7 +920,7 @@ def test_tune_mcboost_params_does_not_modify_input_dataframes(
     sample_data,
     sample_val_data,
     mock_mcgrad_model,
-):
+) -> None:
     df_train_original = sample_data.copy()
     df_val_original = sample_val_data.copy()
 
@@ -944,7 +947,7 @@ def test_tune_mcboost_params_does_not_modify_input_dataframe_when_no_df_val(
     rng,
     sample_data,
     mock_mcgrad_model,
-):
+) -> None:
     train_data, val_data = train_test_split(
         sample_data, test_size=0.2, random_state=rng
     )
@@ -971,7 +974,7 @@ def test_tune_mcboost_params_does_not_modify_input_dataframe_when_no_df_val(
 
 
 @pytest.fixture
-def regression_sample_data(rng):
+def regression_sample_data(rng) -> pd.DataFrame:
     n_samples = 50
     return pd.DataFrame(
         {
@@ -984,7 +987,7 @@ def regression_sample_data(rng):
 
 
 @pytest.fixture
-def regression_val_data(rng):
+def regression_val_data(rng) -> pd.DataFrame:
     n_samples = 30
     return pd.DataFrame(
         {
@@ -997,7 +1000,7 @@ def regression_val_data(rng):
 
 
 @pytest.fixture
-def mock_regression_model(rng):
+def mock_regression_model(rng) -> Mock:
     model = Mock(spec=methods.RegressionMCGrad)
     model.predict = Mock(
         side_effect=lambda df, **kwargs: rng.uniform(0.0, 10.0, len(df))
@@ -1016,7 +1019,7 @@ def test_tune_mcgrad_params_with_regression_model_returns_trial_results(
     regression_sample_data,
     regression_val_data,
     mock_regression_model,
-):
+) -> None:
     result_model, trial_results = tune_mcgrad_params(
         model=mock_regression_model,
         df_train=regression_sample_data,
@@ -1065,7 +1068,7 @@ def test_regression_model_does_not_stratify(
     rng,
     regression_sample_data,
     mock_regression_model,
-):
+) -> None:
     train_data, val_data = train_test_split(
         regression_sample_data, test_size=0.2, random_state=rng
     )
@@ -1093,7 +1096,7 @@ def test_classification_model_does_stratify(
     rng,
     sample_data,
     mock_mcgrad_model,
-):
+) -> None:
     train_data, val_data = train_test_split(
         sample_data, test_size=0.2, random_state=rng
     )
@@ -1118,7 +1121,7 @@ def test_classification_model_does_stratify(
 def test_tune_mcgrad_params_uses_model_score_func(
     sample_data,
     sample_val_data,
-):
+) -> None:
     """Verify that tuning uses the model's early_stopping_score_func, not a hardcoded metric."""
     model = Mock(spec=methods.MCGrad)
     model.predict = Mock(
@@ -1150,7 +1153,7 @@ def test_tune_mcgrad_params_uses_model_score_func(
 
 
 @pytest.mark.arm64_incompatible
-def test_regression_tuning_selects_parameters_with_lowest_score(rng):
+def test_regression_tuning_selects_parameters_with_lowest_score(rng) -> None:
     """Verify that tuning minimizes the regression score (optimization direction is correct).
 
     Same logic as test_tuning_selects_parameters_with_lowest_score but using
@@ -1190,7 +1193,7 @@ def test_regression_tuning_selects_parameters_with_lowest_score(rng):
     learning_rates_evaluated: list[float] = []
     original_set_lightgbm_params = methods.RegressionMCGrad._set_lightgbm_params
 
-    def tracking_set_lightgbm_params(self, params):
+    def tracking_set_lightgbm_params(self, params) -> None:
         if "learning_rate" in params:
             learning_rates_evaluated.append(params["learning_rate"])
         return original_set_lightgbm_params(self, params)
@@ -1259,7 +1262,9 @@ def test_regression_tuning_selects_parameters_with_lowest_score(rng):
 # --- Early stopping configuration tests ---
 
 
-def test_tune_mcgrad_params_raises_without_score_func(sample_data, sample_val_data):
+def test_tune_mcgrad_params_raises_without_score_func(
+    sample_data, sample_val_data
+) -> None:
     model = Mock(spec=methods.MCGrad)
     model.early_stopping_score_func = None
 
@@ -1309,7 +1314,7 @@ def _make_deterministic_score_func(
 )
 def test_tune_mcgrad_params_with_early_stopping_disabled_returns_results(
     rng, model_class
-):
+) -> None:
     n_samples = 50
     is_classification = model_class is methods.MCGrad
     labels = (
@@ -1380,7 +1385,7 @@ def test_tune_mcgrad_params_with_early_stopping_disabled_returns_results(
 )
 def test_tune_mcgrad_params_with_custom_score_func_uses_custom_metric_in_results(
     rng, model_class
-):
+) -> None:
     """Verify tuning uses a custom early_stopping_score_func set on the model."""
     n_samples = 50
     is_classification = model_class is methods.MCGrad
@@ -1441,7 +1446,7 @@ def test_tune_mcgrad_params_with_custom_score_func_uses_custom_metric_in_results
     [methods.MCGrad, methods.RegressionMCGrad],
     ids=["MCGrad", "RegressionMCGrad"],
 )
-def test_tuning_maximization_direction(rng, model_class):
+def test_tuning_maximization_direction(rng, model_class) -> None:
     """Verify that tuning correctly maximizes when early_stopping_minimize_score=False.
 
     Mock score func returns [0.3, 0.8, 0.5]. With maximization, the trial with
@@ -1487,7 +1492,7 @@ def test_tuning_maximization_direction(rng, model_class):
     learning_rates_evaluated: list[float] = []
     original_set_lgbm = model_class._set_lightgbm_params
 
-    def tracking_set_lightgbm_params(self, params):
+    def tracking_set_lightgbm_params(self, params) -> None:
         if "learning_rate" in params:
             learning_rates_evaluated.append(params["learning_rate"])
         return original_set_lgbm(self, params)
@@ -1537,7 +1542,7 @@ def test_tuning_maximization_direction(rng, model_class):
     [methods.MCGrad, methods.RegressionMCGrad],
     ids=["MCGrad", "RegressionMCGrad"],
 )
-def test_tuning_minimization_direction(rng, model_class):
+def test_tuning_minimization_direction(rng, model_class) -> None:
     """Verify that tuning correctly minimizes when early_stopping_minimize_score=True.
 
     Mock score func returns [0.5, 0.2, 0.9]. With minimization, the trial with
@@ -1583,7 +1588,7 @@ def test_tuning_minimization_direction(rng, model_class):
     learning_rates_evaluated: list[float] = []
     original_set_lgbm = model_class._set_lightgbm_params
 
-    def tracking_set_lightgbm_params(self, params):
+    def tracking_set_lightgbm_params(self, params) -> None:
         if "learning_rate" in params:
             learning_rates_evaluated.append(params["learning_rate"])
         return original_set_lgbm(self, params)
