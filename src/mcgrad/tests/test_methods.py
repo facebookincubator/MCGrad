@@ -4174,7 +4174,7 @@ def test_segmentwise_calibrator_second_fit_clears_stale_segments(rng) -> None:
     assert "('C',)" in calibrator.calibrator_per_segment
 
 
-def test_mcgrad_subclass_defaults_missing_lightgbm_params():
+def test_mcgrad_subclass_defaults_missing_lightgbm_params() -> None:
     class SubMCGrad(methods._BaseMCGrad):
         DEFAULT_HYPERPARAMS = {
             "monotone_t": False,
@@ -4183,43 +4183,54 @@ def test_mcgrad_subclass_defaults_missing_lightgbm_params():
             "n_folds": 5,
         }
 
-        def _objective(self):
+        @property
+        def _objective(self) -> str:
             return "binary"
 
         @property
-        def _default_early_stopping_metric(self):
-            m = Mock(spec=_ScoreFunctionInterface)
+        def _default_early_stopping_metric(
+            self,
+        ) -> tuple[_ScoreFunctionInterface, bool]:
+            m: _ScoreFunctionInterface = Mock(spec=_ScoreFunctionInterface)
             m.name = "mock_metric"
             return m, True
 
-        def _transform_predictions(self, p):
-            return p
+        @staticmethod
+        def _transform_predictions(predictions: np.ndarray) -> np.ndarray:
+            return predictions
 
-        def _inverse_transform_predictions(self, p):
-            return p
+        @staticmethod
+        def _inverse_transform_predictions(transformed: np.ndarray) -> np.ndarray:
+            return transformed
 
-        def _compute_unshrink_factor(self, y, p, w):
+        @staticmethod
+        def _compute_unshrink_factor(
+            y: np.ndarray, predictions: np.ndarray, w: np.ndarray | None
+        ) -> float:
             return 1.0
 
-        def _check_predictions(self, df, col):
+        def _check_predictions(
+            self, df_train: pd.DataFrame, prediction_column_name: str
+        ) -> None:
             pass
 
-        def _check_labels(self, df, col):
+        def _check_labels(self, df_train: pd.DataFrame, label_column_name: str) -> None:
             pass
 
-        def _predictions_out_of_bounds(self, p):
-            return np.zeros_like(p, dtype=bool)
+        @staticmethod
+        def _predictions_out_of_bounds(predictions: np.ndarray) -> np.ndarray:
+            return np.zeros_like(predictions, dtype=bool)
 
         @property
-        def _cv_splitter(self):
+        def _cv_splitter(self) -> KFold | StratifiedKFold:
             return Mock()
 
         @property
-        def _holdout_splitter(self):
+        def _holdout_splitter(self) -> utils.TrainTestSplitWrapper:
             return Mock()
 
         @property
-        def _noop_splitter(self):
+        def _noop_splitter(self) -> utils.NoopSplitterWrapper:
             return Mock()
 
     # This should not raise KeyError
@@ -4227,7 +4238,7 @@ def test_mcgrad_subclass_defaults_missing_lightgbm_params():
     assert isinstance(model.lightgbm_params, dict)
 
 
-def test_mcgrad_default_minimization_behavior():
+def test_mcgrad_default_minimization_behavior() -> None:
     class AUCCalibrator(methods._BaseMCGrad):
         DEFAULT_HYPERPARAMS = {
             "monotone_t": False,
@@ -4237,44 +4248,55 @@ def test_mcgrad_default_minimization_behavior():
             "lightgbm_params": {},
         }
 
-        def _objective(self):
+        @property
+        def _objective(self) -> str:
             return "binary"
 
         @property
-        def _default_early_stopping_metric(self):
-            m = Mock(spec=_ScoreFunctionInterface)
+        def _default_early_stopping_metric(
+            self,
+        ) -> tuple[_ScoreFunctionInterface, bool]:
+            m: _ScoreFunctionInterface = Mock(spec=_ScoreFunctionInterface)
             m.name = "auc"
             # Return tuple with minimize=False since AUC should be maximized
             return m, False
 
-        def _transform_predictions(self, p):
-            return p
+        @staticmethod
+        def _transform_predictions(predictions: np.ndarray) -> np.ndarray:
+            return predictions
 
-        def _inverse_transform_predictions(self, p):
-            return p
+        @staticmethod
+        def _inverse_transform_predictions(transformed: np.ndarray) -> np.ndarray:
+            return transformed
 
-        def _compute_unshrink_factor(self, y, p, w):
+        @staticmethod
+        def _compute_unshrink_factor(
+            y: np.ndarray, predictions: np.ndarray, w: np.ndarray | None
+        ) -> float:
             return 1.0
 
-        def _check_predictions(self, df, col):
+        def _check_predictions(
+            self, df_train: pd.DataFrame, prediction_column_name: str
+        ) -> None:
             pass
 
-        def _check_labels(self, df, col):
+        def _check_labels(self, df_train: pd.DataFrame, label_column_name: str) -> None:
             pass
 
-        def _predictions_out_of_bounds(self, p):
-            return np.zeros_like(p, dtype=bool)
+        @staticmethod
+        def _predictions_out_of_bounds(predictions: np.ndarray) -> np.ndarray:
+            return np.zeros_like(predictions, dtype=bool)
 
         @property
-        def _cv_splitter(self):
+        def _cv_splitter(self) -> KFold | StratifiedKFold:
             return Mock()
 
         @property
-        def _holdout_splitter(self):
+        def _holdout_splitter(self) -> utils.TrainTestSplitWrapper:
             return Mock()
 
         @property
-        def _noop_splitter(self):
+        def _noop_splitter(self) -> utils.NoopSplitterWrapper:
             return Mock()
 
     # The tuple return type ensures minimize_score is set correctly from the metric
