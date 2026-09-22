@@ -167,6 +167,7 @@ def tune_mcgrad_params(
     pass_df_val_into_final_fit: bool = False,
     use_model_predictions: bool = False,
     reference_parameters: dict[str, float | int] | None = None,
+    random_seed: int | None = None,
     # @oss-disable[end= ]: _telemetry_overrides: dict[str, Any] | None = None,
 ) -> tuple[methods._BaseMCGrad | None, pd.DataFrame]:
     """
@@ -181,9 +182,9 @@ def tune_mcgrad_params(
     :param categorical_feature_column_names: The names of the categorical feature columns in the data.
     :param numerical_feature_column_names: The names of the numerical feature columns in the data.
     :param n_trials: The number of trials to run. Defaults to 20.
-    :param n_warmup_random_trials: The number of random trials to run before starting the Ax optimization.
-           Defaults to None, which uses calculate_num_initialization_trials to determine the number of warmup trials, which uses the following rules:
-           (i) At least 16 (Twice the number of tunable parameters), (ii) At most 1/5th of num_trials.
+    :param n_warmup_random_trials: The Ax initialization budget, including the
+           attached baseline trial. Once that budget is exhausted, Ax switches to
+           Bayesian optimization. Default: None = let Ax choose.
     :param parameter_configurations: The list of parameter configurations to tune. If None, the default parameter configurations are used.
     :param pass_df_val_into_tuning: Whether to pass the validation data into the tuning process. If True, the validation data is passed into the tuning process.
     :param pass_df_val_into_final_fit: Whether to pass the validation data into the final fit. If True, the validation data is passed into the final fit.
@@ -200,10 +201,16 @@ def tune_mcgrad_params(
            score is directly comparable with every searched trial on the same data. It is
            also a completed trial, which means it is eligible to be returned as the best
            parameterization when it outperforms everything the search finds.
+    :param random_seed: Seed forwarded to Ax for candidate generation during both
+           quasi-random exploration and Bayesian optimization. With identical trial
+           observations, this makes the proposed hyperparameters reproducible. Fully
+           reproducible tuning also requires deterministic data preparation, model
+           fitting, and scoring. Defaults to None.
 
     :returns: A tuple containing:
         - The fitted MCGrad model with the best hyperparameters found during tuning.
-        - A DataFrame containing the results of all trials, sorted by the evaluation metric.
+        - A DataFrame containing the results of all trials, ordered best-first with
+          respect to the evaluation metric.
     """
 
     if (
@@ -295,7 +302,7 @@ def tune_mcgrad_params(
             weight_column="weight" if weight_column_name else None,
         )
 
-    ax_client = Client()
+    ax_client = Client(random_seed=random_seed)
 
     ax_client.configure_experiment(
         name=f"lightgbm_autotuning_{uuid.uuid4().hex[:8]}",
@@ -304,15 +311,13 @@ def tune_mcgrad_params(
 
     ax_objective = f"-{metric_name}" if minimize_score else metric_name
     ax_client.configure_optimization(objective=ax_objective)
-
-    # Configure generation strategy with initialization budget
-    # -1 is because we add an initial trial with default parameters
-    # +1 to account for the manually added trial with default parameters.
-    initialization_budget = (
-        n_warmup_random_trials + 1 if n_warmup_random_trials is not None else None
-    )
     ax_client.configure_generation_strategy(
-        initialization_budget=initialization_budget,
+        initialization_budget=n_warmup_random_trials,
+        # The baseline trial already anchors the search at the default hyperparameters,
+        # which is a more informative starting point than the geometric center of the
+        # search space.
+        initialize_with_center=False,
+        initialization_random_seed=random_seed,
     )
 
     initial_trial_parameters = _build_initial_trial_parameters(
@@ -325,7 +330,10 @@ def tune_mcgrad_params(
 
     with _suppress_logger(methods.logger):
         # Attach and complete the seed trial before the search begins.
-        initial_trial_index = ax_client.attach_trial(
+        # Attaching it as the baseline (rather than an ordinary trial) marks it as the
+        # experiment's status quo, so that tuning results are reported as improvements
+        # over leaving the hyperparameters untuned.
+        initial_trial_index = ax_client.attach_baseline(
             parameters=initial_trial_parameters
         )
         initial_score = _train_evaluate(initial_trial_parameters)
@@ -346,8 +354,11 @@ def tune_mcgrad_params(
                 )
                 logger.info(f"Trial {trial_index} completed with score: {score}")
 
-    # Get trial results using summarize()
-    trial_results = ax_client.summarize().sort_values(metric_name)
+    # Get trial results using summarize(), ordered so that the best trial comes first
+    # for either optimization direction.
+    trial_results = ax_client.summarize().sort_values(
+        metric_name, ascending=minimize_score
+    )
 
     # get_best_parameterization returns (params, outcome, trial_idx, arm_name)
     best_params, _, _, _ = ax_client.get_best_parameterization(
