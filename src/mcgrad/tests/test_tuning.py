@@ -175,21 +175,40 @@ def test_tune_mcgrad_params_ax_client_setup(
     sample_data,
     mock_mcgrad_model,
 ) -> None:
-    result_model, trial_results = tune_mcgrad_params(
-        model=mock_mcgrad_model,
-        df_train=sample_data,
-        prediction_column_name="prediction",
-        label_column_name="label",
-        categorical_feature_column_names=["cat_feature"],
-        n_trials=2,
-    )
+    real_client_type = tuning_module.Client
+    with (
+        patch.object(
+            tuning_module,
+            "Client",
+            side_effect=real_client_type,
+        ) as client_constructor,
+        patch.object(
+            real_client_type,
+            "configure_generation_strategy",
+            autospec=True,
+            side_effect=real_client_type.configure_generation_strategy,
+        ) as configure_generation_strategy,
+    ):
+        result_model, trial_results = tune_mcgrad_params(
+            model=mock_mcgrad_model,
+            df_train=sample_data,
+            prediction_column_name="prediction",
+            label_column_name="label",
+            categorical_feature_column_names=["cat_feature"],
+            n_trials=2,
+            n_warmup_random_trials=4,
+            random_seed=17,
+        )
 
     assert result_model is not None
     assert isinstance(trial_results, pd.DataFrame)
     assert len(trial_results) == 2
-
-    # Verify that fit was called multiple times (once per trial + final fit)
     assert mock_mcgrad_model.fit.call_count >= 2
+    client_constructor.assert_called_once_with(random_seed=17)
+    strategy_kwargs = configure_generation_strategy.call_args.kwargs
+    assert strategy_kwargs["initialization_budget"] == 4
+    assert strategy_kwargs["initialize_with_center"] is False
+    assert strategy_kwargs["initialization_random_seed"] == 17
 
 
 @pytest.mark.arm64_incompatible
@@ -279,20 +298,43 @@ def _tune_with_reference(model, df, reference) -> pd.DataFrame:
 
 
 @pytest.mark.arm64_incompatible
-def test_reference_parameters_are_evaluated_as_a_trial(
+def test_reference_parameters_are_evaluated_as_the_experiment_baseline(
     sample_data, mock_mcgrad_model
 ) -> None:
-    trial_results = _tune_with_reference(
-        mock_mcgrad_model, sample_data, {"learning_rate": 0.0123, "max_depth": 4}
-    )
+    reference = {"learning_rate": 0.0123, "max_depth": 4}
+    real_client_type = tuning_module.Client
+    with (
+        patch.object(tuning_module, "Client", side_effect=real_client_type),
+        patch.object(
+            real_client_type,
+            "attach_baseline",
+            autospec=True,
+            side_effect=real_client_type.attach_baseline,
+        ) as attach_baseline,
+    ):
+        trial_results = _tune_with_reference(
+            mock_mcgrad_model,
+            sample_data,
+            reference,
+        )
 
-    referenced = trial_results[
-        np.isclose(trial_results["learning_rate"], 0.0123)
-        & (trial_results["max_depth"] == 4)
-    ]
-    assert len(referenced) == 1
-    # Tuned parameters absent from the reference are still searched.
-    assert {c.name for c in default_parameter_configurations}.issubset(
+    mcgrad_defaults = mock_mcgrad_model.DEFAULT_HYPERPARAMS["lightgbm_params"]
+    expected_parameters = {
+        config.name: mcgrad_defaults.get(
+            config.name, ORIGINAL_LIGHTGBM_PARAMS[config.name]
+        )
+        for config in default_parameter_configurations
+    }
+    expected_parameters.update(reference)
+    attach_baseline.assert_called_once()
+    assert attach_baseline.call_args.kwargs["parameters"] == expected_parameters
+
+    baseline_rows = trial_results[trial_results["arm_name"] == "baseline"]
+    assert len(baseline_rows) == 1
+    assert pd.isna(baseline_rows.iloc[0]["generation_node"])
+    assert np.isclose(baseline_rows.iloc[0]["learning_rate"], 0.0123)
+    assert baseline_rows.iloc[0]["max_depth"] == 4
+    assert {config.name for config in default_parameter_configurations}.issubset(
         trial_results.columns
     )
 
@@ -319,26 +361,6 @@ def test_reference_parameters_are_not_mutated(sample_data, mock_mcgrad_model) ->
     _tune_with_reference(mock_mcgrad_model, sample_data, reference)
 
     assert reference == reference_before
-
-
-@pytest.mark.arm64_incompatible
-def test_seed_trial_is_identifiable_from_the_reference_values(
-    sample_data, mock_mcgrad_model
-) -> None:
-    # Callers identify the seed trial by matching the values they passed in
-    # against the returned trial results, to a tight relative tolerance. A
-    # round trip that perturbed a value by more than that would leave the seed
-    # trial unidentifiable while every other assertion here still held.
-    reference = {"learning_rate": 0.0123, "max_depth": 4}
-
-    trial_results = _tune_with_reference(mock_mcgrad_model, sample_data, reference)
-
-    is_reference = pd.Series(True, index=trial_results.index)
-    for name, value in reference.items():
-        target = float(value)
-        tolerance = 1e-9 * max(1.0, abs(target))
-        is_reference &= (trial_results[name].astype(float) - target).abs() <= tolerance
-    assert is_reference.sum() == 1
 
 
 def test_mcgrad_and_lightgbm_default_hyperparams_are_within_bounds_for_tuning(
@@ -382,7 +404,9 @@ def test_warm_starting_trials_produces_the_right_number_of_sobol_and_bayesian_tr
         }
     )
 
-    n_warmup_random_trials = 1
+    # The attached baseline trial counts towards the initialization budget, so a budget
+    # of 2 leaves room for exactly one generated Sobol trial.
+    n_warmup_random_trials = 2
     total_trials = 4
 
     # Suppress botorch/ax warnings about constant/non-standardized input data
@@ -403,16 +427,16 @@ def test_warm_starting_trials_produces_the_right_number_of_sobol_and_bayesian_tr
         )
 
     value_counter = trial_results["generation_node"].value_counts().to_dict()
-    # The generated trials progress through initialization nodes (Sobol, plus a
-    # "CenterOfSearchSpace" node on some Ax versions) before transitioning to
-    # model-based Bayesian optimization (MBM). Whether the center node is emitted
-    # depends on the installed Ax version, so we assert the behavior that is
-    # stable across versions rather than the exact per-node split:
+    # The generated trials progress through Sobol warm-up before transitioning to
+    # model-based Bayesian optimization (MBM). Tuning disables the
+    # "CenterOfSearchSpace" node, because the attached baseline trial already anchors
+    # the search at the default hyperparameters. Beyond that we assert the behavior
+    # that is stable across Ax versions rather than the exact per-node split:
     # - exactly ``total_trials`` trials are produced,
     # - at least one Sobol warm-up trial is generated,
     # - the strategy transitions to Bayesian (MBM) optimization,
-    # - every generated trial is an initialization or MBM trial; only the single
-    #   attached default trial sits outside these nodes.
+    # - every generated trial is a Sobol or MBM trial; only the single attached
+    #   baseline trial sits outside these nodes.
     sobol_count = value_counter.get("Sobol", 0)
     center_count = value_counter.get("CenterOfSearchSpace", 0)
     botorch_count = value_counter.get("MBM", 0)
@@ -420,16 +444,19 @@ def test_warm_starting_trials_produces_the_right_number_of_sobol_and_bayesian_tr
     assert len(trial_results) == total_trials, (
         f"Expected {total_trials} trials, got {len(trial_results)}."
     )
+    assert center_count == 0, (
+        f"Expected the center-of-search-space trial to be disabled, got {center_count}."
+    )
     assert sobol_count >= 1, (
         f"Expected at least one Sobol warm-up trial, got {sobol_count}."
     )
     assert botorch_count >= 1, (
         f"Expected at least one Bayesian (MBM) trial, got {botorch_count}."
     )
-    assert sobol_count + center_count + botorch_count == total_trials - 1, (
-        "Expected all generated trials to be initialization or MBM trials "
-        "(only the attached default trial is separate); got "
-        f"Sobol={sobol_count}, Center={center_count}, MBM={botorch_count} "
+    assert sobol_count + botorch_count == total_trials - 1, (
+        "Expected all generated trials to be Sobol or MBM trials "
+        "(only the attached baseline trial is separate); got "
+        f"Sobol={sobol_count}, MBM={botorch_count} "
         f"out of {total_trials} total."
     )
 
@@ -1530,8 +1557,9 @@ def test_tuning_maximization_direction(rng, model_class) -> None:
         f"Got score={final_score}. lr->score: {trial_lr_to_score}"
     )
 
-    # Results should be sorted ascending; best (highest) is last for maximization
-    assert trial_results.iloc[-1]["r2_score"] == 0.8
+    observed_scores = trial_results["r2_score"].tolist()
+    assert observed_scores[0] == 0.8
+    assert observed_scores == sorted(observed_scores, reverse=True)
 
 
 @pytest.mark.arm64_incompatible
@@ -1626,4 +1654,6 @@ def test_tuning_minimization_direction(rng, model_class) -> None:
         f"Got score={final_score}. lr->score: {trial_lr_to_score}"
     )
 
-    assert trial_results.iloc[0]["mse"] == 0.2
+    observed_scores = trial_results["mse"].tolist()
+    assert observed_scores[0] == 0.2
+    assert observed_scores == sorted(observed_scores)

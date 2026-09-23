@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `reference_parameters` argument on `tune_mcgrad_params`: an optional configuration to seed the search with, for example the one currently deployed. It is evaluated as the first trial, so its score is comparable with every searched trial, and it is eligible to be returned as the best parameterization. Defaults to `None`, which preserves the previous default-only seeding.
 - `unjoined_ecce_sigma`: the standard-deviation-normalized `unjoined_ecce` (companion to `ecce_sigma` for unjoined data). The null standard deviation is estimated over the baseline (`label == 0`) rows; on the joined equivalent of the same data it returns exactly the same value as `ecce_sigma`.
 - `unjoined_ecce`: computes the Estimated Cumulative Calibration Error (ECCE / Kuiper calibration statistic) on data in "unjoined" format, where the per-instance baseline and positive events are logged as separate rows (as produced by `make_unjoined`) rather than joined per instance. Returns exactly the same value as `ecce` on the joined equivalent of the same data.
+- `random_seed` argument on `tune_mcgrad_params`, making Ax candidate generation reproducible across quasi-random exploration and Bayesian optimization when trial observations are identical. Fully reproducible tuning also requires deterministic data preparation, model fitting, and scoring. Defaults to `None`.
+
+### Changed
+- `tune_mcgrad_params` attaches the default-hyperparameter trial as the experiment's baseline (status quo) rather than as an ordinary trial, so results can be interpreted as improvements over leaving the hyperparameters untuned.
+- `tune_mcgrad_params` no longer spends an initialization trial on the center of the search space. The default-hyperparameter trial already provides a more informative starting point.
+
+### Fixed
+- The trial results returned by `tune_mcgrad_params` are now ordered best-first for both optimization directions. Previously they were always sorted ascending, which placed the best trial last whenever the score function was maximized (e.g. AUC).
 
 ## [0.1.5] - 2026-06-03
 
