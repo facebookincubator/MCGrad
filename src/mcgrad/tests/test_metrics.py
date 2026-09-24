@@ -3,9 +3,9 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from functools import partial
-from typing import cast
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -30,7 +30,9 @@ def rng() -> np.random.RandomState:
         utils.rank_no_discount,
     ],
 )
-def test_dcg_sample_scores_are_lower_than_ideal(rank_discount: Callable, rng) -> None:
+def test_dcg_sample_scores_are_lower_than_ideal(
+    rank_discount: Callable, rng: np.random.RandomState
+) -> None:
     y_true, y_score = rng.random_sample((2, 100))
     ideal = metrics._dcg_sample_scores(
         y_true,
@@ -53,7 +55,9 @@ def test_dcg_sample_scores_are_lower_than_ideal(rank_discount: Callable, rng) ->
         utils.rank_no_discount,
     ],
 )
-def test_dcg_sample_scores_gives_expected_result(rank_discount: Callable, rng) -> None:
+def test_dcg_sample_scores_gives_expected_result(
+    rank_discount: Callable, rng: np.random.RandomState
+) -> None:
     y_true, y_score = rng.random_sample((2, 100))
     scores = metrics._dcg_sample_scores(
         y_true,
@@ -74,7 +78,9 @@ def test_dcg_sample_scores_gives_expected_result(rank_discount: Callable, rng) -
         utils.rank_no_discount,
     ],
 )
-def test_dcg_score_is_lower_than_ideal(rank_discount: Callable, rng) -> None:
+def test_dcg_score_is_lower_than_ideal(
+    rank_discount: Callable, rng: np.random.RandomState
+) -> None:
     y_true, y_score = rng.random_sample((2, 100))
     ideal = metrics.dcg_score(y_true, y_true, rank_discount=rank_discount)
     score = metrics.dcg_score(y_true, y_score, rank_discount=rank_discount)
@@ -89,7 +95,9 @@ def test_dcg_score_is_lower_than_ideal(rank_discount: Callable, rng) -> None:
         utils.rank_no_discount,
     ],
 )
-def test_dcg_score_is_smaller_when_k_is_specified(rank_discount: Callable, rng) -> None:
+def test_dcg_score_is_smaller_when_k_is_specified(
+    rank_discount: Callable, rng: np.random.RandomState
+) -> None:
     y_true, y_score = rng.random_sample((2, 100))
     score = metrics.dcg_score(y_true, y_score, rank_discount=rank_discount)
     assert (
@@ -106,7 +114,7 @@ def test_dcg_score_is_smaller_when_k_is_specified(rank_discount: Callable, rng) 
     ],
 )
 def test_dcg_score_is_correct_when_k_larger_than_array_length(
-    rank_discount: Callable, rng
+    rank_discount: Callable, rng: np.random.RandomState
 ) -> None:
     y_true, y_score = rng.random_sample((2, 100))
     score = metrics.dcg_score(
@@ -125,7 +133,9 @@ def test_dcg_score_is_correct_when_k_larger_than_array_length(
         utils.rank_no_discount,
     ],
 )
-def test_dcg_score_gives_expected_result(rank_discount: Callable, rng) -> None:
+def test_dcg_score_gives_expected_result(
+    rank_discount: Callable, rng: np.random.RandomState
+) -> None:
     y_true, y_score = rng.random_sample((2, 100))
     scores = metrics.dcg_score(
         y_true,
@@ -147,7 +157,9 @@ def test_dcg_score_gives_expected_result(rank_discount: Callable, rng) -> None:
         utils.rank_no_discount,
     ],
 )
-def test_ndcg_sample_score_is_lower_than_ideal(rank_discount: Callable, rng) -> None:
+def test_ndcg_sample_score_is_lower_than_ideal(
+    rank_discount: Callable, rng: np.random.RandomState
+) -> None:
     y_true, y_score = rng.random_sample((2, 100))
     ideal = metrics._ndcg_sample_scores(
         y_true,
@@ -170,7 +182,9 @@ def test_ndcg_sample_score_is_lower_than_ideal(rank_discount: Callable, rng) -> 
         utils.rank_no_discount,
     ],
 )
-def test_ndcg_sample_ideal_is_one_for_all_samples(rank_discount: Callable, rng) -> None:
+def test_ndcg_sample_ideal_is_one_for_all_samples(
+    rank_discount: Callable, rng: np.random.RandomState
+) -> None:
     y_true, _ = rng.random_sample((2, 100))
     ideal = metrics._ndcg_sample_scores(
         y_true,
@@ -194,7 +208,9 @@ def test_ndcg_sample_ideal_is_one_for_all_samples(rank_discount: Callable, rng) 
         utils.rank_no_discount,
     ],
 )
-def test_ndcg_sample_score_gives_correct_result(rank_discount: Callable, rng) -> None:
+def test_ndcg_sample_score_gives_correct_result(
+    rank_discount: Callable, rng: np.random.RandomState
+) -> None:
     y_true, y_score = rng.random_sample((2, 100))
     k = 10
     score = metrics._ndcg_sample_scores(
@@ -231,7 +247,9 @@ def test_ndcg_sample_score_gives_correct_result(rank_discount: Callable, rng) ->
         utils.rank_no_discount,
     ],
 )
-def test_ndcg_score_is_lower_than_ideal(rank_discount: Callable, rng) -> None:
+def test_ndcg_score_is_lower_than_ideal(
+    rank_discount: Callable, rng: np.random.RandomState
+) -> None:
     y_true, y_score = rng.random_sample((2, 100))
     k = 10
     ideal = metrics.ndcg_score(y_true, y_true, rank_discount=rank_discount, k=k)
@@ -247,7 +265,9 @@ def test_ndcg_score_is_lower_than_ideal(rank_discount: Callable, rng) -> None:
         utils.rank_no_discount,
     ],
 )
-def test_ndcg_score_ideal_is_one_for_all_samples(rank_discount: Callable, rng) -> None:
+def test_ndcg_score_ideal_is_one_for_all_samples(
+    rank_discount: Callable, rng: np.random.RandomState
+) -> None:
     y_true, y_score = rng.random_sample((2, 100))
 
     # ideal NDCG should always be 1, for any k
@@ -268,7 +288,7 @@ def test_ndcg_score_ideal_is_one_for_all_samples(rank_discount: Callable, rng) -
     ],
 )
 def test_ndcg_score_when_ranking_is_preserved_is_one(
-    rank_discount: Callable, rng
+    rank_discount: Callable, rng: np.random.RandomState
 ) -> None:
     _, y_score = rng.random_sample((2, 100))
     y_true = y_score * 2.0
@@ -285,7 +305,9 @@ def test_ndcg_score_when_ranking_is_preserved_is_one(
         utils.rank_no_discount,
     ],
 )
-def test_ndcg_score_gives_expected_result(rank_discount: Callable, rng) -> None:
+def test_ndcg_score_gives_expected_result(
+    rank_discount: Callable, rng: np.random.RandomState
+) -> None:
     y_true, y_score = rng.random_sample((2, 100))
     k = 10
     score = metrics.ndcg_score(
@@ -311,7 +333,7 @@ def test_ndcg_score_gives_expected_result(rank_discount: Callable, rng) -> None:
     ],
 )
 def test_ndcg_score_is_correct_when_k_larger_than_array_length(
-    rank_discount: Callable, rng
+    rank_discount: Callable, rng: np.random.RandomState
 ) -> None:
     y_true, y_score = rng.random_sample((2, 100))
     score = metrics.ndcg_score(
@@ -330,7 +352,9 @@ def test_ndcg_score_is_correct_when_k_larger_than_array_length(
         utils.rank_no_discount,
     ],
 )
-def test_multi_cg_gives_same_result_as_cg_per_segment(rank_discount, rng) -> None:
+def test_multi_cg_gives_same_result_as_cg_per_segment(
+    rank_discount: Callable[[int], np.ndarray], rng: np.random.RandomState
+) -> None:
     n_samples = 200
     k = 100
     df = pd.DataFrame(index=range(n_samples))
@@ -411,12 +435,12 @@ def test_multi_cg_gives_same_result_as_cg_per_segment(rank_discount, rng) -> Non
     ],
 )
 def test_positive_label_proportion_with_weights_gives_expected_output(
-    labels,
-    predictions,
-    bins,
-    sample_weight,
-    expected_output,
-    use_weights_in_sample_size,
+    labels: np.ndarray,
+    predictions: np.ndarray,
+    bins: np.ndarray,
+    sample_weight: np.ndarray,
+    expected_output: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+    use_weights_in_sample_size: bool,
 ) -> None:
     result = utils.positive_label_proportion(
         labels=labels,
@@ -485,7 +509,9 @@ def test_fpr() -> None:
         ([0, 1, 0, 1], [0, 1, 1, 1], 0.5),
     ],
 )
-def test_youdens_j(labels, scores, expected_j) -> None:
+def test_youdens_j(
+    labels: Sequence[int], scores: Sequence[float], expected_j: float
+) -> None:
     result = metrics.youdens_j(np.array(labels), np.array(scores, dtype=float))
     assert result == pytest.approx(expected_j)
 
@@ -527,12 +553,16 @@ def test_youdens_j_does_not_modify_inputs() -> None:
     ],
 )
 def test_ecce_gives_expected_result(
-    scores, labels, sample_weight, expected_result
+    scores: Sequence[float],
+    labels: Sequence[int],
+    sample_weight: Sequence[float] | None,
+    expected_result: float,
 ) -> None:
-    scores, labels = np.array(scores), np.array(labels)
-    if sample_weight is not None:
-        sample_weight = np.array(sample_weight)
-    calibration_metric = metrics.ecce(labels, scores, sample_weight)
+    calibration_metric = metrics.ecce(
+        np.array(labels),
+        np.array(scores),
+        np.array(sample_weight) if sample_weight is not None else None,
+    )
 
     # Check that the offset is correctly calculated
     np.testing.assert_allclose(calibration_metric, expected_result)
@@ -548,12 +578,16 @@ def test_ecce_gives_expected_result(
     ],
 )
 def test_ecce_sigma_gives_expected_result(
-    scores, labels, sample_weight, expected_result
+    scores: Sequence[float],
+    labels: Sequence[int],
+    sample_weight: Sequence[float] | None,
+    expected_result: float,
 ) -> None:
-    scores, labels = np.array(scores), np.array(labels)
-    if sample_weight is not None:
-        sample_weight = np.array(sample_weight)
-    calibration_metric = metrics.ecce_sigma(labels, scores, sample_weight)
+    calibration_metric = metrics.ecce_sigma(
+        np.array(labels),
+        np.array(scores),
+        np.array(sample_weight) if sample_weight is not None else None,
+    )
 
     # Check that the offset is correctly calculated
     np.testing.assert_allclose(calibration_metric, expected_result, atol=1e-5)
@@ -571,12 +605,16 @@ def test_ecce_sigma_gives_expected_result(
     ],
 )
 def test_ecce_sigma_gives_expected_result_for_scores_resulting_in_zero_variance(
-    scores, labels, sample_weight, expected_result
+    scores: Sequence[float],
+    labels: Sequence[int],
+    sample_weight: Sequence[float] | None,
+    expected_result: float,
 ) -> None:
-    scores, labels = np.array(scores), np.array(labels)
-    if sample_weight is not None:
-        sample_weight = np.array(sample_weight)
-    calibration_metric = metrics.ecce_sigma(labels, scores, sample_weight)
+    calibration_metric = metrics.ecce_sigma(
+        np.array(labels),
+        np.array(scores),
+        np.array(sample_weight) if sample_weight is not None else None,
+    )
 
     # Check that the offset is correctly calculated
     np.testing.assert_allclose(calibration_metric, expected_result)
@@ -591,18 +629,23 @@ def test_ecce_sigma_gives_expected_result_for_scores_resulting_in_zero_variance(
     ],
 )
 def test_unjoined_ecce_gives_expected_result(
-    labels, predicted_scores, sample_weight, expected_result
+    labels: Sequence[int],
+    predicted_scores: Sequence[float],
+    sample_weight: Sequence[float] | None,
+    expected_result: float,
 ) -> None:
-    labels = np.array(labels)
-    predicted_scores = np.array(predicted_scores)
-    if sample_weight is not None:
-        sample_weight = np.array(sample_weight)
-    result = metrics.unjoined_ecce(labels, predicted_scores, sample_weight)
+    result = metrics.unjoined_ecce(
+        np.array(labels),
+        np.array(predicted_scores),
+        np.array(sample_weight) if sample_weight is not None else None,
+    )
     np.testing.assert_allclose(result, expected_result)
 
 
 @pytest.mark.parametrize("use_weights", [False, True])
-def test_unjoined_ecce_matches_joined_ecce(use_weights, rng) -> None:
+def test_unjoined_ecce_matches_joined_ecce(
+    use_weights: bool, rng: np.random.RandomState
+) -> None:
     n = 200
     # Distinct scores avoid ambiguity from tied predictions in the joined ecce.
     predicted_scores = rng.random_sample(n)
@@ -663,7 +706,9 @@ def test_unjoined_ecce_returns_zero_when_no_baseline_rows() -> None:
 
 
 @pytest.mark.parametrize("use_weights", [False, True])
-def test_unjoined_ecce_sigma_matches_joined_ecce_sigma(use_weights, rng) -> None:
+def test_unjoined_ecce_sigma_matches_joined_ecce_sigma(
+    use_weights: bool, rng: np.random.RandomState
+) -> None:
     n = 200
     predicted_scores = rng.random_sample(n)
     labels = (rng.random_sample(n) < predicted_scores).astype(int)
@@ -768,7 +813,7 @@ def test_proportional_expected_calibration_error_gives_expected_result(
     ],
 )
 def test_adaptive_calibration_error_with_unjoined_data_gives_expected_result(
-    labels, predictions
+    labels: np.ndarray, predictions: np.ndarray
 ) -> None:
     # Calculate the calibration error for the original data
     original_error = metrics.adaptive_calibration_error(labels, predictions, num_bins=1)
@@ -804,7 +849,10 @@ def test_adaptive_calibration_error_with_unjoined_data_gives_expected_result(
     ],
 )
 def test_calibration_ratio_gives_correct_results(
-    labels, predicted_scores, sample_weight, expected
+    labels: np.ndarray,
+    predicted_scores: np.ndarray,
+    sample_weight: np.ndarray | None,
+    expected: float,
 ) -> None:
     result = metrics.calibration_ratio(
         labels, predicted_scores, sample_weight, adjust_unjoined=False
@@ -864,11 +912,13 @@ def test_calibration_ratio__with_unjoined_adjustment_gives_correct_results(
         (np.array([0.0, 0.0]), 0),
     ],
 )
-def test_that_ecce_total_variance_is_correct(predicted_scores, expected) -> None:
+def test_that_ecce_total_variance_is_correct(
+    predicted_scores: np.ndarray, expected: float
+) -> None:
     assert metrics._ecce_standard_deviation(predicted_scores) == np.sqrt(expected)
 
 
-def test_ecce_detects_miscalibration(rng) -> None:
+def test_ecce_detects_miscalibration(rng: np.random.RandomState) -> None:
     # Test that ECCE detects miscalibration
     n = 100
     predictions = rng.uniform(low=0.0, high=1.0, size=n)
@@ -882,7 +932,7 @@ def test_ecce_detects_miscalibration(rng) -> None:
     assert miscalibrated_p_value < 0.1
 
 
-def test_RCE_is_scale_invariant(rng) -> None:
+def test_RCE_is_scale_invariant(rng: np.random.RandomState) -> None:
     y_true, y_score_1 = rng.random_sample((2, 100))
     y_score_2 = y_score_1 * 2
     RCE_1 = metrics.rank_calibration_error(y_true, y_score_1)
@@ -890,14 +940,16 @@ def test_RCE_is_scale_invariant(rng) -> None:
     assert np.allclose(RCE_1, RCE_2)
 
 
-def test_RCE_is_zero_when_ranking_is_preserved(rng) -> None:
+def test_RCE_is_zero_when_ranking_is_preserved(rng: np.random.RandomState) -> None:
     y_true = rng.random_sample(100)
     y_score = y_true * 4.0
     RCE = metrics.rank_calibration_error(y_true, y_score)
     assert np.allclose(RCE, 0.0)
 
 
-def test_multi_RCE_is_equal_for_groups_with_similar_ranking_quality(rng) -> None:
+def test_multi_RCE_is_equal_for_groups_with_similar_ranking_quality(
+    rng: np.random.RandomState,
+) -> None:
     y_true = rng.random_sample(100)
     df = pd.DataFrame({"group": ["A"] * 50 + ["B"] * 50})
     df["y_score"] = np.zeros(100)
@@ -911,7 +963,9 @@ def test_multi_RCE_is_equal_for_groups_with_similar_ranking_quality(rng) -> None
     assert np.allclose(RCEs["A"][0], RCEs["B"][0])
 
 
-def test_multi_RCE_is_more_for_groups_with_worse_ranking_quality(rng) -> None:
+def test_multi_RCE_is_more_for_groups_with_worse_ranking_quality(
+    rng: np.random.RandomState,
+) -> None:
     y_true = rng.random_sample(100)
     df = pd.DataFrame({"group": ["A"] * 50 + ["B"] * 50})
     df["y_score"] = np.zeros(100)
@@ -951,7 +1005,7 @@ def test_normalized_entropy_gives_expected_result() -> None:
     ],
 )
 def test_normalized_entropy_with_sample_weights_gives_expected_result(
-    y_pred, y_true, sample_weight, expected
+    y_pred: np.ndarray, y_true: np.ndarray, sample_weight: np.ndarray, expected: float
 ) -> None:
     result = metrics.normalized_entropy(y_true, y_pred, sample_weight=sample_weight)
     assert result == pytest.approx(expected)
@@ -968,7 +1022,7 @@ def test_califree_ne_gives_same_result_as_ne_when_calibration_ratio_is_one() -> 
 
 
 @pytest.mark.parametrize("logit_shift", [(1), (0.1), (1.1), (10)])
-def test_califree_ne_is_invariant_to_logit_shifts(logit_shift) -> None:
+def test_califree_ne_is_invariant_to_logit_shifts(logit_shift: float) -> None:
     # Hardcoded labels and predictions with equal sums
     labels = np.array([0, 1, 0, 1, 1, 0, 1, 0, 1, 0])
     predictions = np.array([0.1, 0.9, 0.1, 0.9, 0.9, 0.1, 0.9, 0.1, 0.9, 0.1])
@@ -1000,7 +1054,9 @@ def test_califree_ne_is_invariant_to_logit_shifts(logit_shift) -> None:
         metrics.precision_at_predictive_prevalence,
     ],
 )
-def test_weighted_score_metric_matches_expanded_unweighted(metric_func) -> None:
+def test_weighted_score_metric_matches_expanded_unweighted(
+    metric_func: Callable[..., float],
+) -> None:
     """Weighted score metrics should give the same result as duplicating rows by weight."""
     labels = np.array([0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0])
     scores = np.array([0.1, 0.85, 0.6, 0.7, 0.9, 0.2, 0.4, 0.35, 0.75, 0.15, 0.55, 0.8])
@@ -1022,7 +1078,9 @@ def test_weighted_score_metric_matches_expanded_unweighted(metric_func) -> None:
         metrics.fpr,
     ],
 )
-def test_weighted_binary_metric_matches_expanded_unweighted(metric_func) -> None:
+def test_weighted_binary_metric_matches_expanded_unweighted(
+    metric_func: Callable[..., float],
+) -> None:
     """Weighted binary metrics should give the same result as duplicating rows by weight."""
     labels = np.array([0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0])
     predicted_labels = np.array([0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 1, 1])
@@ -1067,7 +1125,7 @@ def test_weighted_fpr_at_precision_with_false_positives() -> None:
 
 
 @pytest.mark.parametrize("target_precision, expected_fpr", [(0.9, 0.0), (0.8, 0.2)])
-def test_fpr_at_precision(target_precision, expected_fpr) -> None:
+def test_fpr_at_precision(target_precision: float, expected_fpr: float) -> None:
     y_true = np.array([0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
     y_scores = np.array([0.1, 0.9, 0.2, 0.8, 0.3, 0.7, 0.4, 0.6, 0.5, 0.55])
     # At target precision 0.9, the threshold is 0.55 (precision is 1.000, but for next threshold 0.50 it is 0.833), fpr now is 0/5 = 0.0
@@ -1119,7 +1177,10 @@ def test_fpr_at_precision_gives_nan_when_target_precision_is_unreachable() -> No
     ],
 )
 def test_precision_at_predictive_prevalence(
-    y_true, y_scores, predictive_prevalence_target, expected_precision
+    y_true: np.ndarray,
+    y_scores: np.ndarray,
+    predictive_prevalence_target: float,
+    expected_precision: float,
 ) -> None:
     assert (
         metrics.precision_at_predictive_prevalence(
@@ -1165,7 +1226,11 @@ def test_precision_at_predictive_prevalence(
     ],
 )
 def test_precision_at_recall(
-    y_true, y_scores, recall_target, sample_weight, expected
+    y_true: np.ndarray,
+    y_scores: np.ndarray,
+    recall_target: float,
+    sample_weight: np.ndarray | None,
+    expected: float,
 ) -> None:
     result = metrics.precision_at_recall(y_true, y_scores, recall_target, sample_weight)
     assert result == pytest.approx(expected)
@@ -1234,7 +1299,7 @@ def test_that_multicalibrationerror_is_equal_to_ecce_metric_on_single_segment() 
     ],
 )
 def test_wrap_sklearn_metric_func_does_not_raise_an_error_with_any_of_our_main_metrics(
-    metric_func,
+    metric_func: Callable[..., float],
 ) -> None:
     wrapped_func = wrap_sklearn_metric_func(metric_func)
 
@@ -1265,7 +1330,9 @@ def test_mce_wrapper_with_variant_mce_sigma_has_the_right_name() -> None:
     )
 
 
-def test_mce_can_deal_with_infrequent_values_in_int_categorical_columns(rng) -> None:
+def test_mce_can_deal_with_infrequent_values_in_int_categorical_columns(
+    rng: np.random.RandomState,
+) -> None:
     # Check if the MCE can deal with infrequent values in int categorical columns,
     # i.e. a column passed as categorical but containing integers
 
@@ -1325,7 +1392,9 @@ def test_that_mce_returns_correct_prevalence_with_and_without_weights() -> None:
     assert unweighted_mce._prevalence == 0.5
 
 
-def test_mce_speedup_returns_values_equal_for_different_chunk_sizes(rng) -> None:
+def test_mce_speedup_returns_values_equal_for_different_chunk_sizes(
+    rng: np.random.RandomState,
+) -> None:
     # Changing chunk size should return the same ecce absolutes and sigmas
     n_cat_fts = 3
     n_num_fts = 3
@@ -1383,7 +1452,7 @@ def test_mce_speedup_returns_values_equal_for_different_chunk_sizes(rng) -> None
     assert np.equal(mce_chunk25._segments_ecce_std, mce_chunk7._segments_ecce_std).all()
 
 
-def test_mce_sorting_does_not_modify_original_df(rng) -> None:
+def test_mce_sorting_does_not_modify_original_df(rng: np.random.RandomState) -> None:
     # Check that the original df remains unchanged after being passed into the MCE metric and locally sorted
     n_cat_fts = 3
     n_num_fts = 3
@@ -1429,7 +1498,7 @@ def test_mce_sorting_does_not_modify_original_df(rng) -> None:
 
 
 def test_mce_reducing_precision_dtype_returns_correct_value_upto_third_digit(
-    rng,
+    rng: np.random.RandomState,
 ) -> None:
     n_cat_fts = 3
     n_num_fts = 3
@@ -1529,7 +1598,7 @@ def test_mce_reducing_precision_dtype_returns_correct_value_upto_third_digit(
 
 
 def test_segment_feature_values_has_the_correct_features_used_for_segment_generation(
-    rng,
+    rng: np.random.RandomState,
 ) -> None:
     """
     Test that the segment_feature_values dataframe returned by MulticalibrationError._segments
@@ -1637,7 +1706,9 @@ def test_segment_feature_values_has_the_correct_features_used_for_segment_genera
     )
 
 
-def test_precision_dtype_is_maintained_in_multicalibration_error_methods(rng) -> None:
+def test_precision_dtype_is_maintained_in_multicalibration_error_methods(
+    rng: np.random.RandomState,
+) -> None:
     """
     Test that the precision_dtype parameter is maintained when running specific methods
     in the MulticalibrationError class.
@@ -1720,7 +1791,9 @@ def test_precision_dtype_is_maintained_in_multicalibration_error_methods(rng) ->
     assert cast(np.floating, mce_float64.mce_sigma).dtype == np.float64
 
 
-def test_precision_dtype_is_extended_for_large_weights(rng) -> None:
+def test_precision_dtype_is_extended_for_large_weights(
+    rng: np.random.RandomState,
+) -> None:
     n_cat_fts = 2
     n_num_fts = 2
     n_samples = 100
@@ -1795,7 +1868,7 @@ def test_ecce_and_standard_deviation_return_zero_for_empty_segment(
     assert c_jk == k_std == 0, "Expected 0 for empty segment"
 
 
-def test_multi_cg_score_does_not_modify_segments_df(rng) -> None:
+def test_multi_cg_score_does_not_modify_segments_df(rng: np.random.RandomState) -> None:
     """Verify multi_cg_score does not modify input segments_df."""
     n_samples = 100
     df = pd.DataFrame(index=range(n_samples))
@@ -1819,7 +1892,9 @@ def test_multi_cg_score_does_not_modify_segments_df(rng) -> None:
     pd.testing.assert_frame_equal(segments_df, segments_df_original)
 
 
-def test_rank_multicalibration_error_does_not_modify_segments_df(rng) -> None:
+def test_rank_multicalibration_error_does_not_modify_segments_df(
+    rng: np.random.RandomState,
+) -> None:
     """Verify rank_multicalibration_error does not modify input segments_df."""
     y_true = rng.random_sample(100)
     df = pd.DataFrame({"group": ["A"] * 50 + ["B"] * 50})
@@ -1861,7 +1936,10 @@ def test_rank_multicalibration_error_does_not_modify_segments_df(rng) -> None:
     ],
 )
 def test_metric_does_not_modify_input_arrays(
-    rng, metric_func, metric_kwargs, use_sample_weight
+    rng: np.random.RandomState,
+    metric_func: Callable[..., float],
+    metric_kwargs: dict[str, Any],
+    use_sample_weight: bool,
 ) -> None:
     labels = rng.randint(0, 2, 100).astype(np.float64)
     predicted_scores = rng.random_sample(100)
@@ -2191,7 +2269,7 @@ def test_ecce_cdf_returns_near_one_for_large_x() -> None:
 
 
 @pytest.mark.parametrize("value", [-1.0, 0.0])
-def test_ecce_cdf_raises_for_non_positive_scalar(value) -> None:
+def test_ecce_cdf_raises_for_non_positive_scalar(value: float) -> None:
     with pytest.raises(ValueError, match="Can only evaluate ECCE CDF at positive x"):
         metrics._ecce_cdf(value)
 
@@ -2326,7 +2404,9 @@ def test_multicalibration_error_format_method_with_format_spec() -> None:
     assert "mde=" in result
 
 
-def test_multicalibration_error_segment_indices_returns_series(rng) -> None:
+def test_multicalibration_error_segment_indices_returns_series(
+    rng: np.random.RandomState,
+) -> None:
     df = pd.DataFrame(
         {
             "prediction": rng.rand(20),
@@ -2567,7 +2647,9 @@ def test_ndcg_score_returns_nan_on_empty_arrays() -> None:
     assert np.isnan(result), f"Expected NaN for empty arrays, got {result}"
 
 
-def test_ecce_pvalue_consistency_with_ecce_pvalue_from_sigma(rng) -> None:
+def test_ecce_pvalue_consistency_with_ecce_pvalue_from_sigma(
+    rng: np.random.RandomState,
+) -> None:
     labels = rng.randint(0, 2, 100)
     predicted_scores = rng.rand(100)
     ecce_pvalue_result = metrics.ecce_pvalue(labels, predicted_scores)
@@ -2653,7 +2735,9 @@ def test_regression_mce_equals_global_ecce_at_depth_zero() -> None:
     assert np.isclose(mce_absolute, global_ecce_metric, rtol=1e-10, atol=1e-10)
 
 
-def test_regression_mce_sigma_detects_miscalibration(rng) -> None:
+def test_regression_mce_sigma_detects_miscalibration(
+    rng: np.random.RandomState,
+) -> None:
     n = 200
     predictions = rng.uniform(low=0.0, high=10.0, size=n)
     labels = predictions + rng.normal(0, 0.1, size=n)
@@ -2699,7 +2783,9 @@ def test_regression_mce_sigma_detects_miscalibration(rng) -> None:
 
 
 @pytest.mark.parametrize("scale_factor", [0.1, 2.0, 100.0])
-def test_regression_mce_sigma_is_scale_invariant(scale_factor, rng) -> None:
+def test_regression_mce_sigma_is_scale_invariant(
+    scale_factor: float, rng: np.random.RandomState
+) -> None:
     n = 100
     predictions = rng.uniform(0, 10, size=n)
     labels = predictions + rng.normal(0, 1, size=n)
@@ -2734,7 +2820,7 @@ def test_regression_mce_sigma_is_scale_invariant(scale_factor, rng) -> None:
     "attr",
     ["mce_relative", "mde_relative", "segments_ecce_relative", "global_ecce_relative"],
 )
-def test_regression_mce_relative_raises_for_regression(attr) -> None:
+def test_regression_mce_relative_raises_for_regression(attr: str) -> None:
     test_df = pd.DataFrame(
         {
             "prediction": [0.5, 1.5, 2.5, 3.5],
@@ -2815,7 +2901,7 @@ def test_regression_ecce_std_raises_error_with_mismatched_segments() -> None:
         )
 
 
-def test_regression_mce_does_not_modify_input_df(rng) -> None:
+def test_regression_mce_does_not_modify_input_df(rng: np.random.RandomState) -> None:
     n_samples = 50
     df = pd.DataFrame(
         {
