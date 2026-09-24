@@ -4,7 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 import warnings
 from typing import Any
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 import pandas as pd
@@ -28,7 +28,7 @@ def rng() -> np.random.RandomState:
 
 
 @pytest.fixture
-def sample_data(rng) -> pd.DataFrame:
+def sample_data(rng: np.random.RandomState) -> pd.DataFrame:
     n_samples = 50
 
     df = pd.DataFrame(
@@ -45,7 +45,7 @@ def sample_data(rng) -> pd.DataFrame:
 
 
 @pytest.fixture
-def sample_val_data(rng) -> pd.DataFrame:
+def sample_val_data(rng: np.random.RandomState) -> pd.DataFrame:
     n_samples = 30
     return pd.DataFrame(
         {
@@ -59,7 +59,7 @@ def sample_val_data(rng) -> pd.DataFrame:
 
 
 @pytest.fixture
-def mock_mcgrad_model(rng) -> Mock:
+def mock_mcgrad_model(rng: np.random.RandomState) -> Mock:
     model = Mock(spec=methods.MCGrad)
     model.predict = Mock(
         side_effect=lambda df, **kwargs: rng.uniform(0.1, 0.9, len(df))
@@ -82,8 +82,8 @@ def hyperparams_for_tuning() -> tuple[dict[str, Any], dict[str, Any]]:
 
 @pytest.mark.arm64_incompatible
 def test_tune_mcgrad_params_with_weights(
-    sample_data,
-    mock_mcgrad_model,
+    sample_data: pd.DataFrame,
+    mock_mcgrad_model: Mock,
 ) -> None:
     result_model, trial_results = tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -114,8 +114,8 @@ def test_tune_mcgrad_params_with_weights(
 
 @pytest.mark.arm64_incompatible
 def test_tune_mcgrad_params_without_weights(
-    sample_data,
-    mock_mcgrad_model,
+    sample_data: pd.DataFrame,
+    mock_mcgrad_model: Mock,
 ) -> None:
     result_model, trial_results = tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -172,8 +172,8 @@ def test_tune_mcgrad_params_default_parameters(
 
 @pytest.mark.arm64_incompatible
 def test_tune_mcgrad_params_ax_client_setup(
-    sample_data,
-    mock_mcgrad_model,
+    sample_data: pd.DataFrame,
+    mock_mcgrad_model: Mock,
 ) -> None:
     real_client_type = tuning_module.Client
     with (
@@ -214,10 +214,10 @@ def test_tune_mcgrad_params_ax_client_setup(
 @pytest.mark.arm64_incompatible
 @patch(f"{TUNING_MODULE}.train_test_split")
 def test_tune_mcgrad_params_data_splitting(
-    mock_train_test_split,
-    rng,
-    sample_data,
-    mock_mcgrad_model,
+    mock_train_test_split: MagicMock,
+    rng: np.random.RandomState,
+    sample_data: pd.DataFrame,
+    mock_mcgrad_model: Mock,
 ) -> None:
     # Setup mock to return specific train/val splits using sklearn's splitter
     train_data, val_data = train_test_split(
@@ -246,7 +246,7 @@ def test_tune_mcgrad_params_data_splitting(
 
 @pytest.mark.arm64_incompatible
 def test_tune_mcgrad_params_with_subset_of_parameters(
-    sample_data,
+    sample_data: pd.DataFrame,
 ) -> None:
     model = methods.MCGrad()
 
@@ -283,7 +283,11 @@ def test_tune_mcgrad_params_with_subset_of_parameters(
         assert param not in trial_results.columns
 
 
-def _tune_with_reference(model, df, reference) -> pd.DataFrame:
+def _tune_with_reference(
+    model: methods._BaseMCGrad,
+    df: pd.DataFrame,
+    reference: dict[str, float | int],
+) -> pd.DataFrame:
     _, trial_results = tune_mcgrad_params(
         model=model,
         df_train=df,
@@ -299,7 +303,7 @@ def _tune_with_reference(model, df, reference) -> pd.DataFrame:
 
 @pytest.mark.arm64_incompatible
 def test_reference_parameters_are_evaluated_as_the_experiment_baseline(
-    sample_data, mock_mcgrad_model
+    sample_data: pd.DataFrame, mock_mcgrad_model: Mock
 ) -> None:
     reference = {"learning_rate": 0.0123, "max_depth": 4}
     real_client_type = tuning_module.Client
@@ -341,7 +345,7 @@ def test_reference_parameters_are_evaluated_as_the_experiment_baseline(
 
 @pytest.mark.arm64_incompatible
 def test_reference_parameters_outside_the_search_space_are_ignored(
-    sample_data, mock_mcgrad_model
+    sample_data: pd.DataFrame, mock_mcgrad_model: Mock
 ) -> None:
     trial_results = _tune_with_reference(
         mock_mcgrad_model,
@@ -354,7 +358,9 @@ def test_reference_parameters_outside_the_search_space_are_ignored(
 
 
 @pytest.mark.arm64_incompatible
-def test_reference_parameters_are_not_mutated(sample_data, mock_mcgrad_model) -> None:
+def test_reference_parameters_are_not_mutated(
+    sample_data: pd.DataFrame, mock_mcgrad_model: Mock
+) -> None:
     reference = {"learning_rate": 0.0123, "not_a_tuned_parameter": 99}
     reference_before = dict(reference)
 
@@ -364,7 +370,7 @@ def test_reference_parameters_are_not_mutated(sample_data, mock_mcgrad_model) ->
 
 
 def test_mcgrad_and_lightgbm_default_hyperparams_are_within_bounds_for_tuning(
-    hyperparams_for_tuning,
+    hyperparams_for_tuning: tuple[dict[str, Any], dict[str, Any]],
 ) -> None:
     _, lightgbm_params = hyperparams_for_tuning
 
@@ -393,7 +399,7 @@ def test_mcgrad_and_lightgbm_default_hyperparams_are_within_bounds_for_tuning(
 
 @pytest.mark.arm64_incompatible
 def test_warm_starting_trials_produces_the_right_number_of_sobol_and_bayesian_trials(
-    rng,
+    rng: np.random.RandomState,
 ) -> None:
     df_train = pd.DataFrame(
         {
@@ -630,7 +636,7 @@ def test_tuning_selects_parameters_with_lowest_score(
 
 @pytest.mark.arm64_incompatible
 def test_non_default_parameters_preserved_when_not_in_tuning_configurations(
-    sample_data,
+    sample_data: pd.DataFrame,
 ) -> None:
     non_default_params = {
         "learning_rate": 0.05,
@@ -672,10 +678,10 @@ def test_non_default_parameters_preserved_when_not_in_tuning_configurations(
 @pytest.mark.arm64_incompatible
 @patch(f"{TUNING_MODULE}.train_test_split")
 def test_tune_mcgrad_params_with_explicit_validation_set(
-    mock_train_test_split,
-    sample_data,
-    sample_val_data,
-    mock_mcgrad_model,
+    mock_train_test_split: MagicMock,
+    sample_data: pd.DataFrame,
+    sample_val_data: pd.DataFrame,
+    mock_mcgrad_model: Mock,
 ) -> None:
     tune_mcgrad_params(
         model=mock_mcgrad_model,
@@ -707,10 +713,10 @@ def test_tune_mcgrad_params_with_explicit_validation_set(
 @pytest.mark.arm64_incompatible
 @patch(f"{TUNING_MODULE}.train_test_split")
 def test_tune_mcgrad_params_fallback_to_train_test_split(
-    mock_train_test_split,
-    rng,
-    sample_data,
-    mock_mcgrad_model,
+    mock_train_test_split: MagicMock,
+    rng: np.random.RandomState,
+    sample_data: pd.DataFrame,
+    mock_mcgrad_model: Mock,
 ) -> None:
     """Test that when df_val is None, train_test_split is used."""
     # Setup mock to return specific train/val splits using sklearn's splitter
@@ -753,9 +759,9 @@ def test_tune_mcgrad_params_fallback_to_train_test_split(
 
 @pytest.mark.arm64_incompatible
 def test_tune_mcgrad_params_pass_df_val_into_tuning_true(
-    sample_data,
-    sample_val_data,
-    mock_mcgrad_model,
+    sample_data: pd.DataFrame,
+    sample_val_data: pd.DataFrame,
+    mock_mcgrad_model: Mock,
 ) -> None:
     """Test that df_val is passed to model.fit during tuning when pass_df_val_into_tuning=True."""
     tune_mcgrad_params(
@@ -786,9 +792,9 @@ def test_tune_mcgrad_params_pass_df_val_into_tuning_true(
 
 @pytest.mark.arm64_incompatible
 def test_tune_mcgrad_params_pass_df_val_into_tuning_false(
-    sample_data,
-    sample_val_data,
-    mock_mcgrad_model,
+    sample_data: pd.DataFrame,
+    sample_val_data: pd.DataFrame,
+    mock_mcgrad_model: Mock,
 ) -> None:
     """Test that df_val is not passed to model.fit during tuning when pass_df_val_into_tuning=False."""
     tune_mcgrad_params(
@@ -845,9 +851,9 @@ def test_tune_mcgrad_params_pass_df_val_into_final_fit_true(
 
 @pytest.mark.arm64_incompatible
 def test_tune_mcgrad_params_pass_df_val_into_final_fit_false(
-    sample_data,
-    sample_val_data,
-    mock_mcgrad_model,
+    sample_data: pd.DataFrame,
+    sample_val_data: pd.DataFrame,
+    mock_mcgrad_model: Mock,
 ) -> None:
     """Test that df_val is not passed to model.fit during final fit when pass_df_val_into_final_fit=False."""
     tune_mcgrad_params(
@@ -871,9 +877,9 @@ def test_tune_mcgrad_params_pass_df_val_into_final_fit_false(
 
 @pytest.mark.arm64_incompatible
 def test_tune_mcgrad_params_pass_df_val_into_both_tuning_and_final_fit(
-    sample_data,
-    sample_val_data,
-    mock_mcgrad_model,
+    sample_data: pd.DataFrame,
+    sample_val_data: pd.DataFrame,
+    mock_mcgrad_model: Mock,
 ) -> None:
     """Test that df_val is passed to both tuning and final fit when both flags are True."""
     tune_mcgrad_params(
@@ -906,11 +912,11 @@ def test_tune_mcgrad_params_pass_df_val_into_both_tuning_and_final_fit(
     ],
 )
 def test_tune_mcgrad_params_df_val_passing_defaults_to_false(
-    sample_data,
-    sample_val_data,
-    mock_mcgrad_model,
-    pass_df_val_into_tuning,
-    pass_df_val_into_final_fit,
+    sample_data: pd.DataFrame,
+    sample_val_data: pd.DataFrame,
+    mock_mcgrad_model: Mock,
+    pass_df_val_into_tuning: bool,
+    pass_df_val_into_final_fit: bool,
 ) -> None:
     """Test all combinations of pass_df_val_into_tuning and pass_df_val_into_final_fit flags."""
     tune_mcgrad_params(
@@ -942,9 +948,9 @@ def test_tune_mcgrad_params_df_val_passing_defaults_to_false(
 
 @pytest.mark.arm64_incompatible
 def test_tune_mcboost_params_does_not_modify_input_dataframes(
-    sample_data,
-    sample_val_data,
-    mock_mcgrad_model,
+    sample_data: pd.DataFrame,
+    sample_val_data: pd.DataFrame,
+    mock_mcgrad_model: Mock,
 ) -> None:
     df_train_original = sample_data.copy()
     df_val_original = sample_val_data.copy()
@@ -968,10 +974,10 @@ def test_tune_mcboost_params_does_not_modify_input_dataframes(
 @pytest.mark.arm64_incompatible
 @patch(f"{TUNING_MODULE}.train_test_split")
 def test_tune_mcboost_params_does_not_modify_input_dataframe_when_no_df_val(
-    mock_train_test_split,
-    rng,
-    sample_data,
-    mock_mcgrad_model,
+    mock_train_test_split: MagicMock,
+    rng: np.random.RandomState,
+    sample_data: pd.DataFrame,
+    mock_mcgrad_model: Mock,
 ) -> None:
     train_data, val_data = train_test_split(
         sample_data, test_size=0.2, random_state=rng
@@ -999,7 +1005,7 @@ def test_tune_mcboost_params_does_not_modify_input_dataframe_when_no_df_val(
 
 
 @pytest.fixture
-def regression_sample_data(rng) -> pd.DataFrame:
+def regression_sample_data(rng: np.random.RandomState) -> pd.DataFrame:
     n_samples = 50
     return pd.DataFrame(
         {
@@ -1012,7 +1018,7 @@ def regression_sample_data(rng) -> pd.DataFrame:
 
 
 @pytest.fixture
-def regression_val_data(rng) -> pd.DataFrame:
+def regression_val_data(rng: np.random.RandomState) -> pd.DataFrame:
     n_samples = 30
     return pd.DataFrame(
         {
@@ -1025,7 +1031,7 @@ def regression_val_data(rng) -> pd.DataFrame:
 
 
 @pytest.fixture
-def mock_regression_model(rng) -> Mock:
+def mock_regression_model(rng: np.random.RandomState) -> Mock:
     model = Mock(spec=methods.RegressionMCGrad)
     model.predict = Mock(
         side_effect=lambda df, **kwargs: rng.uniform(0.0, 10.0, len(df))
@@ -1041,9 +1047,9 @@ def mock_regression_model(rng) -> Mock:
 
 @pytest.mark.arm64_incompatible
 def test_tune_mcgrad_params_with_regression_model_returns_trial_results(
-    regression_sample_data,
-    regression_val_data,
-    mock_regression_model,
+    regression_sample_data: pd.DataFrame,
+    regression_val_data: pd.DataFrame,
+    mock_regression_model: Mock,
 ) -> None:
     result_model, trial_results = tune_mcgrad_params(
         model=mock_regression_model,
@@ -1089,10 +1095,10 @@ def test_tune_mcgrad_params_with_regression_model_passes_weights_to_score_func(
 @pytest.mark.arm64_incompatible
 @patch(f"{TUNING_MODULE}.train_test_split")
 def test_regression_model_does_not_stratify(
-    mock_train_test_split,
-    rng,
-    regression_sample_data,
-    mock_regression_model,
+    mock_train_test_split: MagicMock,
+    rng: np.random.RandomState,
+    regression_sample_data: pd.DataFrame,
+    mock_regression_model: Mock,
 ) -> None:
     train_data, val_data = train_test_split(
         regression_sample_data, test_size=0.2, random_state=rng
@@ -1117,10 +1123,10 @@ def test_regression_model_does_not_stratify(
 @pytest.mark.arm64_incompatible
 @patch(f"{TUNING_MODULE}.train_test_split")
 def test_classification_model_does_stratify(
-    mock_train_test_split,
-    rng,
-    sample_data,
-    mock_mcgrad_model,
+    mock_train_test_split: MagicMock,
+    rng: np.random.RandomState,
+    sample_data: pd.DataFrame,
+    mock_mcgrad_model: Mock,
 ) -> None:
     train_data, val_data = train_test_split(
         sample_data, test_size=0.2, random_state=rng
@@ -1144,8 +1150,8 @@ def test_classification_model_does_stratify(
 
 @pytest.mark.arm64_incompatible
 def test_tune_mcgrad_params_uses_model_score_func(
-    sample_data,
-    sample_val_data,
+    sample_data: pd.DataFrame,
+    sample_val_data: pd.DataFrame,
 ) -> None:
     """Verify that tuning uses the model's early_stopping_score_func, not a hardcoded metric."""
     model = Mock(spec=methods.MCGrad)
@@ -1178,7 +1184,9 @@ def test_tune_mcgrad_params_uses_model_score_func(
 
 
 @pytest.mark.arm64_incompatible
-def test_regression_tuning_selects_parameters_with_lowest_score(rng) -> None:
+def test_regression_tuning_selects_parameters_with_lowest_score(
+    rng: np.random.RandomState,
+) -> None:
     """Verify that tuning minimizes the regression score (optimization direction is correct).
 
     Same logic as test_tuning_selects_parameters_with_lowest_score but using
@@ -1218,14 +1226,19 @@ def test_regression_tuning_selects_parameters_with_lowest_score(rng) -> None:
     learning_rates_evaluated: list[float] = []
     original_set_lightgbm_params = methods.RegressionMCGrad._set_lightgbm_params
 
-    def tracking_set_lightgbm_params(self, params) -> None:
-        if "learning_rate" in params:
+    def tracking_set_lightgbm_params(self, params: dict[str, Any] | None) -> None:
+        if params is not None and "learning_rate" in params:
             learning_rates_evaluated.append(params["learning_rate"])
         return original_set_lightgbm_params(self, params)
 
     scores_returned = []
 
-    def mock_score_func(df, label_column, score_column, weight_column) -> float:
+    def mock_score_func(
+        df: pd.DataFrame,
+        label_column: str,
+        score_column: str,
+        weight_column: str | None,
+    ) -> float:
         scores_sequence = [2.0, 0.8, 3.5]
         idx = len(scores_returned)
         score = scores_sequence[idx % len(scores_sequence)]
@@ -1288,7 +1301,7 @@ def test_regression_tuning_selects_parameters_with_lowest_score(rng) -> None:
 
 
 def test_tune_mcgrad_params_raises_without_score_func(
-    sample_data, sample_val_data
+    sample_data: pd.DataFrame, sample_val_data: pd.DataFrame
 ) -> None:
     model = Mock(spec=methods.MCGrad)
     model.early_stopping_score_func = None
@@ -1320,7 +1333,12 @@ def _make_deterministic_score_func(
     """Create a mock score function that returns scores from a predetermined sequence."""
     scores_returned: list[float] = []
 
-    def _score_func(df, label_column, score_column, weight_column) -> float:
+    def _score_func(
+        df: pd.DataFrame,
+        label_column: str,
+        score_column: str,
+        weight_column: str | None,
+    ) -> float:
         idx = len(scores_returned)
         score = scores[idx % len(scores)]
         scores_returned.append(score)
@@ -1338,7 +1356,8 @@ def _make_deterministic_score_func(
     ids=["MCGrad", "RegressionMCGrad"],
 )
 def test_tune_mcgrad_params_with_early_stopping_disabled_returns_results(
-    rng, model_class
+    rng: np.random.RandomState,
+    model_class: type[methods.MCGrad] | type[methods.RegressionMCGrad],
 ) -> None:
     n_samples = 50
     is_classification = model_class is methods.MCGrad
@@ -1409,7 +1428,8 @@ def test_tune_mcgrad_params_with_early_stopping_disabled_returns_results(
     ids=["MCGrad", "RegressionMCGrad"],
 )
 def test_tune_mcgrad_params_with_custom_score_func_uses_custom_metric_in_results(
-    rng, model_class
+    rng: np.random.RandomState,
+    model_class: type[methods.MCGrad] | type[methods.RegressionMCGrad],
 ) -> None:
     """Verify tuning uses a custom early_stopping_score_func set on the model."""
     n_samples = 50
@@ -1471,7 +1491,10 @@ def test_tune_mcgrad_params_with_custom_score_func_uses_custom_metric_in_results
     [methods.MCGrad, methods.RegressionMCGrad],
     ids=["MCGrad", "RegressionMCGrad"],
 )
-def test_tuning_maximization_direction(rng, model_class) -> None:
+def test_tuning_maximization_direction(
+    rng: np.random.RandomState,
+    model_class: type[methods.MCGrad] | type[methods.RegressionMCGrad],
+) -> None:
     """Verify that tuning correctly maximizes when early_stopping_minimize_score=False.
 
     Mock score func returns [0.3, 0.8, 0.5]. With maximization, the trial with
@@ -1517,8 +1540,8 @@ def test_tuning_maximization_direction(rng, model_class) -> None:
     learning_rates_evaluated: list[float] = []
     original_set_lgbm = model_class._set_lightgbm_params
 
-    def tracking_set_lightgbm_params(self, params) -> None:
-        if "learning_rate" in params:
+    def tracking_set_lightgbm_params(self, params: dict[str, Any] | None) -> None:
+        if params is not None and "learning_rate" in params:
             learning_rates_evaluated.append(params["learning_rate"])
         return original_set_lgbm(self, params)
 
@@ -1568,7 +1591,10 @@ def test_tuning_maximization_direction(rng, model_class) -> None:
     [methods.MCGrad, methods.RegressionMCGrad],
     ids=["MCGrad", "RegressionMCGrad"],
 )
-def test_tuning_minimization_direction(rng, model_class) -> None:
+def test_tuning_minimization_direction(
+    rng: np.random.RandomState,
+    model_class: type[methods.MCGrad] | type[methods.RegressionMCGrad],
+) -> None:
     """Verify that tuning correctly minimizes when early_stopping_minimize_score=True.
 
     Mock score func returns [0.5, 0.2, 0.9]. With minimization, the trial with
@@ -1614,8 +1640,8 @@ def test_tuning_minimization_direction(rng, model_class) -> None:
     learning_rates_evaluated: list[float] = []
     original_set_lgbm = model_class._set_lightgbm_params
 
-    def tracking_set_lightgbm_params(self, params) -> None:
-        if "learning_rate" in params:
+    def tracking_set_lightgbm_params(self, params: dict[str, Any] | None) -> None:
+        if params is not None and "learning_rate" in params:
             learning_rates_evaluated.append(params["learning_rate"])
         return original_set_lgbm(self, params)
 
