@@ -87,7 +87,7 @@ def test_make_equispaced_bins_gives_similar_results_for_data_with_similar_range_
         (-710, 4.47e-309),
     ],
 )
-def test_logistic(log_odds, expected) -> None:
+def test_logistic(log_odds: float, expected: float) -> None:
     result = utils.logistic(log_odds)
     assert math.isclose(result, expected, abs_tol=1e-310)
 
@@ -110,7 +110,7 @@ def test_logistic(log_odds, expected) -> None:
         ),
     ],
 )
-def test_logit(probs, expected) -> None:
+def test_logit(probs: np.ndarray, expected: np.ndarray) -> None:
     result = utils.logit(probs)
     np.testing.assert_allclose(result, expected, rtol=1e-9)
 
@@ -118,7 +118,7 @@ def test_logit(probs, expected) -> None:
 @pytest.mark.parametrize(
     "probabilities", [(np.linspace(0.1, 0.9, num=10)), (np.linspace(0.1, 0.9, num=100))]
 )
-def test_logistic_is_inverse_function_of_logit(probabilities) -> None:
+def test_logistic_is_inverse_function_of_logit(probabilities: np.ndarray) -> None:
     result = utils.logistic(utils.logit(probabilities))
     np.testing.assert_allclose(result, probabilities, rtol=1e-9)
 
@@ -130,16 +130,16 @@ def test_logistic_is_inverse_function_of_logit(probabilities) -> None:
         (np.zeros(100)),
     ],
 )
-def test_logit_is_inverse_function_of_logistic(log_odds):
-    result = utils.logit(utils.logistic(log_odds))
+def test_logit_is_inverse_function_of_logistic(log_odds: np.ndarray) -> None:
+    result = utils.logit(np.asarray(utils.logistic(log_odds)))
     np.testing.assert_allclose(result, log_odds, rtol=1e-9)
 
 
-def test_logits_and_probs_conversions_maintain_same_scale_with_clipping():
+def test_logits_and_probs_conversions_maintain_same_scale_with_clipping() -> None:
     probabilities = np.array([0, 1e-400, 1e-350, 1e-200, 1e-100, 0.1, 0.2, 0.5, 0.99])
     logits = utils.logit(probs=probabilities)
 
-    recovered_probs = utils.logistic(logits)
+    recovered_probs = np.asarray(utils.logistic(logits))
 
     assert np.all(recovered_probs > 0.0), "Recovered probabilities should be > 0"
 
@@ -152,7 +152,7 @@ def test_logits_and_probs_conversions_maintain_same_scale_with_clipping():
             err_msg="Moderate probabilities should be recovered accurately",
         )
 
-    expected_min_prob = utils.logistic(utils.logit(probs=0))
+    expected_min_prob = utils.logistic(utils.logit(probs=np.array(0.0)))
     extreme_low_mask = probabilities < expected_min_prob
 
     if np.any(extreme_low_mask):
@@ -347,7 +347,9 @@ def test_encoder_serialize_deserialize_preserves_numeric_string_keys() -> None:
         ),
     ],
 )
-def test_make_unjoined_gives_expected_result(x, y, expected_x, expected_y) -> None:
+def test_make_unjoined_gives_expected_result(
+    x: np.ndarray, y: np.ndarray, expected_x: np.ndarray, expected_y: np.ndarray
+) -> None:
     unjoined_x, unjoined_y = utils.make_unjoined(x, y)
     assert np.array_equal(unjoined_x, expected_x), (
         "The unjoined features are not as expected."
@@ -365,7 +367,9 @@ def test_make_unjoined_gives_expected_result(x, y, expected_x, expected_y) -> No
         ("JAKARTA", 21470),
     ],
 )
-def test_hash_categorical_feature(categorical_feature, expected_result) -> None:
+def test_hash_categorical_feature(
+    categorical_feature: str, expected_result: int
+) -> None:
     actual_result = utils.hash_categorical_feature(categorical_feature)
     assert actual_result == expected_result
 
@@ -392,7 +396,9 @@ def test_hash_categorical_feature(categorical_feature, expected_result) -> None:
         (np.array([0, 1, 2, 3]), 0),
     ],
 )
-def test_geometric_mean_gives_correct_result(test_input, expected) -> None:
+def test_geometric_mean_gives_correct_result(
+    test_input: np.ndarray, expected: float
+) -> None:
     assert np.isclose(utils.geometric_mean(test_input), expected, atol=1e-6)
 
 
@@ -404,7 +410,9 @@ def test_geometric_mean_gives_correct_result(test_input, expected) -> None:
         np.array([1, 2, 3, 4, 5, -0.001]),
     ],  # Empty array  # Negative numbers
 )
-def test_geometric_mean_gives_nan_when_geometric_mean_is_undefined(test_input) -> None:
+def test_geometric_mean_gives_nan_when_geometric_mean_is_undefined(
+    test_input: np.ndarray,
+) -> None:
     # These edge cases may trigger numpy warnings for log of negative/zero or mean of empty slice
     # (depends on whether np.errstate() is active in the implementation)
     with warnings.catch_warnings():
@@ -470,9 +478,9 @@ def test_logistic_returns_valid_probabilities() -> None:
     assert np.all(result > 0) and np.all(result < 1)
 
 
-def test_logistic_with_extreme_values():
+def test_logistic_with_extreme_values() -> None:
     log_odds = np.array([-1000, -100, 100, 1000])
-    result = utils.logistic(log_odds)
+    result = np.asarray(utils.logistic(log_odds))
     assert result[0] < 1e-300
     assert result[1] < 1e-40
     assert result[2] > 0.999  # Very close to 1
@@ -488,7 +496,9 @@ def test_OrdinalEncoderWithUnknownSupport_transform_before_fit_raises_error() ->
         encoder.transform(df.values)
 
 
-def test_positive_label_proportion_does_not_modify_input_arrays(rng) -> None:
+def test_positive_label_proportion_does_not_modify_input_arrays(
+    rng: np.random.RandomState,
+) -> None:
     labels = rng.randint(0, 2, 100).astype(float)
     predictions = rng.uniform(0.1, 0.9, 100)
     bins = np.array([0.0, 0.25, 0.5, 0.75, 1.0])
@@ -573,7 +583,9 @@ def test_ordinal_encoder_transform_does_not_modify_input_dataframe() -> None:
     pd.testing.assert_frame_equal(df_test, df_test_original)
 
 
-def test_train_test_split_wrapper_split_does_not_modify_input_arrays(rng) -> None:
+def test_train_test_split_wrapper_split_does_not_modify_input_arrays(
+    rng: np.random.RandomState,
+) -> None:
     X = rng.rand(100, 5)
     y = rng.randint(0, 2, 100)
 
@@ -590,7 +602,9 @@ def test_train_test_split_wrapper_split_does_not_modify_input_arrays(rng) -> Non
     np.testing.assert_array_equal(y, y_original)
 
 
-def test_make_equispaced_bins_does_not_modify_input_array(rng) -> None:
+def test_make_equispaced_bins_does_not_modify_input_array(
+    rng: np.random.RandomState,
+) -> None:
     predicted_scores = rng.uniform(0.1, 0.9, 100)
     predicted_scores_original = predicted_scores.copy()
 
@@ -599,7 +613,9 @@ def test_make_equispaced_bins_does_not_modify_input_array(rng) -> None:
     np.testing.assert_array_equal(predicted_scores, predicted_scores_original)
 
 
-def test_make_equisized_bins_does_not_modify_input_array(rng) -> None:
+def test_make_equisized_bins_does_not_modify_input_array(
+    rng: np.random.RandomState,
+) -> None:
     predicted_scores = rng.uniform(0.1, 0.9, 100)
     predicted_scores_original = predicted_scores.copy()
 
@@ -608,7 +624,7 @@ def test_make_equisized_bins_does_not_modify_input_array(rng) -> None:
     np.testing.assert_array_equal(predicted_scores, predicted_scores_original)
 
 
-def test_logit_does_not_modify_input_array(rng) -> None:
+def test_logit_does_not_modify_input_array(rng: np.random.RandomState) -> None:
     probs = rng.uniform(0.1, 0.9, 100)
     probs_original = probs.copy()
 
@@ -617,7 +633,9 @@ def test_logit_does_not_modify_input_array(rng) -> None:
     np.testing.assert_array_equal(probs, probs_original)
 
 
-def test_absolute_error_does_not_modify_input_arrays(rng) -> None:
+def test_absolute_error_does_not_modify_input_arrays(
+    rng: np.random.RandomState,
+) -> None:
     estimate = rng.uniform(0, 100, 50)
     reference = rng.uniform(0, 100, 50)
 
@@ -630,7 +648,9 @@ def test_absolute_error_does_not_modify_input_arrays(rng) -> None:
     np.testing.assert_array_equal(reference, reference_original)
 
 
-def test_proportional_error_does_not_modify_input_arrays(rng) -> None:
+def test_proportional_error_does_not_modify_input_arrays(
+    rng: np.random.RandomState,
+) -> None:
     estimate = rng.uniform(1, 100, 50)
     reference = rng.uniform(1, 100, 50)
 
@@ -643,7 +663,7 @@ def test_proportional_error_does_not_modify_input_arrays(rng) -> None:
     np.testing.assert_array_equal(reference, reference_original)
 
 
-def test_make_unjoined_does_not_modify_input_arrays(rng) -> None:
+def test_make_unjoined_does_not_modify_input_arrays(rng: np.random.RandomState) -> None:
     x = rng.uniform(0, 1, (50, 3))
     y = rng.randint(0, 2, 50)
 
@@ -656,7 +676,9 @@ def test_make_unjoined_does_not_modify_input_arrays(rng) -> None:
     np.testing.assert_array_equal(y, y_original)
 
 
-def test_noop_splitter_wrapper_split_does_not_modify_input_arrays(rng) -> None:
+def test_noop_splitter_wrapper_split_does_not_modify_input_arrays(
+    rng: np.random.RandomState,
+) -> None:
     X = rng.rand(50, 5)
     y = rng.randint(0, 2, 50)
 
@@ -671,7 +693,7 @@ def test_noop_splitter_wrapper_split_does_not_modify_input_arrays(rng) -> None:
     np.testing.assert_array_equal(y, y_original)
 
 
-def test_geometric_mean_does_not_modify_input_array(rng) -> None:
+def test_geometric_mean_does_not_modify_input_array(rng: np.random.RandomState) -> None:
     x = rng.uniform(0.1, 100, 50)
     x_original = x.copy()
 
@@ -702,10 +724,10 @@ def test_logistic_array_returns_array() -> None:
     assert result.shape == (3,)
 
 
-def test_logistic_no_overflow_warning_on_extreme_inputs():
+def test_logistic_no_overflow_warning_on_extreme_inputs() -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("error", RuntimeWarning)
-        result = utils.logistic(np.array([-1e20, -1000, 1000, 1e20]))
+        result = np.asarray(utils.logistic(np.array([-1e20, -1000, 1000, 1e20])))
         assert result[0] == 0.0
         assert result[3] == 1.0
 
