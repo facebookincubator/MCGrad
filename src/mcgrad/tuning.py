@@ -291,6 +291,13 @@ def _tune_mcgrad_params(
         # search space.
         initialize_with_center=False,
         initialization_random_seed=random_seed,
+        # Prune hyperparameter changes that do not earn their keep, so that a tuned
+        # configuration differs from the defaults only where the difference matters.
+        # The pruning target is the baseline trial attached below, which Ax picks up
+        # from the experiment's status quo when generating candidates.
+        # Methodology: https://arxiv.org/abs/2602.07144
+        # Ax integration: https://ax.dev/docs/tutorials/bonsai/
+        simplify_parameter_changes=True,
     )
 
     initial_trial_parameters = _build_initial_trial_parameters(
