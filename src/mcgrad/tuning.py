@@ -151,7 +151,19 @@ def _build_initial_trial_parameters(
     return initial_trial_parameters
 
 
-def tune_mcgrad_params(
+def _create_oss_tuning_client(
+    random_seed: int | None = None,
+    persist_experiment: bool = False,
+) -> Client:
+    """Create a non-persistent Ax client for open-source tuning."""
+    if persist_experiment:
+        raise ValueError(
+            "Experiment persistence is not supported by the open-source tuning API."
+        )
+    return Client(random_seed=random_seed)
+
+
+def _tune_mcgrad_params(
     model: methods._BaseMCGrad,
     df_train: pd.DataFrame,
     prediction_column_name: str,
@@ -169,49 +181,12 @@ def tune_mcgrad_params(
     reference_parameters: dict[str, float | int] | None = None,
     random_seed: int | None = None,
     # @oss-disable[end= ]: _telemetry_overrides: dict[str, Any] | None = None,
+    *,
+    ax_client: Client,
+    experiment_name: str,
+    experiment_owner: str | None,
 ) -> tuple[methods._BaseMCGrad | None, pd.DataFrame]:
-    """
-    Tune the hyperparameters of an MCGrad model using Ax.
-
-    :param model: The MCGrad model to be tuned. It could be a fitted model or an unfitted model.
-    :param df_train: The training data: 80% of the data is used for training the model, and the remaining 20% is used for validation.
-    :param prediction_column_name: The name of the prediction column in the data.
-    :param label_column_name: The name of the label column in the data.
-    :param df_val: The validation data. If None, 20% of the training data is used for validation.
-    :param weight_column_name: The name of the weight column in the data. If None, all samples are treated equally.
-    :param categorical_feature_column_names: The names of the categorical feature columns in the data.
-    :param numerical_feature_column_names: The names of the numerical feature columns in the data.
-    :param n_trials: The number of trials to run. Defaults to 20.
-    :param n_warmup_random_trials: The Ax initialization budget, including the
-           attached baseline trial. Once that budget is exhausted, Ax switches to
-           Bayesian optimization. Default: None = let Ax choose.
-    :param parameter_configurations: The list of parameter configurations to tune. If None, the default parameter configurations are used.
-    :param pass_df_val_into_tuning: Whether to pass the validation data into the tuning process. If True, the validation data is passed into the tuning process.
-    :param pass_df_val_into_final_fit: Whether to pass the validation data into the final fit. If True, the validation data is passed into the final fit.
-    :param use_model_predictions: Whether to return the surrogate model's predicted best
-           (True) or the actual best observed trial (False). Defaults to False, which is
-           safer when running few trials.
-    :param reference_parameters: An optional configuration to seed the search with, for
-           example the configuration currently deployed or one found by a previous, deeper
-           search. Values are overlaid onto the default seed for parameter names that are
-           being tuned; names outside the search space are ignored, and names absent from
-           this mapping keep their default. Defaults to None, which seeds from defaults only.
-
-           Two consequences worth noting. The seed is evaluated as the first trial, so its
-           score is directly comparable with every searched trial on the same data. It is
-           also a completed trial, which means it is eligible to be returned as the best
-           parameterization when it outperforms everything the search finds.
-    :param random_seed: Seed forwarded to Ax for candidate generation during both
-           quasi-random exploration and Bayesian optimization. With identical trial
-           observations, this makes the proposed hyperparameters reproducible. Fully
-           reproducible tuning also requires deterministic data preparation, model
-           fitting, and scoring. Defaults to None.
-
-    :returns: A tuple containing:
-        - The fitted MCGrad model with the best hyperparameters found during tuning.
-        - A DataFrame containing the results of all trials, ordered best-first with
-          respect to the evaluation metric.
-    """
+    """Run MCGrad tuning with the provided Ax client and experiment metadata."""
 
     if (
         not hasattr(model, "early_stopping_score_func")
@@ -279,7 +254,6 @@ def tune_mcgrad_params(
         )
 
         prediction = model.predict(
-            # pyre-ignore[6] we assert above that df_val is not None
             df=df_val,
             prediction_column_name=prediction_column_name,
             categorical_feature_column_names=categorical_feature_column_names,
@@ -288,7 +262,7 @@ def tune_mcgrad_params(
 
         eval_df = pd.DataFrame(
             {
-                "label": df_val[label_column_name],  # pyre-ignore[16]
+                "label": df_val[label_column_name],
                 "prediction": prediction,
             },
             copy=False,
@@ -302,10 +276,9 @@ def tune_mcgrad_params(
             weight_column="weight" if weight_column_name else None,
         )
 
-    ax_client = Client(random_seed=random_seed)
-
     ax_client.configure_experiment(
-        name=f"lightgbm_autotuning_{uuid.uuid4().hex[:8]}",
+        name=experiment_name,
+        owner=experiment_owner,
         parameters=list(parameter_configurations),
     )
 
@@ -390,6 +363,89 @@ def tune_mcgrad_params(
     return model, trial_results
 
 
+def tune_mcgrad_params(
+    model: methods._BaseMCGrad,
+    df_train: pd.DataFrame,
+    prediction_column_name: str,
+    label_column_name: str,
+    df_val: pd.DataFrame | None = None,
+    weight_column_name: str | None = None,
+    categorical_feature_column_names: list[str] | None = None,
+    numerical_feature_column_names: list[str] | None = None,
+    n_trials: int = 20,
+    n_warmup_random_trials: int | None = None,
+    parameter_configurations: list[RangeParameterConfig] | None = None,
+    pass_df_val_into_tuning: bool = False,
+    pass_df_val_into_final_fit: bool = False,
+    use_model_predictions: bool = False,
+    reference_parameters: dict[str, float | int] | None = None,
+    random_seed: int | None = None,
+    # @oss-disable[end= ]: _telemetry_overrides: dict[str, Any] | None = None,
+) -> tuple[methods._BaseMCGrad | None, pd.DataFrame]:
+    """
+    Tune the hyperparameters of an MCGrad model using Ax.
+
+    :param model: The MCGrad model to be tuned. It could be a fitted model or an unfitted model.
+    :param df_train: The training data: 80% of the data is used for training the model, and the remaining 20% is used for validation.
+    :param prediction_column_name: The name of the prediction column in the data.
+    :param label_column_name: The name of the label column in the data.
+    :param df_val: The validation data. If None, 20% of the training data is used for validation.
+    :param weight_column_name: The name of the weight column in the data. If None, all samples are treated equally.
+    :param categorical_feature_column_names: The names of the categorical feature columns in the data.
+    :param numerical_feature_column_names: The names of the numerical feature columns in the data.
+    :param n_trials: The number of trials to run. Defaults to 20.
+    :param n_warmup_random_trials: The Ax initialization budget, including the
+           attached baseline trial. Once that budget is exhausted, Ax switches to
+           Bayesian optimization. Default: None = let Ax choose.
+    :param parameter_configurations: The list of parameter configurations to tune. If None, the default parameter configurations are used.
+    :param pass_df_val_into_tuning: Whether to pass the validation data into the tuning process. If True, the validation data is passed into the tuning process.
+    :param pass_df_val_into_final_fit: Whether to pass the validation data into the final fit. If True, the validation data is passed into the final fit.
+    :param use_model_predictions: Whether to return the surrogate model's predicted best
+           (True) or the actual best observed trial (False). Defaults to False, which is
+           safer when running few trials.
+    :param reference_parameters: An optional configuration to seed the search with, for
+           example the configuration currently deployed or one found by a previous, deeper
+           search. Values are overlaid onto the default seed for parameter names that are
+           being tuned; names outside the search space are ignored, and names absent from
+           this mapping keep their default. Defaults to None, which seeds from defaults only.
+
+           Two consequences worth noting. The seed is evaluated as the first trial, so its
+           score is directly comparable with every searched trial on the same data. It is
+           also a completed trial, which means it is eligible to be returned as the best
+           parameterization when it outperforms everything the search finds.
+    :param random_seed: Seed forwarded to Ax for candidate generation during both
+           quasi-random exploration and Bayesian optimization. With identical trial
+           observations, this makes the proposed hyperparameters reproducible. Fully
+           reproducible tuning also requires deterministic data preparation, model
+           fitting, and scoring. Defaults to None.
+    :returns: A tuple containing:
+        - The fitted MCGrad model with the best hyperparameters found during tuning.
+        - A DataFrame containing the results of all trials, ordered best-first with
+          respect to the evaluation metric.
+    """
+    return _tune_mcgrad_params(
+        model=model,
+        df_train=df_train,
+        prediction_column_name=prediction_column_name,
+        label_column_name=label_column_name,
+        df_val=df_val,
+        weight_column_name=weight_column_name,
+        categorical_feature_column_names=categorical_feature_column_names,
+        numerical_feature_column_names=numerical_feature_column_names,
+        n_trials=n_trials,
+        n_warmup_random_trials=n_warmup_random_trials,
+        parameter_configurations=parameter_configurations,
+        pass_df_val_into_tuning=pass_df_val_into_tuning,
+        pass_df_val_into_final_fit=pass_df_val_into_final_fit,
+        use_model_predictions=use_model_predictions,
+        reference_parameters=reference_parameters,
+        random_seed=random_seed,
+        # @oss-disable[end= ]: _telemetry_overrides=_telemetry_overrides,
+        ax_client=_create_oss_tuning_client(random_seed=random_seed),
+        experiment_name=f"lightgbm_autotuning_{uuid.uuid4().hex[:8]}",
+        experiment_owner=None,
+    )
+
+
 # @oss-disable: # Alias for backward compatibility and internal use.
-# @oss-disable: # pyre-ignore[5] ignoring because this is a direct alias,
 # @oss-disable[end= ]: tune_mcboost_params = tune_mcgrad_params

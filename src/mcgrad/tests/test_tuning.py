@@ -80,6 +80,14 @@ def hyperparams_for_tuning() -> tuple[dict[str, Any], dict[str, Any]]:
     return default_hyperparams, lightgbm_params
 
 
+def test_oss_tuning_client_rejects_persistence() -> None:
+    with pytest.raises(
+        ValueError,
+        match="Experiment persistence is not supported by the open-source tuning API",
+    ):
+        tuning_module._create_oss_tuning_client(persist_experiment=True)
+
+
 @pytest.mark.arm64_incompatible
 def test_tune_mcgrad_params_with_weights(
     sample_data: pd.DataFrame,
@@ -179,9 +187,9 @@ def test_tune_mcgrad_params_ax_client_setup(
     with (
         patch.object(
             tuning_module,
-            "Client",
-            side_effect=real_client_type,
-        ) as client_constructor,
+            "_create_oss_tuning_client",
+            side_effect=tuning_module._create_oss_tuning_client,
+        ) as create_tuning_client,
         patch.object(
             real_client_type,
             "configure_generation_strategy",
@@ -204,7 +212,7 @@ def test_tune_mcgrad_params_ax_client_setup(
     assert isinstance(trial_results, pd.DataFrame)
     assert len(trial_results) == 2
     assert mock_mcgrad_model.fit.call_count >= 2
-    client_constructor.assert_called_once_with(random_seed=17)
+    create_tuning_client.assert_called_once_with(random_seed=17)
     strategy_kwargs = configure_generation_strategy.call_args.kwargs
     assert strategy_kwargs["initialization_budget"] == 4
     assert strategy_kwargs["initialize_with_center"] is False
