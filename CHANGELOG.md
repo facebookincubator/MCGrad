@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `tune_mcgrad_params` attaches the default-hyperparameter trial as the experiment's baseline (status quo) rather than as an ordinary trial, so results can be interpreted as improvements over leaving the hyperparameters untuned.
 - `tune_mcgrad_params` no longer spends an initialization trial on the center of the search space. The default-hyperparameter trial already provides a more informative starting point.
+- `tune_mcgrad_params` now asks Ax to prune irrelevant parameter changes from the candidates it proposes (BONSAI), using the attached default-hyperparameter trial as the pruning target. Tuned configurations therefore differ from the defaults only where the difference earns its keep, which makes them easier to interpret and to review.
 
 ### Fixed
 - The trial results returned by `tune_mcgrad_params` are now ordered best-first for both optimization directions. Previously they were always sorted ascending, which placed the best trial last whenever the score function was maximized (e.g. AUC).

@@ -1691,3 +1691,40 @@ def test_tuning_minimization_direction(
     observed_scores = trial_results["mse"].tolist()
     assert observed_scores[0] == 0.2
     assert observed_scores == sorted(observed_scores)
+
+
+@pytest.mark.arm64_incompatible
+def test_tuning_enables_parameter_change_simplification(sample_data):
+    """Tuned configurations should differ from the defaults only where it matters."""
+    model = methods.MCGrad(
+        num_rounds=0,
+        early_stopping=False,
+        lightgbm_params={"num_leaves": 2, "n_estimators": 1, "max_depth": 2},
+    )
+
+    recorded_kwargs = {}
+    original_factory = tuning_module._create_oss_tuning_client
+
+    def recording_factory(**kwargs):
+        client = original_factory(**kwargs)
+        original_configure = client.configure_generation_strategy
+
+        def recording_configure(**gs_kwargs):
+            recorded_kwargs.update(gs_kwargs)
+            return original_configure(**gs_kwargs)
+
+        client.configure_generation_strategy = recording_configure
+        return client
+
+    with patch.object(tuning_module, "_create_oss_tuning_client", recording_factory):
+        tune_mcgrad_params(
+            model=model,
+            df_train=sample_data,
+            prediction_column_name="prediction",
+            label_column_name="label",
+            numerical_feature_column_names=["num_feature"],
+            n_trials=2,
+            parameter_configurations=_SINGLE_PARAM_CONFIG,
+        )
+
+    assert recorded_kwargs["simplify_parameter_changes"] is True
