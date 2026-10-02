@@ -2,8 +2,6 @@
 #
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
-# pyre-unsafe
-
 import math
 import warnings
 
@@ -17,25 +15,29 @@ from .. import _utils as utils
 
 
 @pytest.fixture
-def rng():
+def rng() -> np.random.RandomState:
     return np.random.RandomState(42)
 
 
-def test_make_equispaced_bins_gives_expected_result_when_data_between_zero_and_one_when_set_between_zero_one():
+def test_make_equispaced_bins_gives_expected_result_when_data_between_zero_and_one_when_set_between_zero_one() -> (
+    None
+):
     data = np.zeros(5)
     result = utils.make_equispaced_bins(data, 2)
     expected = np.array([-1.0e-8, 0.5, 1.0 + 1.0e-8])
     assert np.allclose(result, expected, atol=1e-5)
 
 
-def test_make_equispaced_bins_gives_expected_result_when_data_not_between_zero_and_one_when_set_between_zero_one():
+def test_make_equispaced_bins_gives_expected_result_when_data_not_between_zero_and_one_when_set_between_zero_one() -> (
+    None
+):
     data = np.zeros(5) + 10
     result = utils.make_equispaced_bins(data, 2)
     expected = np.array([-1.0e-8, 0.5, 10.0 + 1.0e-8])
     assert np.allclose(result, expected, atol=1e-5)
 
 
-def test_make_equispaced_bins_gives_expected_result():
+def test_make_equispaced_bins_gives_expected_result() -> None:
     data = np.array([0.7, 1.4, 2.5, 6.2, 9.7, 2.1])
     bins = utils.make_equispaced_bins(data, 3, set_range_to_zero_one=False)
 
@@ -44,7 +46,9 @@ def test_make_equispaced_bins_gives_expected_result():
     )
 
 
-def test_make_equispaced_bins_gives_similar_results_for_data_with_similar_range():
+def test_make_equispaced_bins_gives_similar_results_for_data_with_similar_range() -> (
+    None
+):
     data_1 = np.array([0.7, 100.7, 2, 2, 2, 2])
     data_2 = np.array([0.7, 100.7, 100, 100, 100, 100])
 
@@ -57,7 +61,9 @@ def test_make_equispaced_bins_gives_similar_results_for_data_with_similar_range(
     assert np.allclose(bins_1, bins_2, atol=1e-5)
 
 
-def test_make_equispaced_bins_gives_similar_results_for_data_with_similar_range_when_set_to_zero_one():
+def test_make_equispaced_bins_gives_similar_results_for_data_with_similar_range_when_set_to_zero_one() -> (
+    None
+):
     data_1 = np.array([0.7, 0.9, 0.2, 0.2, 0.2, 0.2])
     data_2 = np.array([0.7, 0.9, 0.9, 0.9, 0.9, 0.9])
 
@@ -81,7 +87,7 @@ def test_make_equispaced_bins_gives_similar_results_for_data_with_similar_range_
         (-710, 4.47e-309),
     ],
 )
-def test_logistic(log_odds, expected):
+def test_logistic(log_odds: float, expected: float) -> None:
     result = utils.logistic(log_odds)
     assert math.isclose(result, expected, abs_tol=1e-310)
 
@@ -104,7 +110,7 @@ def test_logistic(log_odds, expected):
         ),
     ],
 )
-def test_logit(probs, expected):
+def test_logit(probs: np.ndarray, expected: np.ndarray) -> None:
     result = utils.logit(probs)
     np.testing.assert_allclose(result, expected, rtol=1e-9)
 
@@ -112,7 +118,7 @@ def test_logit(probs, expected):
 @pytest.mark.parametrize(
     "probabilities", [(np.linspace(0.1, 0.9, num=10)), (np.linspace(0.1, 0.9, num=100))]
 )
-def test_logistic_is_inverse_function_of_logit(probabilities):
+def test_logistic_is_inverse_function_of_logit(probabilities: np.ndarray) -> None:
     result = utils.logistic(utils.logit(probabilities))
     np.testing.assert_allclose(result, probabilities, rtol=1e-9)
 
@@ -124,16 +130,16 @@ def test_logistic_is_inverse_function_of_logit(probabilities):
         (np.zeros(100)),
     ],
 )
-def test_logit_is_inverse_function_of_logistic(log_odds):
-    result = utils.logit(utils.logistic(log_odds))
+def test_logit_is_inverse_function_of_logistic(log_odds: np.ndarray) -> None:
+    result = utils.logit(np.asarray(utils.logistic(log_odds)))
     np.testing.assert_allclose(result, log_odds, rtol=1e-9)
 
 
-def test_logits_and_probs_conversions_maintain_same_scale_with_clipping():
+def test_logits_and_probs_conversions_maintain_same_scale_with_clipping() -> None:
     probabilities = np.array([0, 1e-400, 1e-350, 1e-200, 1e-100, 0.1, 0.2, 0.5, 0.99])
     logits = utils.logit(probs=probabilities)
 
-    recovered_probs = utils.logistic(logits)
+    recovered_probs = np.asarray(utils.logistic(logits))
 
     assert np.all(recovered_probs > 0.0), "Recovered probabilities should be > 0"
 
@@ -146,7 +152,7 @@ def test_logits_and_probs_conversions_maintain_same_scale_with_clipping():
             err_msg="Moderate probabilities should be recovered accurately",
         )
 
-    expected_min_prob = utils.logistic(utils.logit(probs=0))
+    expected_min_prob = utils.logistic(utils.logit(probs=np.array(0.0)))
     extreme_low_mask = probabilities < expected_min_prob
 
     if np.any(extreme_low_mask):
@@ -186,7 +192,7 @@ def test_OrdinalEncoderWithUnknownSupport_transform_known_categories() -> None:
     np.testing.assert_array_equal(transformed, expected)
 
 
-def test_OrdinalEncoderWithUnknownSupport_transform_unknown_categories():
+def test_OrdinalEncoderWithUnknownSupport_transform_unknown_categories() -> None:
     encoder = utils.OrdinalEncoderWithUnknownSupport()
     df_a = pd.DataFrame(
         {
@@ -206,7 +212,7 @@ def test_OrdinalEncoderWithUnknownSupport_transform_unknown_categories():
     np.testing.assert_array_equal(transformed, expected)
 
 
-def test_encoder_serialize_deserialize():
+def test_encoder_serialize_deserialize() -> None:
     df = pd.DataFrame({"City": ["Paris", "Tokyo", "Amsterdam", "Paris", "Amsterdam"]})
 
     encoder = utils.OrdinalEncoderWithUnknownSupport()
@@ -243,7 +249,7 @@ def test_encoder_serialize_deserialize_with_integer_category_keys() -> None:
     np.testing.assert_array_equal(deserialized_transformed, original_transformed)
 
 
-def test_encoder_serialize_deserialize_with_mixed_columns():
+def test_encoder_serialize_deserialize_with_mixed_columns() -> None:
     df = pd.DataFrame(
         {
             "City": ["Paris", "Tokyo", "Amsterdam"],
@@ -265,7 +271,7 @@ def test_encoder_serialize_deserialize_with_mixed_columns():
     np.testing.assert_array_equal(deserialized_transformed, original_transformed)
 
 
-def test_encoder_deserialize_legacy_format():
+def test_encoder_deserialize_legacy_format() -> None:
     legacy_str = "{0: {'Paris': 0, 'Tokyo': 1, 'Amsterdam': 2}}"
     deserialized = utils.OrdinalEncoderWithUnknownSupport.deserialize(legacy_str)
 
@@ -277,7 +283,7 @@ def test_encoder_deserialize_legacy_format():
     np.testing.assert_array_equal(transformed, expected)
 
 
-def test_encoder_serialize_deserialize_with_numpy_scalar_keys():
+def test_encoder_serialize_deserialize_with_numpy_scalar_keys() -> None:
     df = pd.DataFrame({"Code": np.array([100, 200, 300, 100, 200], dtype=np.int64)})
 
     encoder = utils.OrdinalEncoderWithUnknownSupport()
@@ -296,7 +302,7 @@ def test_encoder_serialize_deserialize_with_numpy_scalar_keys():
     assert deserialized._category_map == {0: {100: 0, 200: 1, 300: 2}}
 
 
-def test_encoder_serialize_deserialize_preserves_numeric_string_keys():
+def test_encoder_serialize_deserialize_preserves_numeric_string_keys() -> None:
     df = pd.DataFrame({"ProductCode": ["100", "200", "300", "100", "200"]})
 
     encoder = utils.OrdinalEncoderWithUnknownSupport()
@@ -341,7 +347,9 @@ def test_encoder_serialize_deserialize_preserves_numeric_string_keys():
         ),
     ],
 )
-def test_make_unjoined_gives_expected_result(x, y, expected_x, expected_y):
+def test_make_unjoined_gives_expected_result(
+    x: np.ndarray, y: np.ndarray, expected_x: np.ndarray, expected_y: np.ndarray
+) -> None:
     unjoined_x, unjoined_y = utils.make_unjoined(x, y)
     assert np.array_equal(unjoined_x, expected_x), (
         "The unjoined features are not as expected."
@@ -359,7 +367,9 @@ def test_make_unjoined_gives_expected_result(x, y, expected_x, expected_y):
         ("JAKARTA", 21470),
     ],
 )
-def test_hash_categorical_feature(categorical_feature, expected_result):
+def test_hash_categorical_feature(
+    categorical_feature: str, expected_result: int
+) -> None:
     actual_result = utils.hash_categorical_feature(categorical_feature)
     assert actual_result == expected_result
 
@@ -386,7 +396,9 @@ def test_hash_categorical_feature(categorical_feature, expected_result):
         (np.array([0, 1, 2, 3]), 0),
     ],
 )
-def test_geometric_mean_gives_correct_result(test_input, expected):
+def test_geometric_mean_gives_correct_result(
+    test_input: np.ndarray, expected: float
+) -> None:
     assert np.isclose(utils.geometric_mean(test_input), expected, atol=1e-6)
 
 
@@ -398,7 +410,9 @@ def test_geometric_mean_gives_correct_result(test_input, expected):
         np.array([1, 2, 3, 4, 5, -0.001]),
     ],  # Empty array  # Negative numbers
 )
-def test_geometric_mean_gives_nan_when_geometric_mean_is_undefined(test_input):
+def test_geometric_mean_gives_nan_when_geometric_mean_is_undefined(
+    test_input: np.ndarray,
+) -> None:
     # These edge cases may trigger numpy warnings for log of negative/zero or mean of empty slice
     # (depends on whether np.errstate() is active in the implementation)
     with warnings.catch_warnings():
@@ -407,13 +421,13 @@ def test_geometric_mean_gives_nan_when_geometric_mean_is_undefined(test_input):
     assert np.isnan(result), f"Test failed for undefined input: {test_input}"
 
 
-def test_convert_arrow_to_numpy_empty_dataframe_remains_empty():
+def test_convert_arrow_to_numpy_empty_dataframe_remains_empty() -> None:
     df = pd.DataFrame()
     result_df = utils.convert_arrow_columns_to_numpy(df)
     assert result_df.empty
 
 
-def test_convert_arrow_to_numpy_single_column_converts_to_numpy_array():
+def test_convert_arrow_to_numpy_single_column_converts_to_numpy_array() -> None:
     arrow_array = pa.array([1, 2, 3])
     df = pd.DataFrame({"col1": pd.Series(arrow_array, dtype=pd.ArrowDtype(pa.int64()))})
     assert isinstance(df["col1"].values, ArrowExtensionArray)
@@ -423,7 +437,7 @@ def test_convert_arrow_to_numpy_single_column_converts_to_numpy_array():
     assert (result_df["col1"].values == np.array([1, 2, 3])).all()
 
 
-def test_convert_arrow_to_numpy_single_row_converts_to_numpy_array():
+def test_convert_arrow_to_numpy_single_row_converts_to_numpy_array() -> None:
     arrow_array = pa.array([1])
     df = pd.DataFrame({"col1": pd.Series(arrow_array, dtype=pd.ArrowDtype(pa.int64()))})
     assert isinstance(df["col1"].values, ArrowExtensionArray)
@@ -433,7 +447,7 @@ def test_convert_arrow_to_numpy_single_row_converts_to_numpy_array():
     assert (result_df["col1"].values == np.array([1])).all()
 
 
-def test_convert_arrow_to_numpy_with_null_values_converts_correctly():
+def test_convert_arrow_to_numpy_with_null_values_converts_correctly() -> None:
     arrow_array = pa.array([1, None, 3], type=pa.int32())
     df = pd.DataFrame({"col1": pd.Series(arrow_array, dtype=pd.ArrowDtype(pa.int32()))})
     assert isinstance(df["col1"].values, ArrowExtensionArray)
@@ -458,22 +472,22 @@ def test_convert_arrow_to_numpy_with_unsupported_type_remains_unchanged() -> Non
     assert result_df["col1"].dtype == object
 
 
-def test_logistic_returns_valid_probabilities():
+def test_logistic_returns_valid_probabilities() -> None:
     log_odds = np.array([-10, -1, 0, 1, 10])
     result = utils.logistic(log_odds)
     assert np.all(result > 0) and np.all(result < 1)
 
 
-def test_logistic_with_extreme_values():
+def test_logistic_with_extreme_values() -> None:
     log_odds = np.array([-1000, -100, 100, 1000])
-    result = utils.logistic(log_odds)
+    result = np.asarray(utils.logistic(log_odds))
     assert result[0] < 1e-300
     assert result[1] < 1e-40
     assert result[2] > 0.999  # Very close to 1
     assert result[3] > 0.999  # Very close to 1
 
 
-def test_OrdinalEncoderWithUnknownSupport_transform_before_fit_raises_error():
+def test_OrdinalEncoderWithUnknownSupport_transform_before_fit_raises_error() -> None:
     encoder = utils.OrdinalEncoderWithUnknownSupport()
     df = pd.DataFrame({"City": ["Paris", "Tokyo"]})
     with pytest.raises(
@@ -482,7 +496,9 @@ def test_OrdinalEncoderWithUnknownSupport_transform_before_fit_raises_error():
         encoder.transform(df.values)
 
 
-def test_positive_label_proportion_does_not_modify_input_arrays(rng):
+def test_positive_label_proportion_does_not_modify_input_arrays(
+    rng: np.random.RandomState,
+) -> None:
     labels = rng.randint(0, 2, 100).astype(float)
     predictions = rng.uniform(0.1, 0.9, 100)
     bins = np.array([0.0, 0.25, 0.5, 0.75, 1.0])
@@ -506,7 +522,7 @@ def test_positive_label_proportion_does_not_modify_input_arrays(rng):
     np.testing.assert_array_equal(sample_weight, sample_weight_original)
 
 
-def test_ordinal_encoder_fit_does_not_modify_input_array():
+def test_ordinal_encoder_fit_does_not_modify_input_array() -> None:
     data = np.array([["Paris", "Male"], ["Tokyo", "Female"], ["Amsterdam", "Male"]])
     data_original = data.copy()
 
@@ -531,7 +547,7 @@ def test_ordinal_encoder_fit_does_not_modify_input_dataframe() -> None:
     pd.testing.assert_frame_equal(df, df_original)
 
 
-def test_ordinal_encoder_transform_does_not_modify_input_array():
+def test_ordinal_encoder_transform_does_not_modify_input_array() -> None:
     train_data = np.array(
         [["Paris", "Male"], ["Tokyo", "Female"], ["Amsterdam", "Male"]]
     )
@@ -545,7 +561,7 @@ def test_ordinal_encoder_transform_does_not_modify_input_array():
     np.testing.assert_array_equal(test_data, test_data_original)
 
 
-def test_ordinal_encoder_transform_does_not_modify_input_dataframe():
+def test_ordinal_encoder_transform_does_not_modify_input_dataframe() -> None:
     df_train = pd.DataFrame(
         {
             "City": ["Paris", "Tokyo", "Amsterdam"],
@@ -567,7 +583,9 @@ def test_ordinal_encoder_transform_does_not_modify_input_dataframe():
     pd.testing.assert_frame_equal(df_test, df_test_original)
 
 
-def test_train_test_split_wrapper_split_does_not_modify_input_arrays(rng):
+def test_train_test_split_wrapper_split_does_not_modify_input_arrays(
+    rng: np.random.RandomState,
+) -> None:
     X = rng.rand(100, 5)
     y = rng.randint(0, 2, 100)
 
@@ -584,7 +602,9 @@ def test_train_test_split_wrapper_split_does_not_modify_input_arrays(rng):
     np.testing.assert_array_equal(y, y_original)
 
 
-def test_make_equispaced_bins_does_not_modify_input_array(rng):
+def test_make_equispaced_bins_does_not_modify_input_array(
+    rng: np.random.RandomState,
+) -> None:
     predicted_scores = rng.uniform(0.1, 0.9, 100)
     predicted_scores_original = predicted_scores.copy()
 
@@ -593,7 +613,9 @@ def test_make_equispaced_bins_does_not_modify_input_array(rng):
     np.testing.assert_array_equal(predicted_scores, predicted_scores_original)
 
 
-def test_make_equisized_bins_does_not_modify_input_array(rng):
+def test_make_equisized_bins_does_not_modify_input_array(
+    rng: np.random.RandomState,
+) -> None:
     predicted_scores = rng.uniform(0.1, 0.9, 100)
     predicted_scores_original = predicted_scores.copy()
 
@@ -602,7 +624,7 @@ def test_make_equisized_bins_does_not_modify_input_array(rng):
     np.testing.assert_array_equal(predicted_scores, predicted_scores_original)
 
 
-def test_logit_does_not_modify_input_array(rng):
+def test_logit_does_not_modify_input_array(rng: np.random.RandomState) -> None:
     probs = rng.uniform(0.1, 0.9, 100)
     probs_original = probs.copy()
 
@@ -611,7 +633,9 @@ def test_logit_does_not_modify_input_array(rng):
     np.testing.assert_array_equal(probs, probs_original)
 
 
-def test_absolute_error_does_not_modify_input_arrays(rng):
+def test_absolute_error_does_not_modify_input_arrays(
+    rng: np.random.RandomState,
+) -> None:
     estimate = rng.uniform(0, 100, 50)
     reference = rng.uniform(0, 100, 50)
 
@@ -624,7 +648,9 @@ def test_absolute_error_does_not_modify_input_arrays(rng):
     np.testing.assert_array_equal(reference, reference_original)
 
 
-def test_proportional_error_does_not_modify_input_arrays(rng):
+def test_proportional_error_does_not_modify_input_arrays(
+    rng: np.random.RandomState,
+) -> None:
     estimate = rng.uniform(1, 100, 50)
     reference = rng.uniform(1, 100, 50)
 
@@ -637,7 +663,7 @@ def test_proportional_error_does_not_modify_input_arrays(rng):
     np.testing.assert_array_equal(reference, reference_original)
 
 
-def test_make_unjoined_does_not_modify_input_arrays(rng):
+def test_make_unjoined_does_not_modify_input_arrays(rng: np.random.RandomState) -> None:
     x = rng.uniform(0, 1, (50, 3))
     y = rng.randint(0, 2, 50)
 
@@ -650,7 +676,9 @@ def test_make_unjoined_does_not_modify_input_arrays(rng):
     np.testing.assert_array_equal(y, y_original)
 
 
-def test_noop_splitter_wrapper_split_does_not_modify_input_arrays(rng):
+def test_noop_splitter_wrapper_split_does_not_modify_input_arrays(
+    rng: np.random.RandomState,
+) -> None:
     X = rng.rand(50, 5)
     y = rng.randint(0, 2, 50)
 
@@ -665,7 +693,7 @@ def test_noop_splitter_wrapper_split_does_not_modify_input_arrays(rng):
     np.testing.assert_array_equal(y, y_original)
 
 
-def test_geometric_mean_does_not_modify_input_array(rng):
+def test_geometric_mean_does_not_modify_input_array(rng: np.random.RandomState) -> None:
     x = rng.uniform(0.1, 100, 50)
     x_original = x.copy()
 
@@ -683,28 +711,28 @@ def test_logistic_does_not_modify_input_array(rng: np.random.RandomState) -> Non
     np.testing.assert_array_equal(log_odds, log_odds_original)
 
 
-def test_logistic_scalar_returns_scalar():
+def test_logistic_scalar_returns_scalar() -> None:
     result = utils.logistic(0.0)
     assert isinstance(result, float)
     assert result == 0.5
 
 
-def test_logistic_array_returns_array():
+def test_logistic_array_returns_array() -> None:
     log_odds = np.array([-1.0, 0.0, 1.0])
     result = utils.logistic(log_odds)
     assert isinstance(result, np.ndarray)
     assert result.shape == (3,)
 
 
-def test_logistic_no_overflow_warning_on_extreme_inputs():
+def test_logistic_no_overflow_warning_on_extreme_inputs() -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("error", RuntimeWarning)
-        result = utils.logistic(np.array([-1e20, -1000, 1000, 1e20]))
+        result = np.asarray(utils.logistic(np.array([-1e20, -1000, 1000, 1e20])))
         assert result[0] == 0.0
         assert result[3] == 1.0
 
 
-def test_predictions_to_labels_gives_expected_result():
+def test_predictions_to_labels_gives_expected_result() -> None:
     data = pd.DataFrame(
         {
             "prediction": [0.1, 0.2, 0.4, 0.8, 0.9],
@@ -739,7 +767,7 @@ def test_predictions_to_labels_gives_expected_result():
     pd.testing.assert_frame_equal(data_with_predicted_labels_and_thresholds, expected)
 
 
-def test_predictions_to_labels_with_custom_threshold_column_name():
+def test_predictions_to_labels_with_custom_threshold_column_name() -> None:
     data = pd.DataFrame(
         {
             "prediction": [0.1, 0.2, 0.4, 0.8, 0.9],
@@ -771,7 +799,7 @@ def test_predictions_to_labels_with_custom_threshold_column_name():
     pd.testing.assert_frame_equal(result, expected)
 
 
-def test_predictions_to_labels_does_not_modify_input_dataframes():
+def test_predictions_to_labels_does_not_modify_input_dataframes() -> None:
     """Verify predictions_to_labels does not modify input DataFrames."""
     data = pd.DataFrame(
         {

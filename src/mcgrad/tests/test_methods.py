@@ -2,7 +2,6 @@
 #
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
-# pyre-unsafe
 from __future__ import annotations
 
 import json
@@ -26,11 +25,11 @@ from ..metrics import (
 
 
 @pytest.fixture
-def rng():
+def rng() -> np.random.RandomState:
     return np.random.RandomState(42)
 
 
-def generate_test_data(n):
+def generate_test_data(n) -> pd.DataFrame:
     return pd.DataFrame(
         {
             "City": np.array(["Paris", "Tokyo", "Amsterdam", "Paris", "Amsterdam"])[:n],
@@ -66,7 +65,7 @@ def generate_test_data(n):
 )
 def test_deserialized_mcgrad_fits_correct_num_rounds_when_no_early_stopping(
     num_rounds, calibrator_class, calibrator_kwargs
-):
+) -> None:
     df_train = generate_test_data(5)
     model = calibrator_class(
         num_rounds=num_rounds,
@@ -118,7 +117,7 @@ def test_deserialized_mcgrad_fits_correct_num_rounds_when_no_early_stopping(
 )
 def test_mcgrad_serialize_deserialize_encode_categorical(
     calibrator_class, calibrator_kwargs
-):
+) -> None:
     df_train = generate_test_data(5)
     model = calibrator_class(**calibrator_kwargs)
     model.fit(
@@ -178,7 +177,7 @@ def test_mcgrad_serialize_deserialize_encode_categorical(
 )
 def test_mcgrad_serialize_deserialize_no_encode_categorical(
     calibrator_class, calibrator_kwargs
-):
+) -> None:
     df_train = generate_test_data(5)
     city_codebook = {"Paris": 0, "Tokyo": 1, "Amsterdam": 2, "Copenhagen": 3}
     gender_codebook = {
@@ -231,7 +230,7 @@ def test_mcgrad_serialize_deserialize_no_encode_categorical(
 @pytest.mark.parametrize("max_num_rounds", [(1), (2), (6)])
 def test_deserialized_mcgrad_has_at_most_max_num_rounds(
     max_num_rounds, calibrator_class
-):
+) -> None:
     df_train = pd.DataFrame(
         {
             "City": ["Paris", "Tokyo", "Amsterdam", "Paris", "Amsterdam"],
@@ -309,7 +308,7 @@ def test_deserialized_mcgrad_has_at_most_max_num_rounds(
 )
 def test_fit_transform_identical_to_fit_then_predict(
     calibrator_class, calibrator_kwargs, use_train_col, rng
-):
+) -> None:
     df = pd.DataFrame(
         {
             "prediction": np.linspace(0, 1, 100),
@@ -345,7 +344,9 @@ def test_fit_transform_identical_to_fit_then_predict(
         )
 
 
-def test_segmentwise_calibrator_raises_when_incompatible_calibrator_kwargs_are_passed():
+def test_segmentwise_calibrator_raises_when_incompatible_calibrator_kwargs_are_passed() -> (
+    None
+):
     with pytest.raises(ValueError):
         methods.SegmentwiseCalibrator(methods.PlattScaling, {"non_existent_arg": 42})
 
@@ -362,7 +363,7 @@ def test_segmentwise_calibrator_raises_when_incompatible_calibrator_kwargs_are_p
 )
 def test_segmentwise_calibrator_equivalent_to_calibrator_per_segment(
     calibrator_class, rng
-):
+) -> None:
     df = pd.DataFrame(index=range(100))
     df["label"] = rng.choice([0, 1], size=len(df))
     # Create an 'uncalibrated_score' column that is correlated with 'label'
@@ -400,7 +401,9 @@ def test_segmentwise_calibrator_equivalent_to_calibrator_per_segment(
         )
 
 
-def test_segmentwise_calibrator_with_additive_adjustment_gives_expected_results(rng):
+def test_segmentwise_calibrator_with_additive_adjustment_gives_expected_results(
+    rng,
+) -> None:
     df = pd.DataFrame(index=range(1000))
     df["label"] = rng.choice(range(1000), size=len(df))
     df["uncalibrated_score"] = rng.choice(range(1000), size=len(df)).astype(float)
@@ -442,7 +445,7 @@ def test_segmentwise_calibrator_with_additive_adjustment_gives_expected_results(
 )
 def test_multiplicative_adjustment_gives_expected_result(
     scores, labels, expected_multiplier
-):
+) -> None:
     df = pd.DataFrame({"prediction": scores, "label": labels})
     calibrator = methods.MultiplicativeAdjustment(clip_to_zero_one=False)
     calibrator.fit(df, "prediction", "label")
@@ -465,7 +468,7 @@ def test_multiplicative_adjustment_gives_expected_result(
 )
 def test_multiplicative_adjustment_with_clip_gives_expected_result(
     scores, labels, expected_multiplier, expected_predictions
-):
+) -> None:
     df = pd.DataFrame({"prediction": scores, "label": labels})
     calibrator = methods.MultiplicativeAdjustment(clip_to_zero_one=True)
     calibrator.fit(df, "prediction", "label")
@@ -488,7 +491,7 @@ def test_multiplicative_adjustment_with_clip_gives_expected_result(
 )
 def test_additive_adjustment_calibrator_gives_expected_result(
     scores, labels, expected_offset
-):
+) -> None:
     # Create a simple DataFrame for testing
     df = pd.DataFrame({"prediction": scores, "label": labels})
     calibrator = methods.AdditiveAdjustment(clip_to_zero_one=False)
@@ -512,7 +515,7 @@ def test_additive_adjustment_calibrator_gives_expected_result(
 )
 def test_additive_adjustment_calibrator_with_clip_gives_expected_result(
     scores, labels, expected_offset, expected_predictions
-):
+) -> None:
     # Create a simple DataFrame for testing
     df = pd.DataFrame({"prediction": scores, "label": labels})
     calibrator = methods.AdditiveAdjustment(clip_to_zero_one=True)
@@ -555,7 +558,7 @@ def test_additive_adjustment_calibrator_with_clip_gives_expected_result(
 )
 def test_calibration_methods_use_weight_column_correctly(
     calibrator_class, calibrator_kwargs
-):
+) -> None:
     # Create an unweighted dataset with duplicates: positive 0.2 occurs 3x and negative 0.6 occurs 2x
     df_train_unweighted = pd.DataFrame(
         {
@@ -600,7 +603,7 @@ def test_calibration_methods_use_weight_column_correctly(
         (methods.RegressionMCGrad, np.array([-0.001, None])),
     ],
 )
-def test_mcgrad_raises_when_predictions_invalid(calibrator_class, predictions):
+def test_mcgrad_raises_when_predictions_invalid(calibrator_class, predictions) -> None:
     df = pd.DataFrame({"prediction": predictions, "label": np.array([0, 1])})
     mcgrad = calibrator_class()
     with pytest.raises(ValueError):
@@ -636,7 +639,7 @@ def test_mcgrad_raises_when_predictions_invalid(calibrator_class, predictions):
 )
 def test_mcgrad_runs_without_errors_when_scores_in_zero_one(
     calibrator_class, calibrator_kwargs
-):
+) -> None:
     df = pd.DataFrame(
         {
             "prediction": np.array([0.001, 0.999, 0.01, 0.99]),
@@ -676,7 +679,7 @@ def test_mcgrad_runs_without_errors_when_scores_in_zero_one(
 )
 def test_mcgrad_runs_without_errors_when_scores_are_exactly_zero_or_one(
     calibrator_class, calibrator_kwargs
-):
+) -> None:
     df = pd.DataFrame(
         {"prediction": np.array([0, 1, 0, 1]), "label": np.array([0, 1, 0, 1])}
     )
@@ -690,7 +693,7 @@ def test_mcgrad_runs_without_errors_when_scores_are_exactly_zero_or_one(
 @pytest.mark.parametrize("num_rounds", [(1), (2), (4)])
 def test_mcgrad_predict_returns_correct_number_of_rounds_and_consistent_final_prediction_when_no_early_stopping(
     num_rounds, calibrator_class, rng
-):
+) -> None:
     n = 10
     predictions = rng.uniform(low=0.0, high=1.0, size=n)
     labels = scipy.stats.binom.rvs(1, predictions, size=n, random_state=rng)
@@ -715,7 +718,7 @@ def test_mcgrad_predict_returns_correct_number_of_rounds_and_consistent_final_pr
 @pytest.mark.parametrize("num_rounds", [(1), (2), (4)])
 def test_mcgrad_predict_returns_correct_number_of_rounds_and_consistent_final_prediction_when_early_stopping_is_used(
     num_rounds, calibrator_class, rng
-):
+) -> None:
     n = 10
     predictions = rng.uniform(low=0.0, high=1.0, size=n)
     labels = scipy.stats.binom.rvs(1, predictions, size=n, random_state=rng)
@@ -742,7 +745,7 @@ def test_mcgrad_predict_returns_correct_number_of_rounds_and_consistent_final_pr
 def test_mcgrad_predict_returns_correct_number_of_rounds_and_consistent_final_prediction(
     calibrator_class,
     rng,
-):
+) -> None:
     n = 10
     max_num_rounds = 2
 
@@ -828,7 +831,7 @@ def test_mcgrad_predict_returns_correct_number_of_rounds_and_consistent_final_pr
 )
 def test_that_default_lightgbm_params_are_applied_correctly_for_mcgrad(
     calibrator_class, input_params, expected_params, objective
-):
+) -> None:
     model = calibrator_class(lightgbm_params=input_params)
 
     # These are always added in the MCGrad init
@@ -905,7 +908,7 @@ def test_that_default_lightgbm_params_are_applied_correctly_for_mcgrad(
 )
 def test_that_lightgbm_params_are_applied_correctly_after_resetting_them(
     calibrator_class, input_params, expected_params, objective
-):
+) -> None:
     model = calibrator_class()
     model._set_lightgbm_params(lightgbm_params=input_params)
 
@@ -930,7 +933,7 @@ def test_that_lightgbm_params_are_applied_correctly_after_resetting_them(
         methods.RegressionMCGrad,
     ],
 )
-def test_mcgrad_with_random_generator_as_random_state(calibrator_class):
+def test_mcgrad_with_random_generator_as_random_state(calibrator_class) -> None:
     rng = np.random.default_rng(42)
     model = calibrator_class(random_state=rng)
 
@@ -944,7 +947,7 @@ def test_mcgrad_with_random_generator_as_random_state(calibrator_class):
         methods.RegressionMCGrad,
     ],
 )
-def test_mcgrad_reproducibility_with_same_random_state(calibrator_class):
+def test_mcgrad_reproducibility_with_same_random_state(calibrator_class) -> None:
     model1 = calibrator_class(random_state=42)
     model2 = calibrator_class(random_state=42)
 
@@ -967,7 +970,9 @@ def test_mcgrad_reproducibility_with_same_random_state(calibrator_class):
         methods.RegressionMCGrad,
     ],
 )
-def test_mcgrad_different_random_states_produce_different_seeds(calibrator_class):
+def test_mcgrad_different_random_states_produce_different_seeds(
+    calibrator_class,
+) -> None:
     model1 = calibrator_class(random_state=42)
     model2 = calibrator_class(random_state=123)
 
@@ -984,7 +989,9 @@ def test_mcgrad_different_random_states_produce_different_seeds(calibrator_class
         methods.RegressionMCGrad,
     ],
 )
-def test_mcgrad_raises_when_custom_score_func_without_minimize_score(calibrator_class):
+def test_mcgrad_raises_when_custom_score_func_without_minimize_score(
+    calibrator_class,
+) -> None:
     custom_score_func = wrap_sklearn_metric_func(skmetrics.roc_auc_score)
     with pytest.raises(
         ValueError,
@@ -1026,7 +1033,7 @@ def test_mcgrad_raises_when_patience_set_without_early_stopping(
 )
 def test_mcgrad_raises_when_crossvalidation_set_without_early_stopping(
     calibrator_class,
-):
+) -> None:
     with pytest.raises(
         ValueError,
         match="`early_stopping_use_crossvalidation` must be None when `early_stopping` is disabled",
@@ -1044,7 +1051,9 @@ def test_mcgrad_raises_when_crossvalidation_set_without_early_stopping(
         methods.RegressionMCGrad,
     ],
 )
-def test_mcgrad_raises_when_score_func_set_without_early_stopping(calibrator_class):
+def test_mcgrad_raises_when_score_func_set_without_early_stopping(
+    calibrator_class,
+) -> None:
     custom_score_func = wrap_sklearn_metric_func(skmetrics.roc_auc_score)
     with pytest.raises(
         ValueError,
@@ -1066,7 +1075,7 @@ def test_mcgrad_raises_when_score_func_set_without_early_stopping(calibrator_cla
 )
 def test_mcgrad_raises_when_minimize_score_without_custom_score_func_early_stopping_enabled(
     calibrator_class,
-):
+) -> None:
     with pytest.raises(
         ValueError,
         match="`early_stopping_minimize_score` is only relevant when using a custom score function",
@@ -1085,7 +1094,7 @@ def test_mcgrad_raises_when_minimize_score_without_custom_score_func_early_stopp
         methods.RegressionMCGrad,
     ],
 )
-def test_mcgrad_raises_when_n_folds_set_with_holdout(calibrator_class):
+def test_mcgrad_raises_when_n_folds_set_with_holdout(calibrator_class) -> None:
     with pytest.raises(
         ValueError,
         match="`n_folds` must be None when `early_stopping_use_crossvalidation` is disabled",
@@ -1104,7 +1113,9 @@ def test_mcgrad_raises_when_n_folds_set_with_holdout(calibrator_class):
         methods.RegressionMCGrad,
     ],
 )
-def test_mcgrad_default_num_rounds_when_early_stopping_disabled(calibrator_class):
+def test_mcgrad_default_num_rounds_when_early_stopping_disabled(
+    calibrator_class,
+) -> None:
     model = calibrator_class(early_stopping=False, num_rounds=None)
     assert model.num_rounds == calibrator_class.NUM_ROUNDS_DEFAULT_NO_EARLY_STOPPING
 
@@ -1116,7 +1127,7 @@ def test_mcgrad_default_num_rounds_when_early_stopping_disabled(calibrator_class
         methods.RegressionMCGrad,
     ],
 )
-def test_mcgrad_raises_when_num_rounds_in_lightgbm_params(calibrator_class):
+def test_mcgrad_raises_when_num_rounds_in_lightgbm_params(calibrator_class) -> None:
     with pytest.raises(
         ValueError,
         match="Avoid using `num_rounds` in `lightgbm_params`",
@@ -1133,7 +1144,7 @@ def test_mcgrad_raises_when_num_rounds_in_lightgbm_params(calibrator_class):
         methods.RegressionMCGrad,
     ],
 )
-def test_mcgrad_feature_importance_raises_when_not_fit(calibrator_class):
+def test_mcgrad_feature_importance_raises_when_not_fit(calibrator_class) -> None:
     model = calibrator_class()
     with pytest.raises(ValueError, match="Model has not been fit yet"):
         model.feature_importance()
@@ -1148,7 +1159,7 @@ def test_mcgrad_feature_importance_raises_when_not_fit(calibrator_class):
 )
 def test_mcgrad_performance_metrics_raises_when_not_fit_with_early_stopping(
     calibrator_class,
-):
+) -> None:
     model = calibrator_class(early_stopping=False)
     with pytest.raises(
         ValueError,
@@ -1164,7 +1175,7 @@ def test_mcgrad_performance_metrics_raises_when_not_fit_with_early_stopping(
         methods.RegressionMCGrad,
     ],
 )
-def test_mcgrad_monotone_t_constraint_applied_correctly(calibrator_class, rng):
+def test_mcgrad_monotone_t_constraint_applied_correctly(calibrator_class, rng) -> None:
     df_train = pd.DataFrame(
         {
             "cat_feature": rng.choice(["A", "B", "C"], 50),
@@ -1199,7 +1210,7 @@ def test_mcgrad_monotone_t_constraint_applied_correctly(calibrator_class, rng):
         methods.RegressionMCGrad,
     ],
 )
-def test_mcgrad_get_lgbm_params_with_monotone_t(calibrator_class):
+def test_mcgrad_get_lgbm_params_with_monotone_t(calibrator_class) -> None:
     model = calibrator_class(monotone_t=True)
 
     x = np.array([[1, 2, 3], [4, 5, 6]])
@@ -1218,7 +1229,7 @@ def test_mcgrad_get_lgbm_params_with_monotone_t(calibrator_class):
         methods.RegressionMCGrad,
     ],
 )
-def test_mcgrad_extract_features_raises_when_encoder_not_fit(calibrator_class):
+def test_mcgrad_extract_features_raises_when_encoder_not_fit(calibrator_class) -> None:
     model = calibrator_class(encode_categorical_variables=True)
 
     df = pd.DataFrame({"cat_feature": ["A", "B", "C"]})
@@ -1239,7 +1250,7 @@ def test_mcgrad_extract_features_raises_when_encoder_not_fit(calibrator_class):
         methods.RegressionMCGrad,
     ],
 )
-def test_predict_before_fit_with_categorical_features_raises(calibrator_class):
+def test_predict_before_fit_with_categorical_features_raises(calibrator_class) -> None:
     model = calibrator_class()
     df = pd.DataFrame(
         {"prediction": [0.5, 0.6], "cat_feature": ["A", "B"]},
@@ -1259,7 +1270,7 @@ def test_predict_before_fit_with_categorical_features_raises(calibrator_class):
         methods.RegressionMCGrad,
     ],
 )
-def test_predict_before_fit_with_numerical_features_raises(calibrator_class):
+def test_predict_before_fit_with_numerical_features_raises(calibrator_class) -> None:
     model = calibrator_class()
     df = pd.DataFrame(
         {"prediction": [0.5, 0.6], "num_feature": [1.0, 2.0]},
@@ -1279,7 +1290,7 @@ def test_predict_before_fit_with_numerical_features_raises(calibrator_class):
         methods.PlattScalingWithFeatures,
     ],
 )
-def test_platt_scaling_predict_before_fit_raises(calibrator_class):
+def test_platt_scaling_predict_before_fit_raises(calibrator_class) -> None:
     model = calibrator_class()
     df = pd.DataFrame({"prediction": [0.3, 0.6], "label": [0, 1]})
     with pytest.raises(ValueError, match="predict.*before fit"):
@@ -1293,7 +1304,7 @@ def test_platt_scaling_predict_before_fit_raises(calibrator_class):
         methods.RegressionMCGrad,
     ],
 )
-def test_predict_with_different_features_than_fit_raises(calibrator_class, rng):
+def test_predict_with_different_features_than_fit_raises(calibrator_class, rng) -> None:
     df = pd.DataFrame(
         {
             "prediction": rng.rand(30),
@@ -1328,7 +1339,7 @@ def test_predict_with_different_features_than_fit_raises(calibrator_class, rng):
         methods.RegressionMCGrad,
     ],
 )
-def test_predict_with_extra_features_not_in_fit_raises(calibrator_class, rng):
+def test_predict_with_extra_features_not_in_fit_raises(calibrator_class, rng) -> None:
     df = pd.DataFrame(
         {
             "prediction": rng.rand(30),
@@ -1361,7 +1372,7 @@ def test_predict_with_extra_features_not_in_fit_raises(calibrator_class, rng):
         methods.RegressionMCGrad,
     ],
 )
-def test_predict_with_swapped_feature_order_raises(calibrator_class, rng):
+def test_predict_with_swapped_feature_order_raises(calibrator_class, rng) -> None:
     df = pd.DataFrame(
         {
             "prediction": rng.rand(30),
@@ -1476,7 +1487,7 @@ def test_predict_with_matching_features_succeeds(
 )
 def test_feature_consistency_skipped_for_legacy_serialized_models(
     calibrator_class, rng
-):
+) -> None:
     df = pd.DataFrame(
         {
             "prediction": rng.rand(30),
@@ -1523,7 +1534,7 @@ def test_feature_consistency_skipped_for_legacy_serialized_models(
 )
 def test_deserialize_restores_allow_missing_segment_feature_values(
     calibrator_class, rng
-):
+) -> None:
     """Test that allow_missing_segment_feature_values survives serialize/deserialize roundtrip."""
     df = pd.DataFrame(
         {
@@ -1563,7 +1574,9 @@ def test_deserialize_restores_allow_missing_segment_feature_values(
         methods.RegressionMCGrad,
     ],
 )
-def test_mcgrad_feature_importance_returns_correct_dataframe(calibrator_class, rng):
+def test_mcgrad_feature_importance_returns_correct_dataframe(
+    calibrator_class, rng
+) -> None:
     df_train = pd.DataFrame(
         {
             "cat_feature": rng.choice(["A", "B", "C"], 50),
@@ -1598,7 +1611,9 @@ def test_mcgrad_feature_importance_returns_correct_dataframe(calibrator_class, r
 
 @pytest.mark.parametrize("calibrator_class", [methods.MCGrad, methods.RegressionMCGrad])
 @pytest.mark.parametrize("num_rounds", [(2), (6)])
-def test_early_stopping_stops_at_max_num_rounds(num_rounds: int, calibrator_class, rng):
+def test_early_stopping_stops_at_max_num_rounds(
+    num_rounds: int, calibrator_class, rng
+) -> None:
     df_train = pd.DataFrame(
         {
             "feature1": rng.rand(50),
@@ -1647,7 +1662,7 @@ def test_early_stopping_stops_at_max_num_rounds(num_rounds: int, calibrator_clas
 
 
 @pytest.mark.parametrize("calibrator_class", [methods.MCGrad, methods.RegressionMCGrad])
-def test_fit_with_provided_df_val_runs_without_errors(calibrator_class, rng):
+def test_fit_with_provided_df_val_runs_without_errors(calibrator_class, rng) -> None:
     # Setup: create training and validation datasets
 
     df_train = pd.DataFrame(
@@ -1727,7 +1742,7 @@ def test_fit_with_provided_df_val_runs_without_errors(calibrator_class, rng):
         methods.RegressionMCGrad,
     ],
 )
-def test_mce_correctly_setup_in_mcgrad(calibrator_class, rng):
+def test_mce_correctly_setup_in_mcgrad(calibrator_class, rng) -> None:
     # Check if the MCE is the right metric by looking at the name of the score function
 
     df_train = pd.DataFrame(
@@ -1772,7 +1787,7 @@ def test_mce_correctly_setup_in_mcgrad(calibrator_class, rng):
         methods.RegressionMCGrad,
     ],
 )
-def test_mce_parameters_correctly_setup_in_mcgrad(calibrator_class, rng):
+def test_mce_parameters_correctly_setup_in_mcgrad(calibrator_class, rng) -> None:
     # Check if the MCE's parameters are correctly set in the MCGrad object
 
     df_train = pd.DataFrame(
@@ -1829,7 +1844,7 @@ def test_mce_parameters_correctly_setup_in_mcgrad(calibrator_class, rng):
         methods.RegressionMCGrad,
     ],
 )
-def test_mcgrad_calls_score_func_during_early_stopping(calibrator_class, rng):
+def test_mcgrad_calls_score_func_during_early_stopping(calibrator_class, rng) -> None:
     # Check if the score function is called during early stopping
 
     mock_roc_auc_score = Mock(spec="skmetrics.roc_auc_score")
@@ -1915,7 +1930,7 @@ def test_early_stopping_with_multicalibration_error_metric(
 )
 def test_performance_metrics_dictionary_size_matches_number_of_rounds(
     calibrator_class, rng
-):
+) -> None:
     # Check if the performance metrics dictionary has the correct number of elements
 
     df_train = pd.DataFrame(
@@ -1976,7 +1991,7 @@ def test_performance_metrics_dictionary_size_matches_number_of_rounds(
     )
 
 
-def test_categorical_features_used_correctly_in_mcgrad_regressor():
+def test_categorical_features_used_correctly_in_mcgrad_regressor() -> None:
     # Create a dataset that can be perfectly fit only when categorical features are used appropriately, rather than ordinally
 
     uncalibrated_col = "uncalibrated"
@@ -2063,7 +2078,7 @@ def test_categorical_features_used_correctly_in_mcgrad_regressor():
     ],
 )
 @pytest.mark.parametrize("patience", [(4), (9)])
-def test_patience_in_mcgrad(patience: int, calibrator_class, rng):
+def test_patience_in_mcgrad(patience: int, calibrator_class, rng) -> None:
     # Check if the patience is correctly set in the MCGrad object: we use the dummy function that always increases the score
     # and check if the early stopping with a given patience stops at the correct round.
 
@@ -2128,7 +2143,7 @@ def test_patience_in_mcgrad(patience: int, calibrator_class, rng):
         methods.RegressionMCGrad,
     ],
 )
-def test_mcgrad_predict_with_num_rounds_0(calibrator_class, rng):
+def test_mcgrad_predict_with_num_rounds_0(calibrator_class, rng) -> None:
     # Check if the predictions are the same as the original prediction column when num_rounds=0
     df_train = pd.DataFrame(
         {
@@ -2185,7 +2200,9 @@ def test_mcgrad_predict_with_num_rounds_0(calibrator_class, rng):
         methods.RegressionMCGrad,
     ],
 )
-def test_mcgrad_number_rounds_after_fitting_with_0_rounds(calibrator_class, rng):
+def test_mcgrad_number_rounds_after_fitting_with_0_rounds(
+    calibrator_class, rng
+) -> None:
     # Check if the number of rounds is 0 after fitting with 0 rounds by checking the length of the mr attribute
     df_train = pd.DataFrame(
         {
@@ -2221,7 +2238,7 @@ def test_mcgrad_number_rounds_after_fitting_with_0_rounds(calibrator_class, rng)
 @pytest.mark.parametrize("calibrator_class", [methods.MCGrad, methods.RegressionMCGrad])
 def test_that_default_early_stopping_score_func_minimization_adheres_to_scikitlearn_convention(
     calibrator_class,
-):
+) -> None:
     mcb = calibrator_class()
     if mcb.early_stopping_score_func.name.endswith(
         "_loss"
@@ -2241,7 +2258,7 @@ def test_that_default_early_stopping_score_func_minimization_adheres_to_scikitle
 
 def test_mce_below_initial_and_mce_below_strong_evidence_threshold_are_false_when_mce_is_greater_than_THR(
     rng,
-):
+) -> None:
     df_train = pd.DataFrame(
         {
             "feature1": rng.randint(0, 3, 50),
@@ -2251,7 +2268,7 @@ def test_mce_below_initial_and_mce_below_strong_evidence_threshold_are_false_whe
         }
     )
 
-    def mce_sigma_scale_mock():
+    def mce_sigma_scale_mock() -> _ScoreFunctionInterface:
         class WrappedFuncMockMCE:
             name = "Multicalibration Error<br>(mce_sigma_scale)"
 
@@ -2307,7 +2324,7 @@ def test_mce_below_initial_and_mce_below_strong_evidence_threshold_are_false_whe
         methods.RegressionMCGrad,
     ],
 )
-def test_extract_features_categorical_features_overflow(calibrator_class):
+def test_extract_features_categorical_features_overflow(calibrator_class) -> None:
     mcgrad = calibrator_class(encode_categorical_variables=False)
     x_cat = np.array([np.iinfo(np.int32).max + 1, np.nan, 0])
     with pytest.raises(ValueError) as exc_info:
@@ -2327,7 +2344,7 @@ def test_extract_features_categorical_features_overflow(calibrator_class):
         methods.RegressionMCGrad,
     ],
 )
-def test_extract_features_categorical_features_negative(calibrator_class):
+def test_extract_features_categorical_features_negative(calibrator_class) -> None:
     mcgrad = calibrator_class(encode_categorical_variables=False)
     x_cat = np.array([-1, np.nan, 0])
     with pytest.raises(ValueError) as exc_info:
@@ -2347,7 +2364,7 @@ def test_extract_features_categorical_features_negative(calibrator_class):
         methods.RegressionMCGrad,
     ],
 )
-def test_extract_features_categorical_features_valid(calibrator_class):
+def test_extract_features_categorical_features_valid(calibrator_class) -> None:
     mcgrad = calibrator_class(encode_categorical_variables=False)
     x_cat = np.array([1, np.nan, 0])
     mcgrad._extract_features(
@@ -2364,7 +2381,7 @@ def test_extract_features_categorical_features_valid(calibrator_class):
         methods.RegressionMCGrad,
     ],
 )
-def test_extract_features_numerical_features_valid(calibrator_class):
+def test_extract_features_numerical_features_valid(calibrator_class) -> None:
     mcgrad = calibrator_class(encode_categorical_variables=False)
     x_num = np.array([1.0, np.nan, 0])
     mcgrad._extract_features(
@@ -2384,7 +2401,7 @@ def test_extract_features_numerical_features_valid(calibrator_class):
 @pytest.mark.parametrize("best_num_rounds", [(0), (1), (2), (3)])
 def test_mcgrad_early_stopping_returns_correct_number_of_rounds(
     calibrator_class, best_num_rounds: int
-):
+) -> None:
     data_len = 10
 
     x = np.arange(data_len)
@@ -2455,7 +2472,7 @@ def test_mcgrad_early_stopping_returns_correct_number_of_rounds(
         methods.RegressionMCGrad,
     ],
 )
-def test_cross_val_timeout_in_mcgrad(calibrator_class, rng):
+def test_cross_val_timeout_in_mcgrad(calibrator_class, rng) -> None:
     # Check if the cross validation timeout is correctly set in the MCGrad object: we use the dummy function that always increases the score
 
     data_len = 10
@@ -2592,7 +2609,9 @@ def test_cross_val_timeout_in_mcgrad(calibrator_class, rng):
         (methods.RegressionMCGrad, [1.0, 1.0], False),
     ],
 )
-def test_mcgrad__check_labels_fails_when_expected(calibrator_class, labels, is_valid):
+def test_mcgrad__check_labels_fails_when_expected(
+    calibrator_class, labels, is_valid
+) -> None:
     df = pd.DataFrame({"label": labels})
     calibrator = calibrator_class()
     if is_valid:
@@ -2633,7 +2652,7 @@ def test_mcgrad__check_labels_fails_when_expected(calibrator_class, labels, is_v
 )
 def test_mcgrad__check_predictions_fails_when_expected(
     calibrator_class, scores, is_valid
-):
+) -> None:
     df = pd.DataFrame({"score": scores})
     calibrator = calibrator_class()
     if is_valid:
@@ -2652,7 +2671,7 @@ def test_mcgrad__check_predictions_fails_when_expected(
 )
 def test_mcgrad__check_predictions_error_message_matches_cause(
     calibrator_class, scores, expected_match
-):
+) -> None:
     """Verify that the error message correctly identifies the type of invalid value."""
     df = pd.DataFrame({"score": scores})
     calibrator = calibrator_class()
@@ -2660,10 +2679,10 @@ def test_mcgrad__check_predictions_error_message_matches_cause(
         calibrator._check_predictions(df, "score")
 
 
-def test_basemcgrad_implementations_transform_inverse_transform_invariance():
+def test_basemcgrad_implementations_transform_inverse_transform_invariance() -> None:
     # Find all subclasses of _BaseMCGrad. This only works for classes that are imported in this file
     # so we're operating on the assumption that there's at least on other relevant test for any MCGrad implementation.
-    def get_all_subclasses(cls):
+    def get_all_subclasses(cls) -> list[type]:
         all_subclasses = []
         for subclass in cls.__subclasses__():
             all_subclasses.append(subclass)
@@ -2707,7 +2726,7 @@ def test_basemcgrad_implementations_transform_inverse_transform_invariance():
 )
 def test_mcgrad__check_segment_features_fails_when_expected(
     calibrator_class, cat_data, num_data, allow_missing, should_raise
-):
+) -> None:
     df = pd.DataFrame(cat_data + num_data)
     cat_colnames = [str(i) for i in range(len(cat_data))]
     num_colnames = [str(i) for i in range(len(cat_data), len(cat_data) + len(num_data))]
@@ -2752,7 +2771,7 @@ def test_mcgrad__determine_estimation_method(
     weights,
     scoring_function,
     expected_method,
-):
+) -> None:
     # For regression MCGrad we don't have a ESS threshold so we just run it for binary for now
     mcb = methods.MCGrad(
         early_stopping=True,
@@ -2798,7 +2817,7 @@ def test_mcgrad__get_output_presence_mask_works_correctly(
     segment,
     expected_mask,
     allow_missing_segment_features,
-):
+) -> None:
     df = pd.DataFrame({"score": scores, "segment": segment})
     mcb = calibrator_class(
         allow_missing_segment_feature_values=allow_missing_segment_features
@@ -2819,7 +2838,7 @@ def test_mcgrad__get_output_presence_mask_works_correctly(
         methods.RegressionMCGrad,
     ],
 )
-def test_mcgrad_internal_state_reset_when_fitting_again(calibrator_class, rng):
+def test_mcgrad_internal_state_reset_when_fitting_again(calibrator_class, rng) -> None:
     df_train = pd.DataFrame(
         {
             "feature1": rng.rand(50),
@@ -2887,7 +2906,9 @@ def test_mcgrad_internal_state_reset_when_fitting_again(calibrator_class, rng):
         methods.RegressionMCGrad,
     ],
 )
-def test_prepare_mcgrad_processed_data_matches_individual_operations(calibrator_class):
+def test_prepare_mcgrad_processed_data_matches_individual_operations(
+    calibrator_class,
+) -> None:
     df = generate_test_data(5)
     model = calibrator_class(early_stopping=False, num_rounds=1)
 
@@ -2933,7 +2954,7 @@ def test_prepare_mcgrad_processed_data_matches_individual_operations(calibrator_
         methods.RegressionMCGrad,
     ],
 )
-def test_prepare_mcgrad_processed_data_with_weights(calibrator_class):
+def test_prepare_mcgrad_processed_data_with_weights(calibrator_class) -> None:
     df = generate_test_data(5)
     df["Weight"] = np.array([1.0, 2.0, 1.0, 3.0, 1.0])
 
@@ -2962,7 +2983,7 @@ def test_prepare_mcgrad_processed_data_with_weights(calibrator_class):
 )
 def test_prepare_mcgrad_processed_data_presence_mask_with_nan_predictions(
     calibrator_class,
-):
+) -> None:
     df = generate_test_data(5)
     df.loc[2, "Prediction"] = np.nan
 
@@ -3006,7 +3027,7 @@ def test_determine_train_test_splitter_returns_correct_splitter(
     estimation_method,
     has_custom_validation_set,
     expected_splitter_type,
-):
+) -> None:
     # Setup: Create model instance
     model = calibrator_class(
         early_stopping=False,
@@ -3049,7 +3070,7 @@ def test_determine_train_test_splitter_returns_correct_splitter(
 )
 def test_determine_train_test_splitter_raises_error_for_cv_with_custom_validation_set(
     calibrator_class,
-):
+) -> None:
     # Setup: Create model instance
     model = calibrator_class(
         early_stopping=False,
@@ -3076,7 +3097,7 @@ def test_determine_train_test_splitter_raises_error_for_cv_with_custom_validatio
 )
 def test_determine_train_test_splitter_noop_splitter_returned(
     calibrator_class,
-):
+) -> None:
     # Setup: Create model instance
     model = calibrator_class(
         early_stopping=False,
@@ -3119,7 +3140,7 @@ def test_determine_n_folds_returns_correct_value(
     calibrator_class,
     estimation_method,
     expected_n_folds,
-):
+) -> None:
     # Setup: Create model instance
     model = calibrator_class(
         early_stopping=False,
@@ -3145,7 +3166,7 @@ def test_determine_n_folds_returns_correct_value(
 )
 def test_prepare_mcgrad_processed_data_presence_mask_with_out_of_bounds_predictions(
     calibrator_class,
-):
+) -> None:
     df = generate_test_data(5)
     df.loc[1, "Prediction"] = -0.1
     df.loc[3, "Prediction"] = 1.5
@@ -3175,7 +3196,7 @@ def test_prepare_mcgrad_processed_data_presence_mask_with_out_of_bounds_predicti
 )
 def test_prepare_mcgrad_processed_data_presence_mask_with_missing_segment_features(
     calibrator_class,
-):
+) -> None:
     df = generate_test_data(5)
     df.loc[2, "City"] = None
 
@@ -3199,7 +3220,7 @@ def test_prepare_mcgrad_processed_data_presence_mask_with_missing_segment_featur
     assert internal_data.output_presence_mask[[0, 1, 3, 4]].all()
 
 
-def test_platt_scaling_with_features_categorical_features(rng):
+def test_platt_scaling_with_features_categorical_features(rng) -> None:
     df = pd.DataFrame(
         {
             "prediction": rng.uniform(0.2, 0.8, 100),
@@ -3228,7 +3249,7 @@ def test_platt_scaling_with_features_categorical_features(rng):
     assert len(calibrator.ohe_columns) > 0
 
 
-def test_platt_scaling_with_features_numerical_features(rng):
+def test_platt_scaling_with_features_numerical_features(rng) -> None:
     df = pd.DataFrame(
         {
             "prediction": rng.uniform(0.2, 0.8, 100),
@@ -3257,7 +3278,7 @@ def test_platt_scaling_with_features_numerical_features(rng):
     assert len(calibrator.kbd_columns) > 0
 
 
-def test_platt_scaling_with_features_both_categorical_and_numerical(rng):
+def test_platt_scaling_with_features_both_categorical_and_numerical(rng) -> None:
     df = pd.DataFrame(
         {
             "prediction": rng.uniform(0.2, 0.8, 100),
@@ -3297,7 +3318,7 @@ def test_platt_scaling_with_features_both_categorical_and_numerical(rng):
         methods.RegressionMCGrad,
     ],
 )
-def test_predict_does_not_modify_input_predictions_array(calibrator_class, rng):
+def test_predict_does_not_modify_input_predictions_array(calibrator_class, rng) -> None:
     """
     Test that _predict does not modify the input predictions array in-place.
 
@@ -3362,7 +3383,9 @@ def test_predict_does_not_modify_input_predictions_array(calibrator_class, rng):
         methods.RegressionMCGrad,
     ],
 )
-def test_early_stopping_produces_same_model_as_manual_num_rounds(calibrator_class, rng):
+def test_early_stopping_produces_same_model_as_manual_num_rounds(
+    calibrator_class, rng
+) -> None:
     """
     Test that early stopping with N rounds produces the same model as manually setting num_rounds=N.
 
@@ -3455,7 +3478,9 @@ def test_early_stopping_produces_same_model_as_manual_num_rounds(calibrator_clas
         methods.RegressionMCGrad,
     ],
 )
-def test_multiple_predict_calls_produce_consistent_results(calibrator_class, rng):
+def test_multiple_predict_calls_produce_consistent_results(
+    calibrator_class, rng
+) -> None:
     """
     Test that calling predict multiple times on the same data produces identical results.
 
@@ -3514,7 +3539,7 @@ def test_multiple_predict_calls_produce_consistent_results(calibrator_class, rng
 
 def test_segmentwise_calibrator_with_no_categorical_features_equivalent_to_underlying_calibrator(
     rng,
-):
+) -> None:
     df = pd.DataFrame(
         {
             "prediction": rng.uniform(0.2, 0.8, 100),
@@ -3557,7 +3582,7 @@ def test_segmentwise_calibrator_with_no_categorical_features_equivalent_to_under
 
 def test_segmentwise_calibrator_falls_back_to_identity_mapping_for_single_class_segment(
     rng,
-):
+) -> None:
     df = pd.DataFrame(
         {
             "prediction": rng.uniform(0.2, 0.8, 100),
@@ -3585,7 +3610,9 @@ def test_segmentwise_calibrator_falls_back_to_identity_mapping_for_single_class_
     assert isinstance(calibrator.calibrator_per_segment["('B',)"], methods.PlattScaling)
 
 
-def test_segmentwise_calibrator_falls_back_to_identity_mapping_for_unseen_segment(rng):
+def test_segmentwise_calibrator_falls_back_to_identity_mapping_for_unseen_segment(
+    rng,
+) -> None:
     df_train = pd.DataFrame(
         {
             "prediction": rng.uniform(0.2, 0.8, 100),
@@ -3646,7 +3673,7 @@ def test_segmentwise_calibrator_falls_back_to_identity_mapping_for_unseen_segmen
 )
 def test_mcgrad_fit_does_not_modify_input_dataframe(
     calibrator_class, calibrator_kwargs
-):
+) -> None:
     df_train = pd.DataFrame(
         {
             "prediction": [0.1, 0.2, 0.3, 0.4, 0.5],
@@ -3695,7 +3722,7 @@ def test_mcgrad_fit_does_not_modify_input_dataframe(
 )
 def test_mcgrad_predict_does_not_modify_input_dataframe(
     calibrator_class, calibrator_kwargs
-):
+) -> None:
     df_train = pd.DataFrame(
         {
             "prediction": [0.1, 0.2, 0.3, 0.4, 0.5],
@@ -3746,7 +3773,7 @@ def test_mcgrad_predict_does_not_modify_input_dataframe(
 )
 def test_simple_calibrator_fit_does_not_modify_input_dataframe(
     calibrator_class, calibrator_kwargs, rng
-):
+) -> None:
     df_train = pd.DataFrame(
         {
             "prediction": rng.uniform(0.1, 0.9, 50),
@@ -3780,7 +3807,7 @@ def test_simple_calibrator_fit_does_not_modify_input_dataframe(
 )
 def test_simple_calibrator_predict_does_not_modify_input_dataframe(
     calibrator_class, calibrator_kwargs, rng
-):
+) -> None:
     df_train = pd.DataFrame(
         {
             "prediction": rng.uniform(0.1, 0.9, 50),
@@ -3811,7 +3838,7 @@ def test_simple_calibrator_predict_does_not_modify_input_dataframe(
     pd.testing.assert_frame_equal(df_test, df_test_original)
 
 
-def test_platt_scaling_with_features_fit_does_not_modify_input_dataframe(rng):
+def test_platt_scaling_with_features_fit_does_not_modify_input_dataframe(rng) -> None:
     df_train = pd.DataFrame(
         {
             "prediction": rng.uniform(0.1, 0.9, 100),
@@ -3837,7 +3864,9 @@ def test_platt_scaling_with_features_fit_does_not_modify_input_dataframe(rng):
     pd.testing.assert_frame_equal(df_train, df_train_original)
 
 
-def test_platt_scaling_with_features_predict_does_not_modify_input_dataframe(rng):
+def test_platt_scaling_with_features_predict_does_not_modify_input_dataframe(
+    rng,
+) -> None:
     df_train = pd.DataFrame(
         {
             "prediction": rng.uniform(0.1, 0.9, 100),
@@ -3876,7 +3905,7 @@ def test_platt_scaling_with_features_predict_does_not_modify_input_dataframe(rng
     pd.testing.assert_frame_equal(df_test, df_test_original)
 
 
-def test_segmentwise_calibrator_fit_does_not_modify_input_dataframe(rng):
+def test_segmentwise_calibrator_fit_does_not_modify_input_dataframe(rng) -> None:
     df_train = pd.DataFrame(
         {
             "prediction": rng.uniform(0.1, 0.9, 100),
@@ -3900,7 +3929,7 @@ def test_segmentwise_calibrator_fit_does_not_modify_input_dataframe(rng):
     pd.testing.assert_frame_equal(df_train, df_train_original)
 
 
-def test_segmentwise_calibrator_predict_does_not_modify_input_dataframe(rng):
+def test_segmentwise_calibrator_predict_does_not_modify_input_dataframe(rng) -> None:
     df_train = pd.DataFrame(
         {
             "prediction": rng.uniform(0.1, 0.9, 100),
@@ -3962,7 +3991,7 @@ def test_segmentwise_calibrator_predict_does_not_modify_input_dataframe(rng):
 )
 def test_mcgrad_early_stopping_crossvalidation_does_not_modify_input_dataframe(
     calibrator_class, calibrator_kwargs
-):
+) -> None:
     df_train = pd.DataFrame(
         {
             "prediction": [0.1, 0.2, 0.3, 0.4, 0.5],
@@ -4011,7 +4040,7 @@ def test_mcgrad_early_stopping_crossvalidation_does_not_modify_input_dataframe(
 )
 def test_mcgrad_early_stopping_holdout_does_not_modify_input_dataframe(
     calibrator_class, calibrator_kwargs, rng
-):
+) -> None:
     df_train = pd.DataFrame(
         {
             "prediction": rng.uniform(0.1, 0.9, 50),
@@ -4047,7 +4076,7 @@ def test_mcgrad_early_stopping_holdout_does_not_modify_input_dataframe(
     pd.testing.assert_frame_equal(df_val, df_val_original)
 
 
-def test_segmentwise_calibrator_ambiguous_segment_keys():
+def test_segmentwise_calibrator_ambiguous_segment_keys() -> None:
     """When multiple categorical features are joined with '_', ambiguous keys can occur.
     For example, features ["A_B", "C"] and ["A", "B_C"] both produce "A_B_C".
     This test verifies that such cases are handled correctly.
@@ -4077,14 +4106,14 @@ def test_segmentwise_calibrator_ambiguous_segment_keys():
     )
 
 
-def test_additive_adjustment_fit_does_not_crash_on_zero_sum_weights():
+def test_additive_adjustment_fit_does_not_crash_on_zero_sum_weights() -> None:
     df = pd.DataFrame({"prediction": [0.1], "label": [0], "weight": [0]})
     cal = methods.AdditiveAdjustment()
     cal.fit(df, "prediction", "label", "weight")
     assert cal.offset == 0.0
 
 
-def test_platt_scaling_with_features_fit_does_not_crash_on_single_class():
+def test_platt_scaling_with_features_fit_does_not_crash_on_single_class() -> None:
     df = pd.DataFrame(
         {"prediction": [0.1, 0.2, 0.3], "label": [0, 0, 0], "cat": ["a", "b", "a"]}
     )
@@ -4096,7 +4125,7 @@ def test_platt_scaling_with_features_fit_does_not_crash_on_single_class():
     np.testing.assert_allclose(preds, df["prediction"].values)
 
 
-def test_segmentwise_calibrator_fit_does_not_crash_on_empty_dataframe():
+def test_segmentwise_calibrator_fit_does_not_crash_on_empty_dataframe() -> None:
     # Bug 3: SegmentwiseCalibrator.predict crashes on empty DataFrame
     cal = methods.SegmentwiseCalibrator(methods.IdentityCalibrator)
     df_train = pd.DataFrame({"p": [0.1], "y": [0], "s": ["a"]})
@@ -4107,7 +4136,7 @@ def test_segmentwise_calibrator_fit_does_not_crash_on_empty_dataframe():
     assert len(preds) == 0
 
 
-def test_segmentwise_calibrator_second_fit_clears_stale_segments(rng):
+def test_segmentwise_calibrator_second_fit_clears_stale_segments(rng) -> None:
     df_first = pd.DataFrame(
         {
             "prediction": rng.uniform(0.2, 0.8, 60),
@@ -4144,7 +4173,7 @@ def test_segmentwise_calibrator_second_fit_clears_stale_segments(rng):
     assert "('C',)" in calibrator.calibrator_per_segment
 
 
-def test_mcgrad_subclass_defaults_missing_lightgbm_params():
+def test_mcgrad_subclass_defaults_missing_lightgbm_params() -> None:
     class SubMCGrad(methods._BaseMCGrad):
         DEFAULT_HYPERPARAMS = {
             "monotone_t": False,
@@ -4153,43 +4182,54 @@ def test_mcgrad_subclass_defaults_missing_lightgbm_params():
             "n_folds": 5,
         }
 
-        def _objective(self):
+        @property
+        def _objective(self) -> str:
             return "binary"
 
         @property
-        def _default_early_stopping_metric(self):
-            m = Mock(spec=_ScoreFunctionInterface)
+        def _default_early_stopping_metric(
+            self,
+        ) -> tuple[_ScoreFunctionInterface, bool]:
+            m: _ScoreFunctionInterface = Mock(spec=_ScoreFunctionInterface)
             m.name = "mock_metric"
             return m, True
 
-        def _transform_predictions(self, p):
-            return p
+        @staticmethod
+        def _transform_predictions(predictions: np.ndarray) -> np.ndarray:
+            return predictions
 
-        def _inverse_transform_predictions(self, p):
-            return p
+        @staticmethod
+        def _inverse_transform_predictions(transformed: np.ndarray) -> np.ndarray:
+            return transformed
 
-        def _compute_unshrink_factor(self, y, p, w):
+        @staticmethod
+        def _compute_unshrink_factor(
+            y: np.ndarray, predictions: np.ndarray, w: np.ndarray | None
+        ) -> float:
             return 1.0
 
-        def _check_predictions(self, df, col):
+        def _check_predictions(
+            self, df_train: pd.DataFrame, prediction_column_name: str
+        ) -> None:
             pass
 
-        def _check_labels(self, df, col):
+        def _check_labels(self, df_train: pd.DataFrame, label_column_name: str) -> None:
             pass
 
-        def _predictions_out_of_bounds(self, p):
-            return np.zeros_like(p, dtype=bool)
+        @staticmethod
+        def _predictions_out_of_bounds(predictions: np.ndarray) -> np.ndarray:
+            return np.zeros_like(predictions, dtype=bool)
 
         @property
-        def _cv_splitter(self):
+        def _cv_splitter(self) -> KFold | StratifiedKFold:
             return Mock()
 
         @property
-        def _holdout_splitter(self):
+        def _holdout_splitter(self) -> utils.TrainTestSplitWrapper:
             return Mock()
 
         @property
-        def _noop_splitter(self):
+        def _noop_splitter(self) -> utils.NoopSplitterWrapper:
             return Mock()
 
     # This should not raise KeyError
@@ -4197,7 +4237,7 @@ def test_mcgrad_subclass_defaults_missing_lightgbm_params():
     assert isinstance(model.lightgbm_params, dict)
 
 
-def test_mcgrad_default_minimization_behavior():
+def test_mcgrad_default_minimization_behavior() -> None:
     class AUCCalibrator(methods._BaseMCGrad):
         DEFAULT_HYPERPARAMS = {
             "monotone_t": False,
@@ -4207,44 +4247,55 @@ def test_mcgrad_default_minimization_behavior():
             "lightgbm_params": {},
         }
 
-        def _objective(self):
+        @property
+        def _objective(self) -> str:
             return "binary"
 
         @property
-        def _default_early_stopping_metric(self):
-            m = Mock(spec=_ScoreFunctionInterface)
+        def _default_early_stopping_metric(
+            self,
+        ) -> tuple[_ScoreFunctionInterface, bool]:
+            m: _ScoreFunctionInterface = Mock(spec=_ScoreFunctionInterface)
             m.name = "auc"
             # Return tuple with minimize=False since AUC should be maximized
             return m, False
 
-        def _transform_predictions(self, p):
-            return p
+        @staticmethod
+        def _transform_predictions(predictions: np.ndarray) -> np.ndarray:
+            return predictions
 
-        def _inverse_transform_predictions(self, p):
-            return p
+        @staticmethod
+        def _inverse_transform_predictions(transformed: np.ndarray) -> np.ndarray:
+            return transformed
 
-        def _compute_unshrink_factor(self, y, p, w):
+        @staticmethod
+        def _compute_unshrink_factor(
+            y: np.ndarray, predictions: np.ndarray, w: np.ndarray | None
+        ) -> float:
             return 1.0
 
-        def _check_predictions(self, df, col):
+        def _check_predictions(
+            self, df_train: pd.DataFrame, prediction_column_name: str
+        ) -> None:
             pass
 
-        def _check_labels(self, df, col):
+        def _check_labels(self, df_train: pd.DataFrame, label_column_name: str) -> None:
             pass
 
-        def _predictions_out_of_bounds(self, p):
-            return np.zeros_like(p, dtype=bool)
+        @staticmethod
+        def _predictions_out_of_bounds(predictions: np.ndarray) -> np.ndarray:
+            return np.zeros_like(predictions, dtype=bool)
 
         @property
-        def _cv_splitter(self):
+        def _cv_splitter(self) -> KFold | StratifiedKFold:
             return Mock()
 
         @property
-        def _holdout_splitter(self):
+        def _holdout_splitter(self) -> utils.TrainTestSplitWrapper:
             return Mock()
 
         @property
-        def _noop_splitter(self):
+        def _noop_splitter(self) -> utils.NoopSplitterWrapper:
             return Mock()
 
     # The tuple return type ensures minimize_score is set correctly from the metric
@@ -4265,7 +4316,7 @@ def test_mcgrad_default_minimization_behavior():
 )
 def test_compute_unshrink_factor_gives_expected_result(
     labels, predictions, expected_result
-):
+) -> None:
     assert (
         pytest.approx(
             methods.MCGrad._compute_unshrink_factor(labels, predictions, None), 0.0001
@@ -4274,7 +4325,7 @@ def test_compute_unshrink_factor_gives_expected_result(
     )
 
 
-def test_weighted_unshrink_gives_expected_result():
+def test_weighted_unshrink_gives_expected_result() -> None:
     y = np.array([0, 1, 0, 0, 0, 0])
     t = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
     weights = np.array([1, 3, 1, 1, 1, 2])
@@ -4290,7 +4341,7 @@ def test_weighted_unshrink_gives_expected_result():
     assert np.isclose(unshrink_factor_weighted, unshrink_factor_unweighted)
 
 
-def test_compute_unshrink_factor_does_not_modify_input_arrays(rng):
+def test_compute_unshrink_factor_does_not_modify_input_arrays(rng) -> None:
     y = rng.randint(0, 2, 50).astype(float)
     logits = rng.uniform(-2, 2, 50)
     w = rng.uniform(0.5, 2.0, 50)
@@ -4306,7 +4357,7 @@ def test_compute_unshrink_factor_does_not_modify_input_arrays(rng):
     np.testing.assert_array_equal(w, w_original)
 
 
-def test_compute_unshrink_factor_warns_when_not_close_to_1(caplog):
+def test_compute_unshrink_factor_warns_when_not_close_to_1(caplog) -> None:
     y = np.array([0, 1, 0, 1, 1])
     predictions = np.array([0.1, 0.2, 0.3, 0.4, 0.5])
 
@@ -4318,7 +4369,7 @@ def test_compute_unshrink_factor_warns_when_not_close_to_1(caplog):
     assert "Unshrink is not close to 1" in caplog.text
 
 
-def generate_soft_label_test_data(n, rng):
+def generate_soft_label_test_data(n, rng) -> pd.DataFrame:
     """Generate test data with soft labels (float confidence scores in [0, 1])."""
     return pd.DataFrame(
         {
@@ -4330,7 +4381,7 @@ def generate_soft_label_test_data(n, rng):
     )
 
 
-def test_soft_label_log_loss_matches_sklearn_for_binary_labels():
+def test_soft_label_log_loss_matches_sklearn_for_binary_labels() -> None:
     y_true = np.array([0, 1, 1, 0, 1])
     y_pred = np.array([0.1, 0.9, 0.8, 0.2, 0.7])
     expected = skmetrics.log_loss(y_true, y_pred)
@@ -4338,7 +4389,7 @@ def test_soft_label_log_loss_matches_sklearn_for_binary_labels():
     np.testing.assert_almost_equal(result, expected, decimal=10)
 
 
-def test_soft_label_log_loss_with_sample_weight():
+def test_soft_label_log_loss_with_sample_weight() -> None:
     y_true = np.array([0, 1, 1, 0, 1])
     y_pred = np.array([0.1, 0.9, 0.8, 0.2, 0.7])
     weights = np.array([1.0, 2.0, 1.0, 1.0, 2.0])
@@ -4347,7 +4398,7 @@ def test_soft_label_log_loss_with_sample_weight():
     np.testing.assert_almost_equal(result, expected, decimal=10)
 
 
-def test_soft_label_log_loss_with_soft_labels():
+def test_soft_label_log_loss_with_soft_labels() -> None:
     y_true = np.array([0.3, 0.7, 0.5])
     y_pred = np.array([0.3, 0.7, 0.5])
     # Perfect calibration: cross-entropy = -[y*log(y) + (1-y)*log(1-y)]
@@ -4382,7 +4433,7 @@ def test_soft_label_log_loss_with_soft_labels():
 def test_mcgrad_fit_predict_with_soft_labels_yields_valid_predictions(
     calibrator_kwargs,
     rng,
-):
+) -> None:
     """MCGrad should fit and predict with float labels in [0, 1]."""
     df_train = generate_soft_label_test_data(100, rng)
     df_test = generate_soft_label_test_data(20, rng)
@@ -4406,7 +4457,7 @@ def test_mcgrad_fit_predict_with_soft_labels_yields_valid_predictions(
     assert not np.any(np.isnan(predictions))
 
 
-def test_mcgrad_soft_labels_serialize_deserialize_consistent_predictions(rng):
+def test_mcgrad_soft_labels_serialize_deserialize_consistent_predictions(rng) -> None:
     df_train = generate_soft_label_test_data(50, rng)
     df_test = generate_soft_label_test_data(10, rng)
 
@@ -4440,7 +4491,7 @@ def test_mcgrad_soft_labels_serialize_deserialize_consistent_predictions(rng):
     np.testing.assert_array_equal(original_predictions, deserialized_predictions)
 
 
-def test_mcgrad_soft_labels_does_not_raise_with_boundary_values():
+def test_mcgrad_soft_labels_does_not_raise_with_boundary_values() -> None:
     """MCGrad should handle soft labels that include exact 0 and 1 values mixed with floats."""
     df_train = pd.DataFrame(
         {
@@ -4471,7 +4522,7 @@ def test_mcgrad_soft_labels_does_not_raise_with_boundary_values():
     assert np.all(predictions >= 0) and np.all(predictions <= 1)
 
 
-def test_mcgrad_compute_unshrink_factor_with_soft_labels_is_finite(rng):
+def test_mcgrad_compute_unshrink_factor_with_soft_labels_is_finite(rng) -> None:
     n = 100
     y_soft = rng.uniform(0, 1, size=n)
     predictions = rng.normal(0, 1, size=n)
@@ -4481,7 +4532,7 @@ def test_mcgrad_compute_unshrink_factor_with_soft_labels_is_finite(rng):
     assert np.isfinite(factor)
 
 
-def test_mcgrad_compute_unshrink_factor_same_for_binary_labels(rng):
+def test_mcgrad_compute_unshrink_factor_same_for_binary_labels(rng) -> None:
     """Near-binary soft labels should produce approximately the same unshrink
     coefficient as exact binary labels."""
     n = 100
@@ -4507,7 +4558,7 @@ def test_mcgrad_compute_unshrink_factor_same_for_binary_labels(rng):
     np.testing.assert_almost_equal(factor_standard, factor_expanded, decimal=3)
 
 
-def test_mcgrad_binary_labels_unchanged():
+def test_mcgrad_binary_labels_unchanged() -> None:
     """Existing binary label behavior should be unaffected by soft label changes."""
     df_train = generate_test_data(5)
     model = methods.MCGrad(
@@ -4536,7 +4587,7 @@ def test_mcgrad_binary_labels_unchanged():
     "calibrator_class",
     [methods.MCGrad, methods.RegressionMCGrad],
 )
-def test_reset_training_state_restores_fresh_state(calibrator_class):
+def test_reset_training_state_restores_fresh_state(calibrator_class) -> None:
     """Every fit-mutated attribute must be cleared by ``_reset_training_state``.
 
     Calibrators reuse a single instance across repeated fits (e.g. during
@@ -4605,7 +4656,7 @@ def test_reset_training_state_restores_fresh_state(calibrator_class):
     "calibrator_class",
     [methods.MCGrad, methods.RegressionMCGrad],
 )
-def test_serialize_deserialize_roundtrip_restores_full_config(calibrator_class):
+def test_serialize_deserialize_roundtrip_restores_full_config(calibrator_class) -> None:
     """Schema-v1 serialize/deserialize restores the user-controllable config.
 
     Prior to schema v1, ``deserialize`` called ``cls()`` with no arguments, so
@@ -4681,7 +4732,7 @@ def test_deserialize_rejects_unknown_schema_version() -> None:
         methods.MCGrad.deserialize(json.dumps(payload))
 
 
-def test_serialize_deserialize_roundtrip_holdout_early_stopping():
+def test_serialize_deserialize_roundtrip_holdout_early_stopping() -> None:
     """Guard against regressions in the HOLDOUT early-stopping roundtrip.
 
     ``__init__`` sets ``self.n_folds = 1`` internally in HOLDOUT mode but
@@ -4714,14 +4765,14 @@ def test_serialize_deserialize_roundtrip_holdout_early_stopping():
     assert restored.n_folds == 1
 
 
-def test_multiplicative_adjustment_predict_before_fit_raises_error():
+def test_multiplicative_adjustment_predict_before_fit_raises_error() -> None:
     cal = methods.MultiplicativeAdjustment()
     df = pd.DataFrame({"prediction": [0.1, 0.2, 0.3]})
     with pytest.raises(ValueError, match="predict.*before fit"):
         cal.predict(df, "prediction")
 
 
-def test_additive_adjustment_predict_before_fit_raises_error():
+def test_additive_adjustment_predict_before_fit_raises_error() -> None:
     cal = methods.AdditiveAdjustment()
     df = pd.DataFrame({"prediction": [0.1, 0.2, 0.3]})
     with pytest.raises(ValueError, match="predict.*before fit"):
