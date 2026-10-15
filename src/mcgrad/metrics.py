@@ -365,15 +365,19 @@ def youdens_j(
     pos_mask = labels == 1
     neg_mask = labels == 0
 
+    # pyrefly: ignore [unsupported-operation]
     pos_weight = sample_weight[pos_mask].sum()
+    # pyrefly: ignore [unsupported-operation]
     neg_weight = sample_weight[neg_mask].sum()
 
     mean_score_pos = (
+        # pyrefly: ignore [unsupported-operation]
         (predicted_scores[pos_mask] * sample_weight[pos_mask]).sum() / pos_weight
         if pos_weight > 0
         else 0.0
     )
     mean_score_neg = (
+        # pyrefly: ignore [unsupported-operation]
         (predicted_scores[neg_mask] * sample_weight[neg_mask]).sum() / neg_weight
         if neg_weight > 0
         else 0.0
@@ -680,6 +684,7 @@ def fpr_at_precision(
         sample_weight = np.ones_like(y_scores)
 
     neg_mask = y_true == 0
+    # pyrefly: ignore [unsupported-operation]
     negatives = sample_weight[neg_mask].sum()
     # if there are no negatives in the data, fpr is undefined
     if negatives == 0:
@@ -700,6 +705,7 @@ def fpr_at_precision(
 
     threshold_at_precision_target = np.min(thresholds_at_target_precision)
 
+    # pyrefly: ignore [unsupported-operation]
     false_positives = sample_weight[
         neg_mask & (y_scores >= threshold_at_precision_target)
     ].sum()
@@ -805,6 +811,7 @@ def _calculate_cumulative_differences(
             sample_weight[sorted_indices] if sample_weight is not None else None
         )
 
+    # pyrefly: ignore [missing-attribute]
     if not segments.shape[1] == labels.shape[0] == predicted_scores.shape[0]:
         raise ValueError("Segments must be the same length as labels/predictions.")
 
@@ -818,6 +825,7 @@ def _calculate_cumulative_differences(
     differences[:, 0] = 0
 
     # Compute segment weights once — was computed twice in the original code
+    # pyrefly: ignore [unsupported-operation]
     segment_weights = segments * sample_weight
     weighted_diff = np.multiply(segment_weights, (labels - predicted_scores))
     normalization = segment_weights.sum(axis=1)[:, np.newaxis]
@@ -879,6 +887,7 @@ def _ecce_standard_deviation_per_segment(
     if segments is None:
         segments = np.ones(shape=(1, len(predicted_scores)), dtype=np.bool_)
 
+    # pyrefly: ignore [missing-attribute]
     if segments.shape[1] != predicted_scores.shape[0]:
         raise ValueError("Segments must be the same length as labels/predictions.")
 
@@ -888,6 +897,7 @@ def _ecce_standard_deviation_per_segment(
     )
     # Compute segments * sample_weight once; reused for both numerator and denominator.
     variance_preds = predicted_scores * (1 - predicted_scores)
+    # pyrefly: ignore [unsupported-operation]
     segment_weights = segments * sample_weight
     variance_weighted_segments = np.multiply(
         segment_weights, sample_weight * variance_preds
@@ -936,14 +946,17 @@ def _ecce_regression_standard_deviation_per_segment(
     if segments is None:
         segments = np.ones(shape=(1, len(predicted_scores)), dtype=np.bool_)
 
+    # pyrefly: ignore [missing-attribute]
     if segments.shape[1] != predicted_scores.shape[0]:
         raise ValueError("Segments must be the same length as labels/predictions.")
 
+    # pyrefly: ignore [missing-attribute]
     n_segments = segments.shape[0]
     ecce_std_dev = np.zeros(n_segments, dtype=precision_dtype)
     residuals = labels - predicted_scores
 
     for k in range(n_segments):
+        # pyrefly: ignore [unsupported-operation]
         mask = segments[k]
         indices = np.where(mask)[0]
         n_k = len(indices)
@@ -953,6 +966,7 @@ def _ecce_regression_standard_deviation_per_segment(
             continue
 
         r_segment = residuals[indices]
+        # pyrefly: ignore [unsupported-operation]
         w_segment = sample_weight[indices]
 
         diff_r = np.diff(r_segment)
@@ -1028,6 +1042,7 @@ def _ecce_cdf(
 
     if np.any(x <= 0):
         raise ValueError(
+            # pyrefly: ignore [bad-index]
             f"Can only evaluate ECCE CDF at positive x, not at {x[x <= 0]}"
         )
 
@@ -1038,6 +1053,7 @@ def _ecce_cdf(
     if not np.any(needs_computation):
         return float(result[0]) if scalar_input else result
 
+    # pyrefly: ignore [bad-index]
     xc = x[needs_computation]
 
     fact = 4.0 / math.sqrt(2.0 * math.pi) * (1.0 / xc + xc / math.pi**2)
@@ -1222,6 +1238,7 @@ def unjoined_ecce(
         sample_weight = np.ones_like(predicted_scores, dtype=np.float64)
     else:
         sample_weight = np.asarray(sample_weight)
+        # pyrefly: ignore [missing-attribute]
         if sample_weight.shape[0] != predicted_scores.shape[0]:
             raise ValueError(
                 "sample_weight must be the same length as predicted_scores."
