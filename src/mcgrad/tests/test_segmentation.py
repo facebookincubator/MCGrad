@@ -264,7 +264,7 @@ def test_that_collapse_infrequent_values_collapses_all_values_to_collapse_value_
     ],
 )
 def test_that_collapse_infrequent_values_collapses_correctly_for_happy_path(
-    test_array, expected
+    test_array: pd.Series, expected: npt.NDArray[np.str_]
 ) -> None:
     results = segmentation.collapse_infrequent_values(
         values=test_array,
