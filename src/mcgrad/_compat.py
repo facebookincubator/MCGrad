@@ -13,8 +13,7 @@ from sklearn.preprocessing import KBinsDiscretizer
 _PANDAS_GROUPBY_INCLUDE_GROUPS: bool
 try:
     _pandas_version: tuple[int, ...] = tuple(
-        int(x)
-        for x in pd.__version__.split(".")[:2]  # pyre-ignore[16]
+        int(x) for x in pd.__version__.split(".")[:2]
     )
     _PANDAS_GROUPBY_INCLUDE_GROUPS = _pandas_version >= (2, 2)
 except (ValueError, AttributeError):

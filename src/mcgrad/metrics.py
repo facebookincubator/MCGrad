@@ -1320,7 +1320,6 @@ def _rank_calibration_error(
     :return: tuple (RCE, label_cdfs, prediction_cdfs)
     """
     # break ties
-    # pyrefly: ignore [bad-argument-type]
     rng = np.random.RandomState(42) if rng is None else rng
     eps = rng.uniform(0, 1, labels.shape[0]) * CALIBRATION_ERROR_EPSILON
     labels = labels + eps
@@ -2128,7 +2127,6 @@ def soft_label_log_loss(
     return float(np.mean(loss))
 
 
-# pyre-ignore[16]: Setting __name__ so wrap_sklearn_metric_func
 # identifies this metric as "log_loss" for early-stopping heuristics.
 soft_label_log_loss.__name__ = "log_loss"
 

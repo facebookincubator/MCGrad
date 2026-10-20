@@ -471,7 +471,6 @@ class _BaseMCGrad(
             {
                 # Ordering of features here relies on two things 1) that MCGrad.extract_features returns first categoricals then
                 # numericals and 2) that .fit method concatenates logits to the end of the feature matrix
-                # pyre-ignore[58] if either feature_names attribute is None an error is raised above
                 "feature": self.categorical_feature_names
                 + self.numerical_feature_names
                 + [self._PREDICTION_FEATURE_NAME],
