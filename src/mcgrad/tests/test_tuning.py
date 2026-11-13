@@ -203,6 +203,7 @@ def test_tuning_analyses_log_failures(
     ]
     assert len(error_records) == 1
     assert error_records[0].exc_info is not None
+    # pyrefly: ignore [unsupported-operation]
     assert str(error_records[0].exc_info[1]) == "analysis failed"
 
 
