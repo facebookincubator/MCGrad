@@ -1802,6 +1802,7 @@ class MCGrad(_BaseMCGrad):
         if num_out_of_bounds > 0:
             pct_out_of_bounds = 100.0 * num_out_of_bounds / len(predictions)
             logger.warning(
+                # pyrefly: ignore [invalid-argument]
                 f"Found {num_out_of_bounds} ({pct_out_of_bounds:.2f}%) predictions with extreme values (boundaries: [{lower_prob_bound:.6g}, {upper_prob_bound:.6g}]). "
                 f"These samples will be clipped in the unshrink step. Consider reviewing input prediction quality."
             )
